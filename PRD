@@ -1,0 +1,141 @@
+Product Requirements Document (PRD): OppoProfile
+1. Executive Summary
+OppoProfile is an extensible, AI-driven platform designed to interface with web-based board games (specifically Azul via buddyboardgames.com). It serves as a bridge between the game's web UI and custom Machine Learning (ML) models. The platform enables automated "Machine Players" to compete in the game while "Profiling Agents" observe, record, and analyze player behavior to build behavioral profiles.
+
+2. Scope & Objectives
+Play Engine: Utilize headless browser automation to parse game states and execute moves.
+
+Modularity: Decouple the game logic, the Machine Players, and the Profiling Agents.
+
+Extensibility: Provide standardized API endpoints so external developers can plug in custom AI models (either as players, profilers, or a unified combination of both).
+
+Data Integrity: Maintain a rigorous, ledger of all game states and player moves.
+
+3. User Interface (UI) Requirements
+The web interface for OppoProfile acts as the control panel for the automated sessions.
+
+3.1. Session Configuration Page
+Game Platform Field: Editable text field to input the target game URL.
+
+Room Details: Read-only displays for the generated/connected Room Number and Room URL.
+
+Player Selection: Dropdown/toggle selection to assign up to 4 players. Options must include human players or specific registered Machine Players.
+
+Profiler Configuration: * Dropdown to select a single Profiling Agent.
+
+Checkboxes to select which specific players in the current room the agent should profile.
+
+3.2. Game Replay Page (Placeholder)
+A dedicated view to reconstruct past games using the saved historical game state data.
+
+Includes basic playback controls (Play, Pause, Next Step, Previous Step, Jump to Turn).
+
+4. Functional Requirements
+4.1. The Play Engine (Playwright Integration)
+State Retrieval: The engine must continuously monitor the DOM, parse the visual state of Azul (factories, center pool, player boards, floor lines, scores), and translate it into a structured JSON format.
+
+Action Execution: The engine must translate JSON commands from the Machine Player back into precise UI interactions (clicks, drags) on the web platform.
+
+Status Tracking: Capture win/loss conditions, total scores, and game-over triggers.
+
+4.2. Machine Player Architecture
+Game State Feed: OppoProfile must push the parsed game state to the active Machine Player at the start of every turn without data loss.
+
+Decision Loop: The Machine Player ingests the state, computes the optimal move via its ML algorithm, and returns the action to the Play Engine.
+
+4.3. Profiling Agent Architecture
+Passive Observation: The Profiling Agent receives real-time or post-game access to the complete move ledger.
+
+Unified Model Support: The architecture must allow a single external AI model to act as both the Machine Player and the Profiling Agent simultaneously, enabling dynamic strategies (e.g., "testing" an opponent's playstyle by making specific moves and observing the reaction).
+
+4.4. Game Ledger & Logging
+OppoProfile must record every action in an immutable log.
+
+Log Data Points: Player Name, System Tag Name (e.g., "YOLO-Player-v1"), Move Description, Game State Before Move, Game State After Move, and Time Taken (in milliseconds) for the decision.
+
+5. Technical Architecture & Data Structures
+5.1. API Endpoints
+To ensure extensibility for other users and models, the platform will expose standard REST or WebSocket APIs.
+
+POST /api/player/action
+
+Payload: Current game state JSON.
+
+Response: The action the Machine Player wants to take.
+
+GET /api/history/{room_id}
+
+Response: Full historical log of the requested game.
+
+POST /api/profiler/ingest
+
+Payload: Push notification of a newly completed turn/move for the Profiling Agent to analyze.
+
+5.2. Core Data Structures (JSON)
+Game Status Object (Draft)
+
+JSON
+{
+  "timestamp": "2026-04-05T15:38:37Z",
+  "room_id": "123678",
+  "current_turn": "player_2",
+  "game_state": {
+    "factories": [[1, 1, 2, 3], [4, 4, 5, 1], ...],
+    "center_pool": [2, 3, 5],
+    "players": {
+      "player_1": {
+        "name": "Human_Alice",
+        "score": 14,
+        "pattern_lines": [[1, null], [2, 2, null], ...],
+        "wall": [[true, false, false...], ...],
+        "floor_line": [1, 1]
+      },
+      "player_2": {
+        "name": "Agent_Bot_V1",
+        "score": 18,
+        "pattern_lines": [...],
+        "wall": [...],
+        "floor_line": []
+      }
+    }
+  }
+}
+Action Record Object
+
+JSON
+{
+  "step_id": 42,
+  "player_name": "Agent_Bot_V1",
+  "system_tag_name": "ML_Alpha_01",
+  "action": {
+    "source": "factory_3",
+    "color": 2,
+    "destination_pattern_line": 1
+  },
+  "time_taken_ms": 1450,
+  "result_status": "success"
+}
+6. Developer Instructions (Prompt for Claude)
+Copy and paste the following block directly to Claude to initiate the development phase.
+
+System Context:
+You are an expert Full-Stack Software Engineer and QA Automation Specialist. We are building a platform called "OppoProfile". It is an AI-driven framework that interfaces with the web-based board game Azul (hosted at https://buddyboardgames.com/azul).
+
+Your immediate objectives for Phase 1 are:
+
+1. Understand the Rules of Azul:
+Before writing any code, search your knowledge base to fully understand the rules, scoring mechanics, and progression of the board game Azul. You must understand how tiles are drafted from factories, placed on pattern lines, moved to the wall, and how floor penalties work.
+
+2. Explore and Map the Platform (Playwright):
+Write a Python script utilizing playwright to navigate to a sample room (e.g., https://buddyboardgames.com/azul?room=MTIzNjc4).
+
+Your script needs to map the UI elements of this specific platform to your understanding of the Azul rules.
+
+Identify the CSS selectors or XPath for: the factories, the center pool, the player boards, the pattern lines, the wall, the floor line, and the score indicators.
+
+Write a function that extracts these UI elements and parses them into a clean, machine-readable JSON object representing the exact current game_state.
+
+3. Action Execution Automation:
+Write a corresponding Playwright function execute_move(game_state, action) that takes a programmatic decision (e.g., "Take all red tiles from factory 2 and place them on pattern line 3") and executes the required mouse clicks on the web UI to perform that move.
+
+Please output your understanding of the Azul rules briefly, followed by the proposed JSON state structure, and finally the Playwright Python code to scrape the state and execute a move.

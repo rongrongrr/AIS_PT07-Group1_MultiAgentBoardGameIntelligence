@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# Database
+db/*.db
+
+# OS
+.DS_Store
+*.swp
+
+# Playwright
+test-results/
+
+# Exploration artifacts
+backend/azul_*.png
+backend/azul_*.html
+backend/azul_findings.json
+
+# Env
+.env
+.env.local
+
+# Claude
+.claude/

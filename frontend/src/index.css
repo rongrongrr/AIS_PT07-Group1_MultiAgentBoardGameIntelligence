@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+:root {
+  --color-blue-tile: #67c0dd;
+  --color-yellow-tile: #ffff59;
+  --color-red-tile: #f08080;
+  --color-black-tile: #90ee90;
+  --color-white-tile: #ffffff;
+}
+
+body {
+  margin: 0;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
