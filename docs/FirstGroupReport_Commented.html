@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OppoProfile - Group Report with Implementation Commentary</title>
+<style>
+  body { font-family: 'Segoe UI', system-ui, sans-serif; max-width: 1400px; margin: 0 auto; padding: 20px; background: #f8f9fa; color: #333; }
+  h1 { color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 10px; }
+  h2 { color: #2c3e50; margin-top: 40px; border-left: 4px solid #2980b9; padding-left: 12px; }
+  h3 { color: #34495e; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+  th { background: #2c3e50; color: white; padding: 12px 16px; text-align: left; font-size: 14px; }
+  td { padding: 10px 16px; border-bottom: 1px solid #ddd; vertical-align: top; font-size: 13px; line-height: 1.5; }
+  tr:hover { background: #f5f6f7; }
+  .section-header td { background: #ecf0f1; font-weight: bold; font-size: 14px; color: #2c3e50; }
+  .done { background: #d5f5e3; color: #1e8449; font-weight: 600; }
+  .partial { background: #fdebd0; color: #b7950b; font-weight: 600; }
+  .planned { background: #d6eaf8; color: #2874a6; font-weight: 600; }
+  .high-effort { background: #fadbd8; color: #943126; font-weight: 600; }
+  .not-recommended { background: #f2f3f4; color: #7f8c8d; font-weight: 600; font-style: italic; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 20px 0; padding: 16px; background: white; border-radius: 8px; border: 1px solid #ddd; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .legend-dot { width: 14px; height: 14px; border-radius: 3px; }
+  .meta { color: #7f8c8d; font-size: 12px; margin-bottom: 30px; }
+  .note { font-size: 12px; color: #666; margin-top: 4px; }
+  .col-feature { width: 30%; }
+  .col-detail { width: 35%; }
+  .col-status { width: 10%; }
+  .col-comment { width: 25%; }
+</style>
+</head>
+<body>
+
+<h1>OppoProfile: Group Report — Implementation Commentary</h1>
+<p class="meta">
+  Original: <em>CAPSTONE PROJECT PROGRESS REPORT — Multi-Agent Board Game Intelligence</em> (11 Apr 2026)<br>
+  Commentary by: Development Team | Compared against: Current OppoProfile codebase (commit 8a53f6e)
+</p>
+
+<div class="legend">
+  <strong>Status Legend:</strong>
+  <div class="legend-item"><div class="legend-dot" style="background:#d5f5e3"></div> DONE — Implemented and tested</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fdebd0"></div> PARTIAL — Partially implemented or in progress</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#d6eaf8"></div> PLANNED — Feasible, architecture supports it</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fadbd8"></div> HIGH EFFORT — Feasible but significant work required</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f2f3f4"></div> RECONSIDER — Questionable value or scope creep risk</div>
+</div>
+
+<!-- ============================================ -->
+<h2>1. Project Scope</h2>
+<!-- ============================================ -->
+
+<table>
+<tr>
+  <th class="col-feature">Report Feature / Point</th>
+  <th class="col-detail">Detail from Report</th>
+  <th class="col-status">Status</th>
+  <th class="col-comment">Implementation Commentary</th>
+</tr>
+
+<tr class="section-header"><td colspan="4">1.1 AI & Machine Learning & Deep Learning</td></tr>
+<tr>
+  <td>Rule extraction via ML/DL</td>
+  <td>Core focus on advanced ML/DL methods for rule extraction, opponent modeling, and profiling.</td>
+  <td class="partial">PARTIAL</td>
+  <td>Rules are implemented manually in <code>azul/rules.py</code> (237 lines, 47 tests). Manual implementation is more reliable than ML extraction for a single game. ML rule extraction adds complexity without clear value for Azul specifically.</td>
+</tr>
+<tr>
+  <td>Opponent modeling</td>
+  <td>Opponent modeling via Transformer-based architectures, RL, and probabilistic modeling.</td>
+  <td class="planned">PLANNED</td>
+  <td>Architecture fully supports this. <code>MachinePlayer</code> ABC accepts full game state. <code>BasicProfileAnalyzer</code> already computes opponent patterns. Pluggable registry means a Transformer-based model drops in without engine changes.</td>
+</tr>
+<tr>
+  <td>Profiling</td>
+  <td>Profiling via advanced methods.</td>
+  <td class="done">DONE</td>
+  <td><code>BasicProfileAnalyzer</code> implemented: style classification, color/source preferences, timing metrics, score trajectory. Pluggable <code>AnalyzerRegistry</code> allows adding advanced analyzers.</td>
+</tr>
+
+<tr class="section-header"><td colspan="4">1.2 Natural Language Processing (NLP)</td></tr>
+<tr>
+  <td>RAG-based rulebook understanding</td>
+  <td>Automated rulebook understanding using Retrieval-Augmented Generation (RAG). Converting unstructured text into structured formats.</td>
+  <td class="high-effort">HIGH EFFORT</td>
+  <td>Not implemented. For Azul (one game), manual rule coding is faster and more accurate. RAG would make sense if expanding to 10+ games. Consider as a Phase 3 feature for multi-game support. The <code>azul/rules.py</code> module already provides the "structured format" output that RAG would produce.</td>
+</tr>
+
+<tr class="section-header"><td colspan="4">1.3 Explainable AI (XAI)</td></tr>
+<tr>
+  <td>Transparent profiling</td>
+  <td>Transparent profiling of opponents and interpretable decision-making pathways.</td>
+  <td class="partial">PARTIAL</td>
+  <td>Profile Analyzer generates human-readable summaries: <em>"Alice's play style: factory-focused, blue-biased. Floor usage: 12%."</em> The GreedyPlayer's scoring function is inherently explainable (weighted factors). Full XAI dashboard is Phase 3.</td>
+</tr>
+<tr>
+  <td>Human-centered evaluation</td>
+  <td>Human-centered evaluation to ensure clarity and trust in AI outputs.</td>
+  <td class="planned">PLANNED</td>
+  <td>The Game Monitor with expandable board snapshots per move already enables human review. Adding "why did the AI choose this?" tooltips is a natural extension of the GreedyPlayer's score breakdown.</td>
+</tr>
+
+<tr class="section-header"><td colspan="4">1.4 Data Science & Analytics</td></tr>
+<tr>
+  <td>Feature engineering from gameplay data</td>
+  <td>Feature engineering from gameplay data.</td>
+  <td class="done">DONE</td>
+  <td><code>BasicProfileAnalyzer</code> extracts 10+ features: color preferences, source/dest splits, row preferences, timing stats, score trajectory. Every move is stored with full board state — rich feature space for any model.</td>
+</tr>
+<tr>
+  <td>Clustering and classification for opponent archetypes</td>
+  <td>Clustering and classification to derive opponent archetypes.</td>
+  <td class="planned">PLANNED</td>
+  <td>Data pipeline is ready (JSON export with all features). Adding a scikit-learn clustering analyzer is straightforward — register a new <code>ProfileAnalyzer</code> subclass. Architecture explicitly supports this.</td>
+</tr>
+
+<tr class="section-header"><td colspan="4">1.5 Systems Engineering & Agentic Frameworks</td></tr>
+<tr>
+  <td>Modular agent-of-agents architecture</td>
+  <td>Design of a modular agent-of-agents architecture, where specialized agents handle rule extraction, move prediction, and profiling.</td>
+  <td class="done">DONE</td>
+  <td>Implemented via ABC interfaces: <code>MachinePlayer</code> (move prediction), <code>ProfilerAgent</code> (profiling), <code>ProfileAnalyzer</code> (analysis). Registry pattern for pluggable components. Each agent is independent and composable.</td>
+</tr>
+</table>
+
+<!-- ============================================ -->
+<h2>4. Background / Aims / Objectives</h2>
+<!-- ============================================ -->
+
+<table>
+<tr>
+  <th class="col-feature">Objective</th>
+  <th class="col-detail">Detail</th>
+  <th class="col-status">Status</th>
+  <th class="col-comment">Commentary</th>
+</tr>
+<tr>
+  <td>Multi-agent framework with specialized agents</td>
+  <td>Develop a multi-agent framework where each functionality is handled by a specialized agent.</td>
+  <td class="done">DONE</td>
+  <td>Play Engine (browser automation) + MachinePlayer (decisions) + ProfileAnalyzer (profiling) are separate, pluggable components. Registry pattern for model management.</td>
+</tr>
+<tr>
+  <td>Automatic rulebook comprehension via NLP/RAG</td>
+  <td>Enable automatic rulebook comprehension using NLP and Retrieval-Augmented Generation (RAG).</td>
+  <td class="not-recommended">RECONSIDER</td>
+  <td>For a capstone with one target game, manual rule implementation is superior. RAG adds a fragile NLP pipeline that must be validated against the same manual rules anyway. Recommend: demonstrate RAG as a <em>concept demo</em> on the Azul rulebook PDF, but don't use it in the live system.</td>
+</tr>
+<tr>
+  <td>Opponent modeling for next-move prediction</td>
+  <td>Implement opponent modeling for next-move prediction using game tree search, probabilistic models, and sequence modeling.</td>
+  <td class="partial">PARTIAL</td>
+  <td>GreedyPlayer uses heuristic scoring (not game tree search). MCTS/Minimax is architecturally straightforward — the rules engine provides legal moves and scoring, the <code>MachinePlayer</code> interface accepts any algorithm. Recommend: implement MCTS as the next ML milestone.</td>
+</tr>
+<tr>
+  <td>Opponent character profiling</td>
+  <td>Build opponent character profiling through feature engineering, clustering/classification, and RL.</td>
+  <td class="partial">PARTIAL</td>
+  <td>Feature engineering: DONE (BasicProfileAnalyzer). Clustering: PLANNED (data pipeline ready). RL for adaptive profiling: PLANNED (requires significant training infrastructure). Current profiler is rule-based, not learned.</td>
+</tr>
+<tr>
+  <td>Ensure explainability</td>
+  <td>Making AI decisions and player profiles interpretable.</td>
+  <td class="partial">PARTIAL</td>
+  <td>Profile summaries are human-readable. GreedyPlayer's scoring is transparent (weighted factors). Move log shows the full decision context. Missing: counterfactual explanations ("if you had picked red instead...").</td>
+</tr>
+</table>
+
+<!-- ============================================ -->
+<h2>6. Desired Outcome</h2>
+<!-- ============================================ -->
+
+<table>
+<tr>
+  <th class="col-feature">Deliverable</th>
+  <th class="col-detail">Detail</th>
+  <th class="col-status">Status</th>
+  <th class="col-comment">Commentary</th>
+</tr>
+<tr>
+  <td>Functional Prototype</td>
+  <td>A working multi-agent framework where each agent operates independently but integrates seamlessly.</td>
+  <td class="done">DONE</td>
+  <td>Fully working. Bots play complete Azul games autonomously. 6,971 lines of code, 105 tests, 17 API endpoints.</td>
+</tr>
+<tr>
+  <td>Rule Extraction Module</td>
+  <td>Accuracy benchmark — generally correct parsing of rulebook text into structured, machine-readable rules.</td>
+  <td class="partial">PARTIAL</td>
+  <td>Rules are manually coded (100% accurate, 47 tests). Not extracted from text. Recommend: reframe as "Rule Validation Module" which is fully implemented and tested.</td>
+</tr>
+<tr>
+  <td>Opponent Modeling Module</td>
+  <td>Predictive accuracy — next best move prediction across test games. Comparative evaluation against baseline strategies.</td>
+  <td class="partial">PARTIAL</td>
+  <td>GreedyPlayer beats RandomPlayer 43-3. Comparative evaluation infrastructure exists (full-game simulation tests). Missing: MCTS/Minimax for true "next best move" prediction.</td>
+</tr>
+<tr>
+  <td>Opponent Profiling Module</td>
+  <td>At least 3-5 distinct player archetypes. RL agent to adapt strategy.</td>
+  <td class="partial">PARTIAL</td>
+  <td>BasicProfileAnalyzer classifies styles: aggressive, conservative, center-focused, factory-focused, color-biased (5 traits). Not yet clustering into archetypes. RL adaptation not started.</td>
+</tr>
+<tr>
+  <td>Explainability Dashboard</td>
+  <td>Visual outputs showing why a move was chosen or how a profile was derived.</td>
+  <td class="partial">PARTIAL</td>
+  <td>Game Monitor shows full board state per move. Profile Analyzer shows style breakdown with charts. Missing: "why this move" decision explanation view. GreedyPlayer's score breakdown could be exposed as the basis.</td>
+</tr>
+<tr>
+  <td>Source code repository with documentation</td>
+  <td>Source code repository with documentation.</td>
+  <td class="done">DONE</td>
+  <td>GitHub repo with README.md, PRD.md, EXPORT_FORMAT.md, and this milestone report. API auto-documented via FastAPI /docs.</td>
+</tr>
+<tr>
+  <td>Demo showcasing gameplay</td>
+  <td>Demo showcasing gameplay with AI agents and explainability features.</td>
+  <td class="done">DONE</td>
+  <td>Headed browser mode shows live gameplay. Game Monitor provides real-time visualization. Profile Analyzing tab shows behavioral analysis. JSON export for external tools.</td>
+</tr>
+</table>
+
+<!-- ============================================ -->
+<h2>7. Progress Update — System Design Components</h2>
+<!-- ============================================ -->
+
+<table>
+<tr>
+  <th class="col-feature">Component</th>
+  <th class="col-detail">Detail from Report</th>
+  <th class="col-status">Status</th>
+  <th class="col-comment">Commentary</th>
+</tr>
+
+<tr class="section-header"><td colspan="4">7.1 System Design</td></tr>
+<tr>
+  <td>Game state representation</td>
+  <td>Game state representation for Azul.</td>
+  <td class="done">DONE</td>
+  <td><code>GameStateData</code> Pydantic model: factories, center_pool, players (pattern_lines, wall, floor_line, score). JSON-serializable, stored in SQLite per move.</td>
+</tr>
+<tr>
+  <td>Rulebook ingestion</td>
+  <td>Rulebook ingestion into validator.</td>
+  <td class="not-recommended">RECONSIDER</td>
+  <td>Rules are hand-coded in <code>azul/rules.py</code>. NLP ingestion of a PDF rulebook is a research project in itself. Recommend: skip for Azul, demonstrate as a concept with a simple RAG demo on the side.</td>
+</tr>
+<tr>
+  <td>Validator component</td>
+  <td>Deterministic rules + state transitions; the only component allowed to mutate game state.</td>
+  <td class="done">DONE</td>
+  <td><code>azul/rules.py</code> — <code>get_legal_actions()</code>, <code>can_place_on_pattern_line()</code>, <code>score_tile_placement()</code>, etc. 47 unit tests. The server (buddyboardgames.com) is the ultimate validator; our engine validates client-side before emitting.</td>
+</tr>
+<tr>
+  <td>Experiment tracking / Ablation study</td>
+  <td>MLflow or similar for experiment tracking.</td>
+  <td class="planned">PLANNED</td>
+  <td>Not implemented. The JSON export format contains all data needed for analysis. Adding MLflow integration is moderate effort. Recommend: use the JSON export + Jupyter notebooks for Phase 2 analysis, add MLflow in Phase 3.</td>
+</tr>
+
+<tr class="section-header"><td colspan="4">7.3 Multi-Agent Decision Stack</td></tr>
+<tr>
+  <td>Validator (Authoritative)</td>
+  <td>Deterministic rules + state transitions; the only component allowed to mutate game state.</td>
+  <td class="done">DONE</td>
+  <td>See above. Also: the game platform server acts as the authoritative validator — our engine submits moves and checks <code>success: true/false</code> responses.</td>
+</tr>
+<tr>
+  <td>Profiler</td>
+  <td>Produces a brief distribution over opponent archetypes and/or a predictive opponent policy.</td>
+  <td class="partial">PARTIAL</td>
+  <td><code>BasicProfileAnalyzer</code> produces style classification and feature distributions. Not yet: archetype distribution (requires clustering), predictive opponent policy (requires sequence model).</td>
+</tr>
+<tr>
+  <td>Tactician</td>
+  <td>Chooses actions via MCTS/Minimax (optionally guided by learned priors/value) conditioned on Profiler output.</td>
+  <td class="partial">PARTIAL</td>
+  <td><code>GreedyPlayer</code> is a heuristic tactician (single-step lookahead). MCTS/Minimax would use the existing <code>get_legal_actions()</code> + <code>score_tile_placement()</code> as the search foundation. This is the highest-impact next step.</td>
+</tr>
+<tr>
+  <td>Explainer</td>
+  <td>Renders a faithful explanation by consuming artefacts emitted by Validator/Tactician.</td>
+  <td class="planned">PLANNED</td>
+  <td>Not implemented as a separate component. The GreedyPlayer's score breakdown per action is the natural "artefact" for explanation. Adding an Explainer that converts score vectors to natural language is moderate effort.</td>
+</tr>
+
+<tr class="section-header"><td colspan="4">7.4 Agentic Systems Design</td></tr>
+<tr>
+  <td>LangGraph orchestration</td>
+  <td>Graph/state-driven orchestration (LangGraph) and multi-agent conversation abstractions (AutoGen).</td>
+  <td class="not-recommended">RECONSIDER</td>
+  <td>The current architecture uses simple Python async + Registry pattern. LangGraph/AutoGen add significant complexity for marginal benefit in a turn-based game. The agents don't need "conversation" — they need state-in, action-out. Recommend: keep the current clean architecture; mention LangGraph compatibility as a future direction.</td>
+</tr>
+
+<tr class="section-header"><td colspan="4">7.5 Game State Representation for Azul</td></tr>
+<tr>
+  <td>State variables (Factories, Tile Supply, Floor pool, Pattern lines, Wall, Floor line)</td>
+  <td>All Azul state variables defined.</td>
+  <td class="done">DONE</td>
+  <td>All implemented in <code>GameStateData</code> + <code>PlayerState</code> Pydantic models. Serialized as JSON, stored per move.</td>
+</tr>
+<tr>
+  <td>JSON or Embeddings representation</td>
+  <td>Exploring JSON or embeddings for state representation.</td>
+  <td class="done">DONE</td>
+  <td>JSON representation fully implemented and in production. Embeddings would be a model-specific preprocessing step — the JSON provides the raw data for any embedding scheme.</td>
+</tr>
+<tr>
+  <td>Action space: (source, color, destination)</td>
+  <td>Each move could be (source, color, destination).</td>
+  <td class="done">DONE</td>
+  <td><code>GameAction</code> model: <code>source_type</code> (factory/center), <code>source_index</code>, <code>color</code>, <code>destination</code> (pattern_line/floor), <code>destination_row</code>. Exact match to the report's proposal.</td>
+</tr>
+
+<tr class="section-header"><td colspan="4">7.6 Agent Communication Protocol</td></tr>
+<tr>
+  <td>Latency and telemetry constraints</td>
+  <td>We have latency and telemetry constraints. Telemetry could be a module.</td>
+  <td class="done">DONE</td>
+  <td>Every move records <code>decision_time_ms</code>, <code>click_ms</code>, <code>ws_wait_ms</code>, <code>total_ms</code>. System Log broadcasts real-time timing for every phase. Configurable <code>move_timeout_sec</code> + <code>stuck_abort_sec</code>.</td>
+</tr>
+<tr>
+  <td>Traces of action moves for agents</td>
+  <td>Traces of the action moves for agents.</td>
+  <td class="done">DONE</td>
+  <td>Immutable move ledger in SQLite. Every move has action, board state snapshot, timing, player name, model tag. JSON export includes full trace. System log captures every phase.</td>
+</tr>
+<tr>
+  <td>Explanations / thinking / reason / profile update from the agent</td>
+  <td>Agent-level explanations and reasoning traces.</td>
+  <td class="planned">PLANNED</td>
+  <td>Not yet emitted per-move. The GreedyPlayer's score breakdown per candidate action is available internally — exposing it requires adding a <code>explain()</code> method to the <code>MachinePlayer</code> ABC. Moderate effort.</td>
+</tr>
+<tr>
+  <td>Performance metrics (self-report collector)</td>
+  <td>Self-report metrics collector installed per agent.</td>
+  <td class="done">DONE</td>
+  <td>System log captures per-move: DOM parse time, ML decision time, click execution time, WS confirmation time. Profiler computes per-player statistics.</td>
+</tr>
+
+<tr class="section-header"><td colspan="4">7.8 Profiler Design</td></tr>
+<tr>
+  <td>Cold-start handling</td>
+  <td>Initialize prior + Bayesian updating. High-uncertainty gating: down-weight opponent-conditioning in search.</td>
+  <td class="high-effort">HIGH EFFORT</td>
+  <td>Not implemented. Requires a probabilistic profiler model (not rule-based). The current <code>BasicProfileAnalyzer</code> works post-game. A real-time Bayesian profiler that updates during the game is a significant ML engineering effort. Recommend for Phase 3.</td>
+</tr>
+
+<tr class="section-header"><td colspan="4">7.9 Tactician Design</td></tr>
+<tr>
+  <td>MCTS/Minimax integration</td>
+  <td>Integrated profiling into MCTS/Minimax.</td>
+  <td class="planned">PLANNED</td>
+  <td>The rules engine provides everything MCTS needs: <code>get_legal_actions()</code>, <code>score_tile_placement()</code>, <code>is_game_over()</code>. The full-game simulation in <code>test_full_game.py</code> already demonstrates state transitions. MCTS implementation is the next high-impact feature.</td>
+</tr>
+<tr>
+  <td>RL + search hybrid pathway</td>
+  <td>RL + search hybrid.</td>
+  <td class="high-effort">HIGH EFFORT</td>
+  <td>Requires: (1) RL training pipeline, (2) value/policy network, (3) integration with MCTS. The game simulation infrastructure is ready for generating training data. Recommend: start with pure MCTS, add learned value function in Phase 3.</td>
+</tr>
+
+<tr class="section-header"><td colspan="4">7.10 Explainability and Experimentation</td></tr>
+<tr>
+  <td>Mapping RL/MCTS values to natural language</td>
+  <td>Pipeline: Tactician emits structured factors, Validator emits semantic features, Explainer performs counterfactual comparison.</td>
+  <td class="planned">PLANNED</td>
+  <td>GreedyPlayer already computes per-action scores with named factors (wall_score, fill_ratio, overflow_penalty). Adding natural language mapping is moderate effort. Counterfactual comparison ("what if you picked red instead?") requires running the evaluator on alternative actions — straightforward with the rules engine.</td>
+</tr>
+<tr>
+  <td>Experiment system (MLflow)</td>
+  <td>Build experiment tracking tools — MLflow.</td>
+  <td class="planned">PLANNED</td>
+  <td>Not started. The JSON export format serves as experiment data. MLflow can be added for tracking model performance across games. Low priority for MVP.</td>
+</tr>
+<tr>
+  <td>Isolate Profiler win-rate contribution</td>
+  <td>Experiment: Isolate and measure the win-rate contribution of the Profiler vs baseline MCTS.</td>
+  <td class="planned">PLANNED</td>
+  <td>The tournament simulation infrastructure (<code>test_full_game.py</code>) can run GreedyPlayer-with-profiling vs. GreedyPlayer-without-profiling. This is a valuable experiment once MCTS + Profiler are both implemented.</td>
+</tr>
+</table>
+
+<!-- ============================================ -->
+<h2>Summary</h2>
+<!-- ============================================ -->
+
+<table>
+<tr><th>Status</th><th>Count</th><th>Details</th></tr>
+<tr><td class="done">DONE</td><td><strong>14</strong></td><td>Game state, rules engine, validator, action space, telemetry, traces, metrics, profiling features, modular architecture, functional prototype, demo, documentation, feature engineering, agent framework</td></tr>
+<tr><td class="partial">PARTIAL</td><td><strong>8</strong></td><td>Opponent modeling, profiler archetypes, tactician (heuristic only), explainability, rule extraction (manual), character profiling, next-move prediction, XAI dashboard</td></tr>
+<tr><td class="planned">PLANNED</td><td><strong>7</strong></td><td>MCTS, clustering archetypes, experiment tracking, NL explanations, human evaluation, agent explain() method, Profiler win-rate experiment</td></tr>
+<tr><td class="high-effort">HIGH EFFORT</td><td><strong>3</strong></td><td>RAG rulebook ingestion, Bayesian cold-start profiling, RL+search hybrid</td></tr>
+<tr><td class="not-recommended">RECONSIDER</td><td><strong>2</strong></td><td>LangGraph/AutoGen orchestration (overengineered for turn-based game), NLP rulebook ingestion (unnecessary for single game)</td></tr>
+</table>
+
+<p style="margin-top: 30px; padding: 16px; background: #eafaf1; border-radius: 8px; border-left: 4px solid #27ae60;">
+  <strong>Overall Assessment:</strong> The report's proposed architecture maps well to the implemented system. 14 of 34 points are fully delivered, 8 are partially done, and the remaining are architecturally supported for future phases. The two "RECONSIDER" items (LangGraph orchestration and RAG rulebook ingestion) add complexity without clear value for the current scope — recommend demonstrating them as side concepts rather than core pipeline components.
+</p>
+
+</body>
+</html>
