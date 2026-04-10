@@ -178,45 +178,161 @@ add_heading("3. System Architecture")
 
 add_body(
     "The system is organized into four AI-focused components (Validator, Tactician, Profiler, Explainer) "
-    "orchestrated by a Play Engine that manages browser sessions and game communication."
+    "orchestrated by a Play Engine that manages browser sessions and game communication. "
+    "The diagram below shows the component architecture and data flow."
 )
 
-add_heading("3.1 Multi-Agent Decision Stack", level=2)
+# --- Architecture diagram as a styled table ---
+add_heading("3.1 System Architecture Diagram", level=2)
+
+arch = doc.add_table(rows=7, cols=5)
+arch.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+# Helper to style a cell as a "box"
+def style_box(cell, title, subtitle, bg_hex):
+    cell.text = ""
+    p = cell.paragraphs[0]
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run(title + "\n")
+    run.bold = True
+    run.font.size = Pt(10)
+    run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+    run2 = p.add_run(subtitle)
+    run2.font.size = Pt(7)
+    run2.font.color.rgb = RGBColor(0xE0, 0xE0, 0xE0)
+    shading = cell._element.get_or_add_tcPr()
+    bg = shading.makeelement(qn('w:shd'), {})
+    bg.set(qn('w:fill'), bg_hex)
+    bg.set(qn('w:val'), 'clear')
+    shading.append(bg)
+
+def style_arrow(cell, text):
+    cell.text = ""
+    p = cell.paragraphs[0]
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run(text)
+    run.font.size = Pt(8)
+    run.font.color.rgb = RGBColor(0x7f, 0x8c, 0x8d)
+
+def style_label(cell, text):
+    cell.text = ""
+    p = cell.paragraphs[0]
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = p.add_run(text)
+    run.font.size = Pt(7)
+    run.font.color.rgb = RGBColor(0x95, 0xa5, 0xa6)
+    run.italic = True
+
+def merge_clear(row, c1, c2):
+    row.cells[c1].merge(row.cells[c2])
+
+# Row 0: Frontend
+merge_clear(arch.rows[0], 0, 4)
+style_box(arch.rows[0].cells[0],
+    "React Frontend",
+    "Session Config  |  Game Monitor  |  Profile Analyzer  |  Replay Viewer",
+    "34495E")
+
+# Row 1: arrow
+merge_clear(arch.rows[1], 0, 4)
+style_arrow(arch.rows[1].cells[0], "\u2195  HTTP / WebSocket")
+
+# Row 2: Backend header with Play Engine
+merge_clear(arch.rows[2], 0, 4)
+style_box(arch.rows[2].cells[0],
+    "Python Backend (FastAPI)  \u2014  Play Engine + Session Orchestrator",
+    "Playwright Browser Pool  |  Socket.IO Protocol  |  Move Ledger (SQLite)",
+    "2C3E50")
+
+# Row 3: arrow
+merge_clear(arch.rows[3], 0, 4)
+style_arrow(arch.rows[3].cells[0], "\u2193  Game State  \u2193                        \u2191  Actions  \u2191")
+
+# Row 4: Four AI agent boxes
+style_box(arch.rows[4].cells[0],
+    "\U0001f6e1 VALIDATOR",
+    "Rules Engine\n47 tests\nDONE",
+    "1A5276")
+style_arrow(arch.rows[4].cells[1], "legal\nmoves\n\u2192")
+style_box(arch.rows[4].cells[2],
+    "\u2694 TACTICIAN",
+    "GreedyPlayer\nMCTS planned\nDONE",
+    "1A6B3C")
+style_arrow(arch.rows[4].cells[3], "game\nstate\n\u2192")
+style_box(arch.rows[4].cells[4],
+    "\U0001f50d PROFILER",
+    "Style Analysis\n5 traits\nDONE",
+    "7D3C98")
+
+# Row 5: arrow down from center
+merge_clear(arch.rows[5], 0, 1)
+style_label(arch.rows[5].cells[0], "")
+style_arrow(arch.rows[5].cells[2], "\u2193 artefacts")
+merge_clear(arch.rows[5], 3, 4)
+style_label(arch.rows[5].cells[3], "")
+
+# Row 6: Explainer
+merge_clear(arch.rows[6], 1, 3)
+style_label(arch.rows[6].cells[0], "")
+style_box(arch.rows[6].cells[1],
+    "\U0001f4ac EXPLAINER",
+    "Board Snapshots | Profile Summaries | NL Commentary (planned)",
+    "B7950B")
+style_label(arch.rows[6].cells[4], "")
+
+doc.add_paragraph()
+
+# Row 7 equivalent: external platform
+ext = doc.add_table(rows=1, cols=1)
+ext.alignment = WD_TABLE_ALIGNMENT.CENTER
+style_box(ext.rows[0].cells[0],
+    "\U0001f310  buddyboardgames.com/azul",
+    "External Game Platform  |  Socket.IO  |  2-4 Player Rooms",
+    "616A6B")
+
+doc.add_paragraph()
 
 add_body(
-    "Each component in the stack is implemented as an independent module with a defined interface, "
-    "allowing components to be swapped or upgraded without affecting the rest of the system."
+    "The four AI components form the Multi-Agent Decision Stack. Each is implemented as an "
+    "independent module with a defined Python ABC interface, allowing components to be swapped "
+    "or upgraded without affecting the rest of the system."
 )
+
+# --- Component detail table ---
+add_heading("3.2 Component Details", level=2)
 
 add_table(
     ["Component", "Role", "Current Implementation", "Status"],
     [
-        ["Validator",
-         "Deterministic rules engine. Validates legal moves, computes scores, detects game-over conditions. "
-         "The only component that defines state transitions.",
-         "azul/rules.py \u2014 237 lines, 47 unit tests. Legal move generation, wall pattern validation, "
-         "floor penalties, end-game bonuses.",
+        ["\U0001f6e1 Validator",
+         "Deterministic rules engine. Validates legal moves, computes scores, "
+         "detects game-over. The only component that defines state transitions.",
+         "azul/rules.py \u2014 237 lines, 47 unit tests. Legal move generation, "
+         "wall pattern validation, floor penalties, end-game bonuses.",
          "DONE"],
-        ["Tactician",
-         "Chooses actions via search or heuristic evaluation. Conditioned on Profiler output for adaptive play.",
-         "GreedyPlayer \u2014 heuristic scoring engine. Evaluates wall placement value, pattern line progress, "
-         "end-game bonus potential, and overflow penalties. Beats RandomPlayer 43-3.",
-         "DONE (heuristic)\nMCTS planned"],
-        ["Profiler",
-         "Analyzes opponent behavior to produce style classifications and predictive patterns.",
-         "BasicProfileAnalyzer \u2014 computes color preferences, source/destination splits, timing metrics, "
-         "and scoring trajectories. Generates natural language summaries.",
-         "DONE (rule-based)\nML-based planned"],
-        ["Explainer",
-         "Renders human-readable explanations of AI decisions by consuming artefacts from Tactician and Validator.",
-         "Profile summaries and move-level board snapshots with highlighted source/destination. "
-         "GreedyPlayer score breakdown available for future NL generation.",
+        ["\u2694 Tactician",
+         "Chooses actions via search or heuristic evaluation. "
+         "Conditioned on Profiler output for adaptive play.",
+         "GreedyPlayer \u2014 heuristic scoring engine. Evaluates wall placement, "
+         "pattern line progress, bonus potential. Beats RandomPlayer 43-3.",
+         "DONE\n(MCTS planned)"],
+        ["\U0001f50d Profiler",
+         "Analyzes opponent behavior to produce style classifications "
+         "and predictive patterns.",
+         "BasicProfileAnalyzer \u2014 color preferences, source/dest splits, "
+         "timing metrics, scoring trajectories. NL summaries.",
+         "DONE\n(ML planned)"],
+        ["\U0001f4ac Explainer",
+         "Renders human-readable explanations by consuming artefacts "
+         "from Tactician and Validator.",
+         "Profile summaries, move-level board snapshots with highlighted "
+         "source/destination. Score breakdown available for NL generation.",
          "PARTIAL"],
     ],
-    col_widths=[1.0, 2.0, 2.5, 1.0],
+    col_widths=[1.0, 2.0, 2.5, 0.8],
 )
 
-add_heading("3.2 Platform Integration", level=2)
+add_heading("3.3 Platform Integration", level=2)
 
 add_body(
     "The Play Engine manages Chromium browser instances via Playwright. Each bot runs in its own browser, "
@@ -227,7 +343,7 @@ add_bullet("placeTiles \u2014 place chosen tiles on a pattern line or floor", bo
 add_bullet("Each emit waits for server acknowledgment (success/failure) before proceeding")
 add_bullet("Configurable headless/headed mode \u2014 headed mode opens visible browser windows for demos and debugging")
 
-add_heading("3.3 Data Architecture", level=2)
+add_heading("3.4 Data Architecture", level=2)
 
 add_body(
     "Every move is recorded as an immutable ledger entry in SQLite with the full board state snapshot. "
