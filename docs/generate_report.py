@@ -1,0 +1,407 @@
+#!/usr/bin/env python3
+"""Generate the Milestone 1 Word document report."""
+
+from docx import Document
+from docx.shared import Inches, Pt, Cm, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.oxml.ns import qn
+import os
+
+doc = Document()
+
+# --- Page setup ---
+for section in doc.sections:
+    section.top_margin = Cm(2)
+    section.bottom_margin = Cm(2)
+    section.left_margin = Cm(2.5)
+    section.right_margin = Cm(2.5)
+
+# --- Styles ---
+style = doc.styles['Normal']
+font = style.font
+font.name = 'Calibri'
+font.size = Pt(11)
+font.color.rgb = RGBColor(0x33, 0x33, 0x33)
+style.paragraph_format.space_after = Pt(6)
+style.paragraph_format.line_spacing = 1.15
+
+def add_heading(text, level=1):
+    h = doc.add_heading(text, level=level)
+    for run in h.runs:
+        run.font.color.rgb = RGBColor(0x1a, 0x52, 0x76)
+    return h
+
+def add_body(text):
+    return doc.add_paragraph(text)
+
+def add_bullet(text, bold_prefix=None):
+    p = doc.add_paragraph(style='List Bullet')
+    if bold_prefix:
+        run = p.add_run(bold_prefix)
+        run.bold = True
+        p.add_run(f" {text}")
+    else:
+        p.add_run(text)
+    return p
+
+def add_table(headers, rows, col_widths=None):
+    table = doc.add_table(rows=1, cols=len(headers))
+    table.style = 'Light Grid Accent 1'
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for i, h in enumerate(headers):
+        cell = table.rows[0].cells[i]
+        cell.text = h
+        for p in cell.paragraphs:
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            for run in p.runs:
+                run.bold = True
+                run.font.size = Pt(10)
+    for row_data in rows:
+        row = table.add_row()
+        for i, val in enumerate(row_data):
+            row.cells[i].text = str(val)
+            for p in row.cells[i].paragraphs:
+                for run in p.runs:
+                    run.font.size = Pt(10)
+    if col_widths:
+        for i, w in enumerate(col_widths):
+            for row in table.rows:
+                row.cells[i].width = Inches(w)
+    doc.add_paragraph()
+    return table
+
+# =========================================================
+# COVER
+# =========================================================
+doc.add_paragraph()
+doc.add_paragraph()
+title = doc.add_paragraph()
+title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+run = title.add_run("Multi-Agent Board Game Intelligence")
+run.font.size = Pt(26)
+run.font.color.rgb = RGBColor(0x1a, 0x52, 0x76)
+run.bold = True
+
+subtitle = doc.add_paragraph()
+subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+run = subtitle.add_run("Milestone 1 Progress Report")
+run.font.size = Pt(16)
+run.font.color.rgb = RGBColor(0x29, 0x80, 0xb9)
+
+doc.add_paragraph()
+meta = doc.add_paragraph()
+meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
+meta.add_run("Master of Technology in Intelligent Systems\n").font.size = Pt(11)
+meta.add_run("ISS, National University of Singapore\n\n").font.size = Pt(11)
+meta.add_run("AIS PT07 Group 1\n").font.size = Pt(12)
+meta.add_run("April 2026\n\n").font.size = Pt(11)
+meta.add_run("ISS Supervisor: Zhengqing Hu").font.size = Pt(11)
+
+doc.add_paragraph()
+members = doc.add_paragraph()
+members.alignment = WD_ALIGN_PARAGRAPH.CENTER
+members.add_run("Team Members\n").bold = True
+for name in ["Chan Jing Rong (A0185806W)", "Velu (A0314464H)", "Johann Oh Hock Seng (A0314457A)",
+             "Brian Zheng (A0132097H)", "Weiqiao Li (A0314458B)"]:
+    members.add_run(f"{name}\n").font.size = Pt(10)
+
+doc.add_page_break()
+
+# =========================================================
+# 1. EXECUTIVE SUMMARY
+# =========================================================
+add_heading("1. Executive Summary")
+
+add_body(
+    "OppoProfile is an AI-driven platform that automates gameplay on the board game Azul, "
+    "enabling Machine Learning agents to compete, observe, and profile player behavior. "
+    "The platform bridges the gap between a live web-based game (buddyboardgames.com) and "
+    "custom ML models, creating an end-to-end pipeline for game intelligence research."
+)
+
+add_body(
+    "In this first milestone, we have delivered a fully functional MVP that can:"
+)
+add_bullet("Launch multiple independent AI agents that play complete Azul games autonomously")
+add_bullet("Record every move with full board-state snapshots for replay and analysis")
+add_bullet("Analyze player behavior through a pluggable profiling framework")
+add_bullet("Visualize games in real time and provide detailed post-game review")
+
+add_body(
+    "The platform is built on a modern, extensible architecture (React + FastAPI + Playwright + SQLite) "
+    "with 105 automated tests covering rules validation, ML decision-making, API integrity, and full-game simulation."
+)
+
+# =========================================================
+# 2. PROBLEM STATEMENT
+# =========================================================
+add_heading("2. Problem Statement")
+
+add_body(
+    "Board games like Azul present rich decision spaces that combine short-term tactical play with "
+    "long-term strategic planning. Understanding how different players approach these decisions \u2014 "
+    "their preferences, risk tolerance, and adaptation patterns \u2014 is valuable for AI research, "
+    "player modeling, and game analytics."
+)
+
+add_body(
+    "However, no existing platform connects a live game environment to a modular ML pipeline "
+    "where agents can play, observe, and learn. OppoProfile solves this by providing four key capabilities:"
+)
+
+add_table(
+    ["Capability", "Description"],
+    [
+        ["Play Engine", "Interfaces with the real game platform via browser automation (Playwright + Socket.IO)"],
+        ["ML Framework", "Pluggable player and profiler components via abstract interfaces and a model registry"],
+        ["Data Pipeline", "Captures every game state as structured JSON for training, replay, and export"],
+        ["Visualization", "Real-time game monitoring, round-grouped move log, and expandable board snapshots"],
+    ],
+    col_widths=[1.5, 5.0],
+)
+
+# =========================================================
+# 3. SYSTEM ARCHITECTURE
+# =========================================================
+add_heading("3. System Architecture")
+
+add_body(
+    "The system is organized into four AI-focused components (Validator, Tactician, Profiler, Explainer) "
+    "orchestrated by a Play Engine that manages browser sessions and game communication."
+)
+
+add_heading("3.1 Multi-Agent Decision Stack", level=2)
+
+add_body(
+    "Each component in the stack is implemented as an independent module with a defined interface, "
+    "allowing components to be swapped or upgraded without affecting the rest of the system."
+)
+
+add_table(
+    ["Component", "Role", "Current Implementation", "Status"],
+    [
+        ["Validator",
+         "Deterministic rules engine. Validates legal moves, computes scores, detects game-over conditions. "
+         "The only component that defines state transitions.",
+         "azul/rules.py \u2014 237 lines, 47 unit tests. Legal move generation, wall pattern validation, "
+         "floor penalties, end-game bonuses.",
+         "DONE"],
+        ["Tactician",
+         "Chooses actions via search or heuristic evaluation. Conditioned on Profiler output for adaptive play.",
+         "GreedyPlayer \u2014 heuristic scoring engine. Evaluates wall placement value, pattern line progress, "
+         "end-game bonus potential, and overflow penalties. Beats RandomPlayer 43-3.",
+         "DONE (heuristic)\nMCTS planned"],
+        ["Profiler",
+         "Analyzes opponent behavior to produce style classifications and predictive patterns.",
+         "BasicProfileAnalyzer \u2014 computes color preferences, source/destination splits, timing metrics, "
+         "and scoring trajectories. Generates natural language summaries.",
+         "DONE (rule-based)\nML-based planned"],
+        ["Explainer",
+         "Renders human-readable explanations of AI decisions by consuming artefacts from Tactician and Validator.",
+         "Profile summaries and move-level board snapshots with highlighted source/destination. "
+         "GreedyPlayer score breakdown available for future NL generation.",
+         "PARTIAL"],
+    ],
+    col_widths=[1.0, 2.0, 2.5, 1.0],
+)
+
+add_heading("3.2 Platform Integration", level=2)
+
+add_body(
+    "The Play Engine manages Chromium browser instances via Playwright. Each bot runs in its own browser, "
+    "connecting to the same room on buddyboardgames.com. Communication uses the platform's native Socket.IO protocol:"
+)
+add_bullet("chooseTiles \u2014 select tiles of a color from a factory or center pool", bold_prefix="Step 1:")
+add_bullet("placeTiles \u2014 place chosen tiles on a pattern line or floor", bold_prefix="Step 2:")
+add_bullet("Each emit waits for server acknowledgment (success/failure) before proceeding")
+add_bullet("Configurable headless/headed mode \u2014 headed mode opens visible browser windows for demos and debugging")
+
+add_heading("3.3 Data Architecture", level=2)
+
+add_body(
+    "Every move is recorded as an immutable ledger entry in SQLite with the full board state snapshot. "
+    "This creates a rich dataset suitable for ML training, replay, and analysis."
+)
+
+add_table(
+    ["Data Store", "Contents", "Purpose"],
+    [
+        ["sessions", "Room name, player config, browser mode, timeouts, final scores, winner", "Session management"],
+        ["moves", "Action (source, color, destination), board snapshot, timing breakdown", "Move-level replay and ML training"],
+        ["game_states", "Full JSON state per step", "State reconstruction at any point"],
+        ["player_profiles", "Profiler output per player per session", "Behavioral analysis storage"],
+    ],
+    col_widths=[1.3, 3.0, 2.2],
+)
+
+# =========================================================
+# 4. IMPLEMENTATION PROGRESS
+# =========================================================
+doc.add_page_break()
+add_heading("4. Implementation Progress")
+
+add_body(
+    "The following table maps each planned feature from the project proposal to its current implementation status."
+)
+
+add_table(
+    ["Feature", "Planned Scope", "Current Status", "Detail"],
+    [
+        ["Game state representation",
+         "JSON model for all Azul state variables",
+         "DONE",
+         "GameStateData + PlayerState Pydantic models. Factories, center, pattern lines, wall, floor, scores."],
+        ["Deterministic Validator",
+         "Authoritative rules engine for state transitions",
+         "DONE",
+         "47 unit tests. Legal move generation, scoring, wall validation, game-over detection."],
+        ["Tactician (Heuristic)",
+         "Greedy/heuristic action selection",
+         "DONE",
+         "GreedyPlayer with weighted scoring. Beats RandomPlayer 43-3 in simulation."],
+        ["Tactician (Search)",
+         "MCTS/Minimax with profiler conditioning",
+         "PLANNED",
+         "Rules engine provides all primitives needed. Full-game simulation test validates state transitions."],
+        ["Profiler (Rule-based)",
+         "Style classification from game features",
+         "DONE",
+         "BasicProfileAnalyzer: 5 style traits, color/source/timing metrics, NL summaries."],
+        ["Profiler (ML-based)",
+         "Sequence modeling and archetype clustering",
+         "PLANNED",
+         "Data pipeline ready (JSON export). Pluggable AnalyzerRegistry supports new implementations."],
+        ["Opponent Modeling",
+         "Predictive opponent policy",
+         "PLANNED",
+         "MachinePlayer ABC accepts full state. Architecture supports any prediction model."],
+        ["Explainability",
+         "Decision explanations tied to search internals",
+         "PARTIAL",
+         "Board snapshots per move, profile summaries. Missing: per-action score breakdown UI."],
+        ["Game state telemetry",
+         "Latency and timing metrics per agent",
+         "DONE",
+         "Per-move: decision_ms, click_ms, ws_wait_ms, total_ms. System log with real-time broadcast."],
+        ["Action trace ledger",
+         "Immutable move recording",
+         "DONE",
+         "SQLite ledger with full board snapshots. JSON export with documented schema."],
+        ["Multi-agent orchestration",
+         "Independent agents in shared game room",
+         "DONE",
+         "2-4 Chromium browsers per session. Host bot manages room creation and game start."],
+        ["Visualization & Replay",
+         "Live monitoring and post-game review",
+         "DONE",
+         "Round-grouped move log, expandable board snapshots, winner banner, JSON export."],
+        ["Experiment tracking",
+         "MLflow integration",
+         "PLANNED",
+         "JSON export provides experiment data. MLflow integration is moderate effort."],
+    ],
+    col_widths=[1.3, 1.8, 0.8, 2.6],
+)
+
+# Summary counts
+add_body("Summary: 8 features fully delivered, 1 partially done, 4 planned for Phase 2.")
+
+# =========================================================
+# 5. FUTURE ROADMAP
+# =========================================================
+add_heading("5. Future Roadmap: AI-Powered Features")
+
+add_body(
+    "The modular architecture is specifically designed to enable the following advanced capabilities. "
+    "Each feature leverages the existing data pipeline, rules engine, and pluggable model interfaces."
+)
+
+add_heading("5.1 Monte Carlo Tree Search (MCTS) Player", level=2)
+add_body(
+    "Implement a search-based player that simulates possible futures from the current board state, "
+    "evaluates positions using the existing scoring functions, handles the stochastic tile-bag element "
+    "through random playouts, and provides configurable search depth/time budget. "
+    "The rules engine already provides get_legal_actions(), score_tile_placement(), and is_game_over() \u2014 "
+    "the complete interface MCTS requires."
+)
+
+add_heading("5.2 Opponent Modeling & Adaptive Play", level=2)
+add_body(
+    "This is the core vision of OppoProfile \u2014 agents that don't just play well, but play differently "
+    "based on who they're facing. The profiling framework enables a unified player-profiler agent that "
+    "builds a real-time behavioral model of the opponent during gameplay, predicts which tiles the opponent "
+    "will pick next, adapts its strategy dynamically (blocking preferred colors, competing for the same factory), "
+    "and tests hypotheses by making exploratory moves."
+)
+
+add_heading("5.3 Reinforcement Learning Player", level=2)
+add_body(
+    "Train a neural network player using recorded game data. The state representation (board snapshot \u2192 tensor), "
+    "action space (legal moves as discrete choices), and reward signal (points minus penalties) are all defined. "
+    "The MachinePlayer interface means a trained RL model drops in with zero engine changes. "
+    "The full-game simulation can generate thousands of training games automatically."
+)
+
+add_heading("5.4 Natural Language Game Commentary", level=2)
+add_body(
+    "Using large language models, generate real-time commentary tied to the board state: "
+    "\"Alice is building toward a complete second row \u2014 two more reds would trigger a 7-point column bonus.\" "
+    "The board snapshot data structure is already rich enough to serve as LLM context."
+)
+
+add_heading("5.5 Multi-Game Tournament System", level=2)
+add_body(
+    "Run automated round-robin tournaments with multiple ML models, tracking Elo ratings across games. "
+    "Statistical analysis of win rates, score distributions, and matchup advantages. "
+    "Automated parameter tuning via genetic algorithms on GreedyPlayer weights."
+)
+
+# =========================================================
+# 6. RISK & CONCLUSION
+# =========================================================
+add_heading("6. Risk Assessment")
+
+add_table(
+    ["Risk", "Impact", "Mitigation"],
+    [
+        ["Platform changes (CSS/JS updates)", "High",
+         "Socket.IO protocol is more stable than DOM. Exploration script can re-map selectors quickly."],
+        ["Rate limiting or blocking", "Medium",
+         "Headless mode + reasonable play speed. Configurable delays between moves."],
+        ["Browser automation brittleness", "Medium",
+         "Floor-placement fallback, move verification, configurable timeout + abort."],
+        ["Model training data quality", "Medium",
+         "Full board snapshots per move ensure complete state. Validator guarantees move legality."],
+    ],
+    col_widths=[2.0, 0.8, 3.7],
+)
+
+add_heading("7. Conclusion")
+
+add_body(
+    "OppoProfile has reached a solid MVP state with a working end-to-end pipeline: AI agents autonomously "
+    "play Azul on the live platform, every move is recorded with full board state, and player behavior can be "
+    "analyzed through pluggable profilers. The architecture is deliberately modular \u2014 new ML models, "
+    "new analyzers, and even new games can be added without restructuring the core platform."
+)
+
+add_body(
+    "The next phase focuses on implementing MCTS-based search, expanding the profiling framework with "
+    "ML-based opponent modeling, and demonstrating the platform's unique value: agents that understand "
+    "their opponents, not just the game."
+)
+
+doc.add_paragraph()
+footer = doc.add_paragraph()
+footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+run = footer.add_run(
+    "Repository: github.com/rongrongrr/AIS_PT07-Group1_MultiAgentBoardGameIntelligence"
+)
+run.font.size = Pt(9)
+run.font.color.rgb = RGBColor(0x7f, 0x8c, 0x8d)
+
+# --- Save ---
+out_path = os.path.join(os.path.dirname(__file__), "Milestone_1_Report.docx")
+doc.save(out_path)
+print(f"Saved to {out_path}")
