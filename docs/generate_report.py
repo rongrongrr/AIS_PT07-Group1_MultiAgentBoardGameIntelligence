@@ -78,16 +78,22 @@ doc.add_paragraph()
 doc.add_paragraph()
 title = doc.add_paragraph()
 title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = title.add_run("Multi-Agent Board Game Intelligence")
-run.font.size = Pt(26)
+run = title.add_run("Architecting an Explainable Multi-Agent System\nfor Imperfect-Profile Games")
+run.font.size = Pt(22)
 run.font.color.rgb = RGBColor(0x1a, 0x52, 0x76)
 run.bold = True
 
 subtitle = doc.add_paragraph()
 subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = subtitle.add_run("Milestone 1 Progress Report")
+run = subtitle.add_run("A Case Study on Azul")
 run.font.size = Pt(16)
 run.font.color.rgb = RGBColor(0x29, 0x80, 0xb9)
+
+sub2 = doc.add_paragraph()
+sub2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+run = sub2.add_run("Milestone 1 Progress Report")
+run.font.size = Pt(14)
+run.font.color.rgb = RGBColor(0x7f, 0x8c, 0x8d)
 
 doc.add_paragraph()
 meta = doc.add_paragraph()
@@ -96,7 +102,9 @@ meta.add_run("Master of Technology in Intelligent Systems\n").font.size = Pt(11)
 meta.add_run("ISS, National University of Singapore\n\n").font.size = Pt(11)
 meta.add_run("AIS PT07 Group 1\n").font.size = Pt(12)
 meta.add_run("April 2026\n\n").font.size = Pt(11)
-meta.add_run("ISS Supervisor: Zhengqing Hu").font.size = Pt(11)
+r = meta.add_run("ISS Supervisor: Zhengqing Hu")
+r.font.size = Pt(11)
+r.bold = True
 
 doc.add_paragraph()
 members = doc.add_paragraph()
@@ -114,14 +122,15 @@ doc.add_page_break()
 add_heading("1. Executive Summary")
 
 add_body(
-    "OppoProfile is an AI-driven platform that automates gameplay on the board game Azul, "
-    "enabling Machine Learning agents to compete, observe, and profile player behavior. "
-    "The platform bridges the gap between a live web-based game (buddyboardgames.com) and "
-    "custom ML models, creating an end-to-end pipeline for game intelligence research."
+    "This project investigates how explainable multi-agent systems can be architected for "
+    "imperfect-profile games \u2014 games where opponent intentions and play styles are unknown "
+    "and must be inferred during gameplay. Using Azul as a case study, we develop both the "
+    "research framework and a supporting platform, OppoProfile, that enables AI agents to "
+    "compete on a live game platform, record complete game data, and profile opponent behavior."
 )
 
 add_body(
-    "In this first milestone, we have delivered a fully functional MVP that can:"
+    "In this first milestone, we have delivered OppoProfile as a fully functional MVP that can:"
 )
 add_bullet("Launch multiple independent AI agents that play complete Azul games autonomously")
 add_bullet("Record every move with full board-state snapshots for replay and analysis")
@@ -129,8 +138,9 @@ add_bullet("Analyze player behavior through a pluggable profiling framework")
 add_bullet("Visualize games in real time and provide detailed post-game review")
 
 add_body(
-    "The platform is built on a modern, extensible architecture (React + FastAPI + Playwright + SQLite) "
-    "with 105 automated tests covering rules validation, ML decision-making, API integrity, and full-game simulation."
+    "OppoProfile is built on a modern, extensible architecture (React + FastAPI + Playwright + SQLite) "
+    "with 105 automated tests. It serves as the experimental platform for the research components: "
+    "opponent modeling, adaptive play strategies, and explainable decision-making."
 )
 
 # =========================================================
