@@ -45,7 +45,7 @@ INIT_SCRIPT = """(function() {
                     const orig = val.connect.bind(val);
                     val.connect = function() {
                         const s = orig.apply(val, arguments);
-                        window.__oppo_socket = s;
+                        window.__tiles_socket = s;
                         return s;
                     };
                 }
@@ -96,8 +96,8 @@ async def launch_bot(name, room, is_host):
     # Store room/player on window for Socket.IO emits
     await page.evaluate(
         """([room, player]) => {
-            window.__oppo_room = room;
-            window.__oppo_player = player;
+            window.__tiles_room = room;
+            window.__tiles_player = player;
         }""",
         [room, name],
     )
@@ -106,9 +106,9 @@ async def launch_bot(name, room, is_host):
     log("join", f"{name} joined room '{room}' in {join_ms}ms (in_lobby={in_lobby})")
 
     # Check socket
-    has_socket = await page.evaluate("() => !!window.__oppo_socket") or False
+    has_socket = await page.evaluate("() => !!window.__tiles_socket") or False
     socket_connected = await page.evaluate(
-        "() => window.__oppo_socket ? window.__oppo_socket.connected : false"
+        "() => window.__tiles_socket ? window.__tiles_socket.connected : false"
     ) or False
     log("socket", f"{name} socket: exists={has_socket} connected={socket_connected}")
 
@@ -154,7 +154,7 @@ async def deal_tiles(bot):
     t0 = time.time()
     result = await page.evaluate(
         """([room, player]) => {
-            const socket = window.__oppo_socket;
+            const socket = window.__tiles_socket;
             if (socket && typeof socket.emit === 'function') {
                 socket.emit('takeTurn', {
                     room: room, player: player,
@@ -434,7 +434,7 @@ async def run_game():
 
 async def main():
     print("\n" + "="*60)
-    print("  OPPO PROFILE - LIVE GAME DIAGNOSTIC")
+    print("  TILES - LIVE GAME DIAGNOSTIC")
     print("="*60 + "\n")
 
     result = await run_game()

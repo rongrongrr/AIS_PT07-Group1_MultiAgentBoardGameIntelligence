@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 # Use a test database
-os.environ["OPPO_DB_PATH"] = "/tmp/oppo_profile_test.db"
+os.environ["TILES_DB_PATH"] = "/tmp/tiles_test.db"
 
 from app.main import app
 from app.models.db import Base, engine, init_db

@@ -125,12 +125,12 @@ add_body(
     "This project investigates how explainable multi-agent systems can be architected for "
     "imperfect-profile games \u2014 games where opponent intentions and play styles are unknown "
     "and must be inferred during gameplay. Using Azul as a case study, we develop both the "
-    "research framework and a supporting platform, OppoProfile, that enables AI agents to "
+    "research framework and a supporting platform, TILES, that enables AI agents to "
     "compete on a live game platform, record complete game data, and profile opponent behavior."
 )
 
 add_body(
-    "In this first milestone, we have delivered OppoProfile as a fully functional MVP that can:"
+    "In this first milestone, we have delivered TILES as a fully functional MVP that can:"
 )
 add_bullet("Launch multiple independent AI agents that play complete Azul games autonomously")
 add_bullet("Record every move with full board-state snapshots for replay and analysis")
@@ -138,7 +138,7 @@ add_bullet("Analyze player behavior through a pluggable profiling framework")
 add_bullet("Visualize games in real time and provide detailed post-game review")
 
 add_body(
-    "OppoProfile is built on a modern, extensible architecture (React + FastAPI + Playwright + SQLite) "
+    "TILES is built on a modern, extensible architecture (React + FastAPI + Playwright + SQLite) "
     "with 105 automated tests. It serves as the experimental platform for the research components: "
     "opponent modeling, adaptive play strategies, and explainable decision-making."
 )
@@ -157,7 +157,7 @@ add_body(
 
 add_body(
     "However, no existing platform connects a live game environment to a modular ML pipeline "
-    "where agents can play, observe, and learn. OppoProfile solves this by providing four key capabilities:"
+    "where agents can play, observe, and learn. TILES solves this by providing four key capabilities:"
 )
 
 add_table(
@@ -454,7 +454,7 @@ add_body(
 
 add_heading("5.2 Opponent Modeling & Adaptive Play", level=2)
 add_body(
-    "This is the core vision of OppoProfile \u2014 agents that don't just play well, but play differently "
+    "This is the core vision of TILES \u2014 agents that don't just play well, but play differently "
     "based on who they're facing. The profiling framework enables a unified player-profiler agent that "
     "builds a real-time behavioral model of the opponent during gameplay, predicts which tiles the opponent "
     "will pick next, adapts its strategy dynamically (blocking preferred colors, competing for the same factory), "
@@ -506,7 +506,7 @@ add_table(
 add_heading("7. Conclusion")
 
 add_body(
-    "OppoProfile has reached a solid MVP state with a working end-to-end pipeline: AI agents autonomously "
+    "TILES has reached a solid MVP state with a working end-to-end pipeline: AI agents autonomously "
     "play Azul on the live platform, every move is recorded with full board state, and player behavior can be "
     "analyzed through pluggable profilers. The architecture is deliberately modular \u2014 new ML models, "
     "new analyzers, and even new games can be added without restructuring the core platform."

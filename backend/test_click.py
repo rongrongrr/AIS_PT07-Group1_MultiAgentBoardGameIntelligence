@@ -6,7 +6,7 @@ from playwright.async_api import async_playwright
 from base64 import b64encode
 from app.engine.state_parser import parse_socketio_message, parse_game_state_from_event
 
-INIT = """(function(){let _io;try{Object.defineProperty(window,'io',{configurable:true,get(){return _io;},set(v){_io=v;if(v&&typeof v.connect==='function'){const o=v.connect.bind(v);v.connect=function(){const s=o.apply(v,arguments);window.__oppo_socket=s;return s;};}}});}catch(e){}})();"""
+INIT = """(function(){let _io;try{Object.defineProperty(window,'io',{configurable:true,get(){return _io;},set(v){_io=v;if(v&&typeof v.connect==='function'){const o=v.connect.bind(v);v.connect=function(){const s=o.apply(v,arguments);window.__tiles_socket=s;return s;};}}});}catch(e){}})();"""
 
 async def main():
     pw = await async_playwright().start()
@@ -53,7 +53,7 @@ async def main():
         # Need to deal manually
         print("No tiles, dealing manually...")
         await page.evaluate(f"""()=>{{
-            window.__oppo_socket.emit('takeTurn',{{
+            window.__tiles_socket.emit('takeTurn',{{
                 room:'{room}',player:'{name}',gameName:'azul',turnType:'dealTiles'
             }});
         }}""")
@@ -83,7 +83,7 @@ async def main():
     print(f"\n--- chooseTiles: factory=0, color={first_tile} ---")
     result = await page.evaluate(
         """([factory, tileType]) => {
-            const socket = window.__oppo_socket;
+            const socket = window.__tiles_socket;
             if (!socket) return 'no_socket';
             const room = document.querySelector('#azul-room-name-text')?.textContent?.trim();
             const player = document.querySelector('#me-info-name')?.textContent?.trim();
@@ -115,7 +115,7 @@ async def main():
         print(f"\n--- placeTiles: patternLine=0 ---")
         await page.evaluate(
             """([patternLine]) => {
-                const socket = window.__oppo_socket;
+                const socket = window.__tiles_socket;
                 const room = document.querySelector('#azul-room-name-text')?.textContent?.trim();
                 const player = document.querySelector('#me-info-name')?.textContent?.trim();
                 socket.emit('takeTurn', {

@@ -1,4 +1,4 @@
-# OppoProfile: Milestone 1 Report
+# TILES: Milestone 1 Report
 
 **Project:** Multi-Agent Board Game Intelligence Platform  
 **Team:** AIS PT07 Group 1  
@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary
 
-OppoProfile is an AI-driven platform that automates gameplay on the board game Azul, enabling Machine Learning agents to compete, observe, and profile player behavior. The platform bridges the gap between a live web-based game (buddyboardgames.com) and custom ML models, creating an end-to-end pipeline for game intelligence research.
+TILES is an AI-driven platform that automates gameplay on the board game Azul, enabling Machine Learning agents to compete, observe, and profile player behavior. The platform bridges the gap between a live web-based game (buddyboardgames.com) and custom ML models, creating an end-to-end pipeline for game intelligence research.
 
 **In the first milestone, we have delivered a fully functional MVP** that can:
 - Launch multiple independent AI agents that play complete Azul games autonomously
@@ -29,7 +29,7 @@ Board games like Azul present rich decision spaces that combine short-term tacti
 - **Player modeling**: Building behavioral profiles that predict future moves
 - **Game analytics**: Quantifying play styles and identifying winning strategies
 
-However, no existing platform connects a live game environment to a modular ML pipeline where agents can play, observe, and learn. OppoProfile solves this by providing:
+However, no existing platform connects a live game environment to a modular ML pipeline where agents can play, observe, and learn. TILES solves this by providing:
 
 1. **A Play Engine** that interfaces with the real game platform via browser automation
 2. **A modular ML framework** where players and profilers are pluggable components
@@ -180,7 +180,7 @@ The profiling framework enables a **unified player-profiler agent** that:
 - Adapts its strategy dynamically (e.g., blocking preferred colors, competing for the same factory)
 - Tests hypotheses by making exploratory moves ("if I take blue, will they switch to red?")
 
-This is the core vision of OppoProfile — agents that don't just play well, but play *differently* based on who they're facing.
+This is the core vision of TILES — agents that don't just play well, but play *differently* based on who they're facing.
 
 ### 6.4 Natural Language Game Commentary
 Using large language models, generate real-time commentary:
@@ -219,7 +219,7 @@ The ML framework, database, frontend visualization, and profiling pipeline remai
 
 ## 8. Conclusion
 
-OppoProfile has reached a solid MVP state with a working end-to-end pipeline: AI agents autonomously play Azul, every move is recorded with full board state, and player behavior can be analyzed through pluggable profilers. The architecture is deliberately modular — new ML models, new analyzers, and even new games can be added without restructuring the core platform.
+TILES has reached a solid MVP state with a working end-to-end pipeline: AI agents autonomously play Azul, every move is recorded with full board state, and player behavior can be analyzed through pluggable profilers. The architecture is deliberately modular — new ML models, new analyzers, and even new games can be added without restructuring the core platform.
 
 The next phase focuses on hardening the play engine for multi-round games, expanding the ML model library, and demonstrating the platform's unique value: **agents that understand their opponents, not just the game.**
 

@@ -1,8 +1,8 @@
-# OppoProfile Game Export Format (v1.0)
+# TILES Game Export Format (v1.0)
 
 ## Overview
 
-The export JSON file contains a complete record of an Azul game session played through OppoProfile. It can be used for game replay, ML training data, player profiling analysis, or archival.
+The export JSON file contains a complete record of an Azul game session played through TILES. It can be used for game replay, ML training data, player profiling analysis, or archival.
 
 ## How to Export
 

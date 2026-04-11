@@ -1,4 +1,4 @@
-"""Integration tests for the OppoProfile session lifecycle.
+"""Integration tests for the TILES session lifecycle.
 
 These tests verify the full API flow: create session -> start -> check status.
 The actual Playwright game execution requires a live connection to buddyboardgames.com,
@@ -9,7 +9,7 @@ import asyncio
 import os
 import pytest
 
-os.environ["OPPO_DB_PATH"] = "/tmp/oppo_profile_integration_test.db"
+os.environ["TILES_DB_PATH"] = "/tmp/tiles_integration_test.db"
 
 from fastapi.testclient import TestClient
 

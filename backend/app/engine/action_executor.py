@@ -61,11 +61,11 @@ async def _emit_and_wait(page, payload: dict) -> dict:
     return await page.evaluate(
         """(payload) => {
             return new Promise((resolve) => {
-                const socket = window.__oppo_socket;
+                const socket = window.__tiles_socket;
                 if (!socket) { resolve({ok: false, msg: 'no_socket'}); return; }
 
-                const room = window.__oppo_room || '';
-                const player = window.__oppo_player || '';
+                const room = window.__tiles_room || '';
+                const player = window.__tiles_player || '';
                 if (!room || !player) {
                     resolve({ok: false, msg: 'no_room=[' + room + '] player=[' + player + ']'});
                     return;

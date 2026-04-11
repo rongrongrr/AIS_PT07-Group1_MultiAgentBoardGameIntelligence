@@ -1,4 +1,4 @@
-"""SQLAlchemy models and database setup for OppoProfile."""
+"""SQLAlchemy models and database setup for TILES."""
 
 import os
 from datetime import datetime
@@ -16,8 +16,8 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 DB_PATH = os.environ.get(
-    "OPPO_DB_PATH",
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "db", "oppo_profile.db"),
+    "TILES_DB_PATH",
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "db", "tiles.db"),
 )
 DB_URL = f"sqlite:///{os.path.abspath(DB_PATH)}"
 

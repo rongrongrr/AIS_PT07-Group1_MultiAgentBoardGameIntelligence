@@ -1,4 +1,4 @@
-"""Pydantic schemas for OppoProfile API and internal data structures."""
+"""Pydantic schemas for TILES API and internal data structures."""
 
 from __future__ import annotations
 

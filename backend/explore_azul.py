@@ -173,7 +173,7 @@ import time
 from datetime import datetime
 from playwright.async_api import async_playwright
 
-SCREENSHOTS_DIR = "/Users/bravozheng/06_Coding/05_Claude/04_OppoProfile/backend"
+SCREENSHOTS_DIR = "/Users/bravozheng/06_Coding/05_Claude/04_TILES/backend"
 BASE_URL = "https://buddyboardgames.com/azul"
 PLAYER_NAME = "Explorer1"
 ROOM_NAME = "test-explore-1"

@@ -1,4 +1,4 @@
-"""FastAPI application entry point for OppoProfile."""
+"""FastAPI application entry point for TILES."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="OppoProfile",
+    title="TILES",
     description="AI-driven platform for Azul board game automation and player profiling",
     version="0.1.0",
     lifespan=lifespan,
@@ -46,4 +46,4 @@ app.include_router(profiler.router, prefix="/api/profiler", tags=["profiler"])
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "oppo-profile"}
+    return {"status": "ok", "service": "tiles"}

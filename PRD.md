@@ -1,8 +1,8 @@
-# OppoProfile - Product Requirements Document
+# TILES - Product Requirements Document
 
 ## 1. Executive Summary
 
-OppoProfile is an AI-driven platform that interfaces with the web-based board game **Azul** (hosted on [buddyboardgames.com](https://buddyboardgames.com/azul)). It acts as a bridge between the game's web UI and custom ML models, enabling automated **Machine Players** to compete and **Profiling Agents** to observe, record, and analyze player behavior to build behavioral profiles.
+TILES is an AI-driven platform that interfaces with the web-based board game **Azul** (hosted on [buddyboardgames.com](https://buddyboardgames.com/azul)). It acts as a bridge between the game's web UI and custom ML models, enabling automated **Machine Players** to compete and **Profiling Agents** to observe, record, and analyze player behavior to build behavioral profiles.
 
 ---
 
@@ -104,7 +104,7 @@ The target platform has the following characteristics (discovered via exploratio
 ### 4.3 Project Structure
 
 ```
-oppo-profile/
+tiles/
 ├── frontend/                    # React app (Vite)
 │   ├── src/
 │   │   ├── components/
@@ -146,7 +146,7 @@ oppo-profile/
 │   └── requirements.txt
 │
 ├── db/
-│   └── oppo_profile.db             # SQLite database file
+│   └── tiles.db             # SQLite database file
 │
 └── README.md
 ```

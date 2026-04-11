@@ -1,4 +1,4 @@
-# OppoProfile
+# TILES
 
 AI-driven platform that plays the board game **Azul** on [buddyboardgames.com](https://buddyboardgames.com/azul) using automated Machine Players, while recording every move for replay and analysis.
 
@@ -89,7 +89,7 @@ Completed games can be exported as JSON containing every move with full board sn
 ## Project Structure
 
 ```
-oppo-profile/
+tiles/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py              # FastAPI entry point

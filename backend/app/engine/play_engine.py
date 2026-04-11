@@ -100,7 +100,7 @@ class BotBrowser:
                                 const origConnect = val.connect.bind(val);
                                 val.connect = function() {
                                     const socket = origConnect.apply(val, arguments);
-                                    window.__oppo_socket = socket;
+                                    window.__tiles_socket = socket;
                                     return socket;
                                 };
                             }
@@ -144,8 +144,8 @@ class BotBrowser:
         # Store room/player on window for the emit helper
         await page.evaluate(
             """([room, player]) => {
-                window.__oppo_room = room;
-                window.__oppo_player = player;
+                window.__tiles_room = room;
+                window.__tiles_player = player;
             }""",
             [self.room_name, self.player_name],
         )
@@ -187,7 +187,7 @@ class BotBrowser:
         result = await page.evaluate(
             """([room, player]) => {
                 // Try multiple ways to find the socket
-                const socket = window.__oppo_socket || window.socket;
+                const socket = window.__tiles_socket || window.socket;
                 if (socket && typeof socket.emit === 'function') {
                     socket.emit('takeTurn', {
                         room: room,
@@ -224,8 +224,8 @@ class BotBrowser:
                     const perf = performance.getEntriesByType('resource')
                         .filter(r => r.name.includes('socket.io'));
                     // Try to send via any open WebSocket
-                    if (window.__oppo_ws) {
-                        window.__oppo_ws.send(raw);
+                    if (window.__tiles_ws) {
+                        window.__tiles_ws.send(raw);
                         return true;
                     }
                     return false;

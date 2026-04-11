@@ -70,7 +70,7 @@ export default function App() {
     <div className="h-screen flex flex-col bg-gray-950 text-gray-100">
       {/* Top bar */}
       <nav className="bg-gray-900 border-b border-gray-700 px-3 py-1.5 flex items-center gap-1 shrink-0">
-        <span className="text-lg font-bold text-teal-400 tracking-tight mr-3">OppoProfile</span>
+        <span className="text-lg font-bold text-teal-400 tracking-tight mr-3">TILES</span>
 
         <button
           onClick={() => setActiveTab('config')}
