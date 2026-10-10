@@ -401,14 +401,13 @@ source .venv/bin/activate
 pytest
 ```
 
-The suite has around 500 tests across 52 files. It covers the rules of the
-game, each Tactician, the Profiler, the turn pipeline, the database, the API,
-every experiment, rule extraction, and the live-play loop against a simulated
-site.
+The suite has 130 tests across 15 files. It covers the rules of the game,
+each Tactician, the Profiler, the Explainer, the turn pipeline, the database,
+the API, every experiment, rule extraction, and the live-play loop against a
+simulated site.
 
-One test plays real games on buddyboardgames.com and is skipped unless you ask
-for it with `pytest -m live`. Tests that depend on an optional extra are
-skipped when that extra is not installed.
+Tests that depend on an optional extra are skipped when that extra is not
+installed.
 
 The web app has no tests of its own. `npm run build` in `frontend/` type-checks
 it.
