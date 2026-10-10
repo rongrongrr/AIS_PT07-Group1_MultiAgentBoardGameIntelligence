@@ -1,169 +1,138 @@
-# TILES
+# TILES — Transparent Intelligence for Learning, Exploration, and Simulation
 
-**T**ransparent **I**ntelligence for **L**earning, **E**xploration and **S**imulation: an explainable multi-agent platform that plays **Azul** on [buddyboardgames.com](https://buddyboardgames.com/azul) through automated Machine Players, records every move for replay and analysis, and profiles how players behave.
+An **explainable multi-agent system** for competitive board games, built as a
+case study on **Azul**. TILES fields a decision stack of four specialized
+agents — a **Validator**, a **Tactician**, a **Profiler**, and an
+**Explainer** — that plays Azul locally (fast simulation) or live on
+[buddyboardgames.com](https://buddyboardgames.com/azul) via browser
+automation, records every move in an immutable ledger, and explains every
+decision it makes.
 
-AIS PT07 Capstone, Group 1 (NUS ISS). See [docs/EVALUATION.md](docs/EVALUATION.md) for measured results and their limits.
+*AIS PT07 Capstone Group 1 — Master of Technology in Artificial Intelligent
+Systems, ISS, National University of Singapore.*
 
-## Quick Start
+## What it does
 
-### Fastest: Docker (one command)
+- **Plays Azul well**: a PUCT Monte Carlo Tree Search Tactician with
+  heuristic priors, plus Greedy / Minimax / Random baselines.
+- **Models opponents**: the Profiler learns each opponent's style online
+  (Bayesian prior → posterior), classifies them into 5 archetypes, and
+  predicts their next moves. Those predictions are **injected into the MCTS
+  search** so the agent adapts its play to who it is facing.
+- **Explains itself**: every move ships with a natural-language rationale
+  derived from real search artifacts (Q-value margins, principal variation,
+  profiler evidence) — template-based, optionally refined by an LLM.
+- **Never breaks the rules**: a deterministic symbolic rules engine gates
+  every proposed move; rules are also *extracted from the English rulebook*
+  (RAG pipeline) and verified against the engine as an accuracy benchmark.
+- **Measures everything**: immutable SQLite ledger with full board
+  snapshots, per-move latency telemetry, Elo tournaments, and an ablation
+  study isolating the Profiler's win-rate contribution (MLflow-optional).
 
-```bash
-docker compose up --build        # first build downloads ~1.5 GB (Chromium image); later starts take seconds
-```
-
-Then open **http://localhost:8080**. Everything runs in two containers: `backend` (FastAPI + Playwright/Chromium) and `frontend` (nginx serving the UI and proxying `/api`, including WebSockets, to the backend). Sessions and move history are kept in the `tiles-data` Docker volume across restarts (`docker compose down -v` wipes them).
-
-- Browsers always run **headless** in a container (no display); the "Headed" option is ignored there.
-- The containers need outbound internet access to reach buddyboardgames.com.
-- Stop with `docker compose down`. Rebuild after code changes with `docker compose up --build`.
-
-### Without Docker
-
-### Prerequisites
-
-- **Python 3.11+** (developed on 3.11)
-- **Node.js 18+**
-- **Chromium** (installed by Playwright)
-
-### 1. Backend
+## Quick start
 
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-playwright install chromium
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e '.[dev]'
 
-uvicorn app.main:app --host 127.0.0.1 --port 8000
+# Watch an adaptive MCTS agent beat a greedy bot, with explanations:
+tiles play --player Athena=mcts_profiled:simulations=300 --player Bruno=greedy --seed 7
+
+# Benchmarks from the report deliverables:
+tiles predict-eval --games 10          # opponent-model prediction accuracy
+tiles verify-rules                     # rulebook extraction accuracy
+tiles ablate --games 10                # profiler ablation (win-rate uplift)
+tiles tournament --games-per-pair 2    # Elo standings across all tacticians
 ```
 
-API docs: `http://localhost:8000/docs`. The database path can be changed with `TILES_DB_PATH`.
-
-### 2. Frontend
+### Web UI (live monitor + XAI dashboard + replay)
 
 ```bash
-cd frontend
-npm install
-npm run dev                     # http://localhost:5173 (proxies /api and WebSockets to :8000)
+# terminal 1 — API server
+cd backend && source .venv/bin/activate && tiles serve
+
+# terminal 2 — frontend dev server (or `npm run build` once and let
+# `tiles serve` host the built app at http://localhost:8000)
+cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
-### 3. Play a game
+Create a session in the UI (2–4 players, any mix of tacticians), start it,
+and watch the board, the move log, and the **XAI panel** (why each move was
+chosen, what was considered, who the opponent is) update live.
 
-1. Open `http://localhost:5173`, enter a **Room Name** (max 20 characters) or click Random.
-2. Choose **Headed** (watch the browsers) or **Headless**.
-3. Add 2-4 player slots: any registered bot, or **Human** (joins through the room link).
-4. **Create Session**, then **Start** in the Game Monitor.
+### Run with Docker
 
-Each bot gets its own Chromium window, joins the room, and plays autonomously. Bots wait in the lobby for human slots before the host bot starts the game.
-
-## Machine Players
-
-| Player | Strategy |
-|---|---|
-| `GreedyPlayer` | Heuristic: scores every legal move on wall points, line progress, end-game bonus potential and floor penalties. The balanced baseline. |
-| `ColorCollectorPlayer`, `RusherPlayer`, `RecklessPlayer`, `BlockerPlayer` | The same engine with different weights, giving distinct play styles (colour loyalty, fast small rows, big piles and floor tolerance, denying opponents' colours). Used to train and test the profiler. |
-| **`RolloutPlayer`** (recommended) | Lookahead: shortlists the heuristic's best moves, simulates the rest of the round for each, and picks the one with the best resulting board. Wins 98% of simulated games against `GreedyPlayer` (73 vs 42 points). |
-| `AdaptivePlayer` | Watches opponent moves, classifies their style, and switches to the weights that did best against that style in simulation. |
-| `AdaptiveRolloutPlayer` | `RolloutPlayer` that simulates each opponent as its inferred archetype. Measured to give no benefit over `RolloutPlayer` (see [EVALUATION.md](docs/EVALUATION.md)); kept for future work. |
-| `RandomPlayer` | Uniform random legal move (optionally seeded). Baseline. |
-
-Every decision records its top alternatives and scores (`last_explanation`); they are stored in the ledger and shown under "Why this move" in the move log.
-
-## Profiling
-
-- `BasicProfileAnalyzer`: colour/source/destination preferences, timing, score trajectory, rule-based style notes.
-- `ArchetypeProfileAnalyzer`: the above plus a learned archetype with probabilities and the behavioural features that drove the label (logistic regression, 10 features). **Trained on simulated bot-vs-bot play**, so labels on human games are hypotheses.
-
-Analysis is run per player from the **Profile Analyzing** tab (or `POST /api/profiler/{session_id}/analyze`).
-
-## Reproducing the experiments
-
-All run from `backend/` and are seeded.
+Everything (backend + built UI) ships as one container:
 
 ```bash
-python scripts/tournament.py --games 100 --seed 1                # Greedy vs Random win rates + 95% CI
-python scripts/train_archetypes.py --games 1200 --seed 7         # self-play -> classifier, held-out accuracy
-python scripts/best_response.py --games 100 --seed 21            # best counter-style per opponent archetype
-python scripts/evaluate_adaptive.py --games 100 --seed 99        # adaptive vs static baseline, unseen deals
-python scripts/evaluate_lookahead.py --games 25 --seed 66        # lookahead strength + opponent modelling in search
+docker build -t tiles .          # or: docker compose up tiles
+docker run -p 8000:8000 -v tiles-db:/data tiles
+# UI + API at http://localhost:8000
 ```
 
-`app/azul/game.py` is the simulation engine behind these (move application, round scoring, tile recycling); `app/azul/rules.py` holds legality and scoring.
+Variants via compose profiles:
+
+```bash
+docker compose --profile live up        # live-play image (bundled Chromium)
+docker compose --profile telemetry up   # + MLflow UI at :5000
+docker compose --profile dev up ui-dev  # hot-reload frontend at :5173
+```
+
+The SQLite ledger persists in the `tiles-db` volume. Set
+`ANTHROPIC_API_KEY` (see `docker-compose.yml`) to enable the LLM explainer.
+
+### Live play on buddyboardgames.com
+
+```bash
+cd backend && pip install -e '.[live]' && playwright install chromium
+```
+
+Then create a session with mode **live** in the UI (or via `POST
+/api/sessions`), giving a room name. Each bot gets its own Chromium seat;
+add a `human` slot and share the room link to play against the agents
+yourself. See `tiles/engine/` for the adapter design.
+
+## Repository layout
+
+```
+backend/tiles/
+├── core/            # pure Azul engine: state, actions, rules, simulator, encodings
+├── agents/
+│   ├── base.py      # Decision Stack contracts (Tactician/Profiler/Explainer)
+│   ├── validator.py # deterministic rules gate + audit trail
+│   ├── tacticians/  # random, greedy, minimax, MCTS (+ profiler-conditioned MCTS)
+│   ├── profiler/    # features → archetypes → next-move prediction
+│   └── explainer/   # template + optional LLM rationales
+├── orchestration/   # the per-turn pipeline (sense→profile→decide→validate→…)
+├── ledger/          # immutable SQLite move ledger + export
+├── rulebook/        # RAG rule ingestion: rulebook.md → RuleSpecs → verification
+├── engine/          # live-play adapter (Playwright + Socket.IO)
+├── sim/             # match runner, tournaments, ablation, prediction eval
+├── rl/              # PettingZoo AEC environment (optional extra)
+├── telemetry/       # MLflow / JSONL experiment tracking
+└── server/          # FastAPI: sessions, WebSocket live updates, history
+frontend/            # React + TypeScript: config, live monitor, XAI panel, replay
+docs/                # ARCHITECTURE.md, API.md
+```
 
 ## Tests
 
 ```bash
-cd backend
-python -m pytest                                  # 217 offline tests (live test excluded)
-python -m pytest --cov=app --cov-report=term      # with coverage; fails below 80% (currently 97%)
-python -m pytest -m live -s                       # live game on buddyboardgames.com (network + Chromium)
-cd ../frontend && npx tsc -b                      # type-check
+cd backend && .venv/bin/python -m pytest        # full suite
 ```
 
-The orchestration tests run the production game loop against a fake platform backed by the simulation engine, so complete multi-round games are exercised with no browser, and `tests/fixtures/live_frames.json` holds real frames captured from the live site. The browser-side JavaScript strings and the live site itself are covered only by live runs (below).
+Covers rules legality/scoring/transitions (with a 100-tile conservation
+invariant over full games), tactician correctness and strength, profiler
+learning and prediction accuracy, the orchestration reject-loop, ledger
+round-trips, rulebook extraction accuracy, the live-state translator, and
+the PettingZoo API (when the `rl` extra is installed).
 
-### Live runs
+## Documentation
 
-```bash
-cd backend && uvicorn app.main:app --port 8000        # start the API, then create/start a session from the UI or API
-TILES_DEBUG_FRAMES=frames.jsonl uvicorn ...           # optional: log every platform WebSocket frame for debugging
-```
-
-Recorded completed live games (2, 3 and 4 players) are in [docs/evidence/](docs/evidence/).
-
-## Project structure
-
-```
-backend/
-  app/
-    main.py                    FastAPI entry
-    azul/rules.py              legal moves, scoring, bonuses
-    azul/game.py               state transitions + full-game simulation
-    engine/play_engine.py      Playwright browsers, game-over / new-round detection
-    engine/action_executor.py  Socket.IO chooseTiles/placeTiles
-    engine/state_parser.py     Socket.IO + DOM state parsing
-    ml/greedy_player.py        heuristic player + style variants + explanations
-    ml/adaptive_player.py      profile-conditioned player
-    ml/archetypes.py           behaviour features + archetype classifier
-    ml/analyzers.py            profile analyzers + registry
-    ml/registry.py             player registry
-    models/{db,schemas}.py     SQLAlchemy + Pydantic
-    routers/                   sessions, players, history, profiler
-  scripts/                     tournament, training and evaluation scripts
-  models/                      trained classifier + best-response table (JSON)
-  tests/
-frontend/src/                  React + Zustand UI (config, monitor, profile)
-docs/                          reports, evaluation, design notes
-```
-
-## API
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/api/health` | Health check |
-| `POST` | `/api/sessions` | Create a session (validated: room <= 20 chars, name <= 16, 4 players max) |
-| `GET` | `/api/sessions`, `/api/sessions/{id}` | List / get sessions |
-| `POST` | `/api/sessions/{id}/start`, `/stop` | Start / stop (stop is a no-op on finished sessions) |
-| `WS` | `/api/sessions/{id}/ws` | Live state, moves, system log |
-| `GET` | `/api/players`, `/api/players/{name}` | Registered players |
-| `GET` | `/api/history/{id}` | Moves with board snapshots and explanations |
-| `GET` | `/api/history/{id}/export` | Full game JSON ([format](backend/EXPORT_FORMAT.md)) |
-| `GET` | `/api/history/{id}/state/{step}`, `/states` | State snapshots |
-| `GET` | `/api/profiler/analyzers` | Available analyzers |
-| `POST` | `/api/profiler/{id}/analyze?player_name=` | Profile a player |
-
-## Status and known limitations
-
-- **Live play works end to end** on buddyboardgames.com for 2-4 bot players: after the final fixes, 7 consecutive live games completed (3 four-player, 4 two-player) with no errors and no floor fallbacks, at roughly 300-440 ms per move; ledger scores match the platform's final scores. Details and the defects found along the way: [docs/EVALUATION.md](docs/EVALUATION.md) section 7.
-- **The platform is a third-party dependency and has changed before.** It now speaks JSON `{"type", "payload"}` over a plain WebSocket (not Socket.IO), and the client captures the page's socket object via an injected script. Decisions, turn detection, dealing and scores all use the platform's WebSocket state; the DOM parser is only a fallback. If the site changes again, run with `TILES_DEBUG_FRAMES` set and compare against `tests/fixtures/live_frames.json`.
-- A session is only marked `completed` if the final board shows a finished wall row; otherwise it is `aborted` with the reason. The host starts only once the platform has confirmed every expected player is in the room.
-- **Not tested live:** human players joining through the room link (roster logic is unit-tested), headed mode over long sessions.
-- **Strength:** `RolloutPlayer` is a strong heuristic-plus-lookahead player, not a trained or exhaustive-search one. Two-player mirror matches between lookahead players are low-scoring (live 10-56 points); 3-4 player games score 30-70 per player.
-- **Profiling** is trained on simulated bot play only; archetype labels on human games are hypotheses (55% accurate on held-out simulated styles).
-- Not implemented: rulebook ingestion (RAG/LLM), MCTS/minimax players, MLflow tracking, replay playback controls, external-model REST endpoints, authentication.
-- The API has no authentication and accepts any http(s) `platform_url`; run it locally only.
-
-## Tech stack
-
-React 19 + TypeScript + Vite + Tailwind + Zustand; Python, FastAPI, SQLAlchemy, SQLite; Playwright (Chromium) with the platform's Socket.IO protocol; numpy + scikit-learn for profiling.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — the system design and how
+  it maps to the project report.
+- [docs/API.md](docs/API.md) — the REST/WebSocket contract between backend
+  and frontend.
+- [docs/STAGE2_PLAN.md](docs/STAGE2_PLAN.md) — remaining work, the
+  experiments the final report needs, and the report outline.

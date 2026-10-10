@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tiles"
+version = "0.2.0"
+description = "TILES: Transparent Intelligence for Learning, Exploration, and Simulation — an explainable multi-agent system for Azul"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pydantic>=2.5",
+]
+
+[project.optional-dependencies]
+live = ["playwright>=1.40"]        # live play on buddyboardgames.com
+telemetry = ["mlflow>=2.10"]       # experiment tracking for ablations
+llm = ["anthropic>=0.40"]          # LLM-refined explanations & rule extraction
+rl = ["pettingzoo>=1.24.3", "gymnasium>=0.29", "numpy>=1.26"]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[project.scripts]
+tiles = "tiles.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tiles*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

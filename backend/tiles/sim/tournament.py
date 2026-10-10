@@ -1,0 +1,138 @@
+"""Round-robin tournaments with Elo tracking (report roadmap item)."""
+
+from __future__ import annotations
+
+import itertools
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional
+
+from tiles.sim.match import MatchConfig, MatchRunner
+
+DEFAULT_ELO = 1200.0
+K_FACTOR = 32.0
+
+
+@dataclass
+class Standing:
+    name: str
+    spec: dict
+    elo: float = DEFAULT_ELO
+    wins: int = 0
+    losses: int = 0
+    ties: int = 0
+    points_for: int = 0
+    points_against: int = 0
+
+    def to_dict(self) -> dict:
+        games = self.wins + self.losses + self.ties
+        return {
+            "name": self.name,
+            "tactician": self.spec.get("tactician"),
+            "elo": round(self.elo, 1),
+            "games": games,
+            "wins": self.wins,
+            "losses": self.losses,
+            "ties": self.ties,
+            "win_rate": round(self.wins / games, 3) if games else 0.0,
+            "avg_score": (
+                round(self.points_for / games, 1) if games else 0.0
+            ),
+        }
+
+
+def _elo_update(a: Standing, b: Standing, result_a: float) -> None:
+    expected_a = 1.0 / (1.0 + 10 ** ((b.elo - a.elo) / 400.0))
+    a.elo += K_FACTOR * (result_a - expected_a)
+    b.elo += K_FACTOR * ((1.0 - result_a) - (1.0 - expected_a))
+
+
+@dataclass
+class TournamentResult:
+    standings: List[Standing]
+    games: List[dict] = field(default_factory=list)
+
+    def table(self) -> str:
+        rows = sorted(self.standings, key=lambda s: -s.elo)
+        header = f"{'player':<24}{'elo':>7}{'W':>4}{'L':>4}{'T':>4}{'avg pts':>9}"
+        lines = [header, "-" * len(header)]
+        for s in rows:
+            d = s.to_dict()
+            lines.append(
+                f"{d['name']:<24}{d['elo']:>7.1f}{d['wins']:>4}{d['losses']:>4}"
+                f"{d['ties']:>4}{d['avg_score']:>9.1f}"
+            )
+        return "\n".join(lines)
+
+    def to_dict(self) -> dict:
+        return {
+            "standings": [
+                s.to_dict()
+                for s in sorted(self.standings, key=lambda x: -x.elo)
+            ],
+            "games": self.games,
+        }
+
+
+def run_tournament(
+    entrants: List[dict],
+    games_per_pair: int = 4,
+    seed: int = 0,
+    profiler: Optional[str] = "basic",
+    on_game=None,
+) -> TournamentResult:
+    """Round-robin between entrant specs.
+
+    Each entrant: ``{"name": ..., "tactician": ..., "config": {...}}``.
+    Seats alternate so first-move advantage cancels out.
+    """
+    standings: Dict[str, Standing] = {
+        e["name"]: Standing(name=e["name"], spec=e) for e in entrants
+    }
+    result = TournamentResult(standings=list(standings.values()))
+
+    game_no = 0
+    for a, b in itertools.combinations(entrants, 2):
+        for g in range(games_per_pair):
+            first, second = (a, b) if g % 2 == 0 else (b, a)
+            config = MatchConfig(
+                players=[dict(first), dict(second)],
+                profiler=profiler,
+                explainer=None,
+                seed=seed + game_no,
+            )
+            match = MatchRunner(config).run()
+            names = [first["name"], second["name"]]
+            winner_name = names[match.winner]
+            loser_name = names[1 - match.winner]
+            tie = match.scores[0] == match.scores[1]
+
+            sa, sb = standings[names[0]], standings[names[1]]
+            sa.points_for += match.scores[0]
+            sa.points_against += match.scores[1]
+            sb.points_for += match.scores[1]
+            sb.points_against += match.scores[0]
+            if tie:
+                sa.ties += 1
+                sb.ties += 1
+                _elo_update(sa, sb, 0.5)
+            else:
+                standings[winner_name].wins += 1
+                standings[loser_name].losses += 1
+                _elo_update(
+                    standings[names[0]],
+                    standings[names[1]],
+                    1.0 if winner_name == names[0] else 0.0,
+                )
+            record = {
+                "game": game_no,
+                "players": names,
+                "scores": match.scores,
+                "winner": winner_name if not tie else None,
+                "steps": match.steps,
+                "duration_s": round(match.duration_s, 2),
+            }
+            result.games.append(record)
+            if on_game:
+                on_game(record)
+            game_no += 1
+    return result

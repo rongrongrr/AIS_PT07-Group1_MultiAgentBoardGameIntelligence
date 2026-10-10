@@ -1,17 +1,23 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
+// The FastAPI backend serves /api; in dev we proxy to it (including the
+// session WebSocket). `npm run build` emits to dist/, which the backend
+// serves statically in production. TILES_API_PROXY overrides the proxy
+// target (used by the docker-compose ui-dev service).
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react()],
   server: {
+    port: 5173,
     proxy: {
-      // ws: true is required so /api/sessions/{id}/ws upgrades are proxied
-      '/api': {
-        target: 'http://localhost:8000',
+      "/api": {
+        target: process.env.TILES_API_PROXY ?? "http://localhost:8000",
         changeOrigin: true,
         ws: true,
       },
     },
   },
-})
+  build: {
+    outDir: "dist",
+  },
+});

@@ -1,237 +1,139 @@
-"""The real game-orchestration loop (sessions._run_multi_bot_game) against a fake platform.
+"""Turn pipeline + match runner tests."""
 
-The fake platform is the simulation engine, so these tests play complete multi-round
-games through the production code path (state read, decide, validate, execute, verify,
-ledger, broadcast) with no browser or network.
-"""
+from tiles.agents.base import Decision, DecisionContext, Tactician
+from tiles.agents.tacticians.greedy import GreedyTactician
+from tiles.agents.validator import Validator
+from tiles.core import Action, CENTER, FLOOR, new_game
+from tiles.orchestration import TurnPipeline
+from tiles.sim.match import MatchConfig, MatchRunner
 
-import asyncio
-import json
-
-import pytest
-
-from app.azul.rules import is_game_over
-from app.ml.base import MachinePlayer
-from app.ml.registry import registry
-from app.models.db import GameState, Move, Session
-from app.models.schemas import DestinationType, GameAction, SourceType, TileColor
-from app.routers import sessions as S
-from tests.fakes import FakeBot, FakeClock, FakeMP, FakePlatform, instant_sleep
-
-NAMES = ["Alice", "Bob"]
-
-
-@pytest.fixture(autouse=True)
-def fast(monkeypatch):
-    monkeypatch.setattr(S.asyncio, "sleep", instant_sleep)
+REQUIRED_RECORD_KEYS = {
+    "step",
+    "round",
+    "player_index",
+    "player_name",
+    "tactician",
+    "action",
+    "state_before",
+    "state_after",
+    "explanation",
+    "report",
+    "profiles",
+    "validation",
+    "timing",
+}
 
 
-def make_session(db, sid="sess_test", players=None):
-    row = Session(
-        id=sid, room_name="fake-room", platform_url="https://buddyboardgames.com/azul",
-        browser_mode="headless", status="created",
-        player_config=json.dumps(players or [{"slot": 0, "type": "GreedyPlayer", "name": "Alice"},
-                                             {"slot": 1, "type": "GreedyPlayer", "name": "Bob"}]),
-        move_timeout_sec=5, stuck_abort_sec=2,
+def test_full_local_match_produces_contract_shaped_records():
+    config = MatchConfig(
+        players=[
+            {"name": "Greta", "tactician": "greedy", "config": {}},
+            {"name": "Randy", "tactician": "random", "config": {"seed": 1}},
+        ],
+        profiler=None,
+        explainer="template",
+        seed=11,
     )
-    db.add(row)
-    db.commit()
-    return row
+    events = []
+    runner = MatchRunner(
+        config, on_event=events.append, keep_records=True
+    )
+    result = runner.run()
+
+    assert result.steps > 10
+    assert len(result.scores) == 2
+    assert result.winner in (0, 1)
+    assert result.winner_name in ("Greta", "Randy")
+
+    for record in result.records:
+        assert REQUIRED_RECORD_KEYS <= set(record)
+        assert record["validation"]["ok"] is True
+        assert record["validation"]["attempts"] == 1
+        assert record["timing"]["total_ms"] >= record["timing"]["decide_ms"]
+        assert record["explanation"]["text"]
+        assert record["state_before"]["players"][0]["name"] == "Greta"
+
+    event_types = {e["type"] for e in events}
+    assert {"status", "state", "move", "round", "game_over"} <= event_types
+    game_over = [e for e in events if e["type"] == "game_over"][0]
+    assert game_over["scores"] == result.scores
+    assert game_over["bonuses"] is not None
 
 
-def setup(db, models=("GreedyPlayer", "RandomPlayer"), seed=1, **bot_kw):
-    platform = FakePlatform(NAMES, seed=seed)
-    bots = [FakeBot(platform, n, is_host=(i == 0), **(bot_kw if i == 0 else {})) for i, n in enumerate(NAMES)]
-    mp = FakeMP(platform, bots)
-    bot_models = {n: registry.create_player(m) for n, m in zip(NAMES, models)}
-    make_session(db)
-    return platform, mp, bot_models
+def test_match_persists_to_ledger(tmp_path):
+    from tiles.ledger import Ledger
+
+    ledger = Ledger(tmp_path / "match.db")
+    config = MatchConfig(
+        players=[
+            {"name": "A", "tactician": "greedy"},
+            {"name": "B", "tactician": "random", "config": {"seed": 2}},
+        ],
+        profiler=None,
+        explainer=None,
+        seed=5,
+    )
+    result = MatchRunner(config, ledger=ledger).run()
+    session = ledger.get_session(result.session_id)
+    assert session["status"] == "completed"
+    history = ledger.get_history(result.session_id)
+    assert len(history) == result.steps
+    export = ledger.export(result.session_id)
+    assert export["session"]["result"]["winner"] == result.winner
+    ledger.close()
 
 
-def run_game(db, mp, bot_models, **kw):
-    asyncio.run(S._run_multi_bot_game("sess_test", mp, bot_models, db,
-                                      move_timeout_sec=kw.pop("move_timeout_sec", 5),
-                                      stuck_abort_sec=kw.pop("stuck_abort_sec", 2)))
-    db.expire_all()
-    return db.query(Session).filter(Session.id == "sess_test").first()
+class IllegalFirstTactician(Tactician):
+    """Proposes an obviously illegal action once, then behaves."""
+
+    name = "rigged"
+
+    def __init__(self) -> None:
+        self.calls = 0
+        self._greedy = GreedyTactician()
+
+    def decide(self, ctx: DecisionContext) -> Decision:
+        self.calls += 1
+        if self.calls == 1:
+            # Factory 0 can never contain a color it doesn't hold AND
+            # dest row 0 may be blocked; use a guaranteed-illegal source.
+            return Decision(action=Action(8, 0, FLOOR))
+        return self._greedy.decide(ctx)
 
 
-class BadModel(MachinePlayer):
-    """Proposes an action that is never legal."""
-
-    @property
-    def name(self):
-        return "BadModel"
-
-    async def decide(self, game_state, player_index):
-        return GameAction(source_type=SourceType.FACTORY, source_index=99, color=TileColor.RED,
-                          destination=DestinationType.FLOOR)
-
-
-class CrashModel(BadModel):
-    async def decide(self, game_state, player_index):
-        raise RuntimeError("boom")
-
-
-class HangModel(BadModel):
-    async def decide(self, game_state, player_index):
-        await asyncio.Event().wait()
+def test_reject_edge_recovers_from_illegal_proposal():
+    state = new_game(2, seed=9)
+    # A 2-player game has 5 factories, so factory index 8 is illegal.
+    rigged = IllegalFirstTactician()
+    pipeline = TurnPipeline(
+        validator=Validator(),
+        tacticians={0: rigged, 1: GreedyTactician()},
+        profiler=None,
+        explainer=None,
+    )
+    record, move, _ = pipeline.run_turn(state, 1)
+    assert rigged.calls == 2
+    assert record["validation"]["ok"] is True
+    assert record["validation"]["attempts"] == 2
+    assert move.tiles_taken > 0
 
 
-def test_full_multi_round_game_completes_and_is_recorded(db):
-    platform, mp, models = setup(db)
-    row = run_game(db, mp, models)
+class AlwaysIllegalTactician(Tactician):
+    name = "broken"
 
-    sim = platform.sim
-    assert sim.finished and is_game_over(sim.state)
-    assert sim.state.round >= 5                      # a real game spans several rounds
-    assert row.status == "completed"
-    assert row.winner in NAMES
-    assert set(json.loads(row.final_scores)) == set(NAMES)
-    assert mp.closed
-
-    moves = db.query(Move).filter(Move.session_id == "sess_test").order_by(Move.step_id).all()
-    assert len(moves) == platform.moves_applied
-    assert [m.step_id for m in moves] == list(range(1, len(moves) + 1))
-    extra = json.loads(moves[0].action_json)["_extra"]
-    for key in ("board", "scores", "click_ms", "total_ms", "legal_actions", "explanation"):
-        assert key in extra
-    assert extra["explanation"]["top_alternatives"]            # "why this move" is persisted
-
-    # each state snapshot is stored under the id of the move that follows it
-    snaps = {g.step_id for g in db.query(GameState).filter(GameState.session_id == "sess_test")}
-    assert set(range(1, len(moves) + 1)) <= snaps
+    def decide(self, ctx: DecisionContext) -> Decision:
+        return Decision(action=Action(8, 0, FLOOR))
 
 
-def test_both_players_get_independent_model_state(db):
-    platform, mp, models = setup(db, models=("AdaptivePlayer", "GreedyPlayer"))
-    run_game(db, mp, models)
-    adaptive = models["Alice"]
-    assert list(adaptive.history) == ["Bob"]                   # observed only the opponent
-    assert len(adaptive.history["Bob"]) > 10
-
-
-def test_floor_fallback_is_recorded_as_played(db):
-    platform, mp, models = setup(db, fallback_first=True)
-    run_game(db, mp, models)
-    first = db.query(Move).filter(Move.session_id == "sess_test", Move.step_id == 1).first()
-    data = json.loads(first.action_json)
-    assert data["destination"] == "floor"
-    assert data["_extra"]["fell_back_to_floor"] is True
-
-
-def test_failed_clicks_are_retried(db):
-    platform, mp, models = setup(db, fail_first=2)
-    row = run_game(db, mp, models)
-    assert row.status == "completed"
-
-
-def test_dom_only_confirmation_path(db):
-    platform, mp, models = setup(db, ws_updates=False)
-    row = run_game(db, mp, models)
-    assert row.status == "completed"
-
-
-def test_initial_deal_when_no_tiles_present(db):
-    platform, mp, models = setup(db)
-    platform.sim.state.factories = [[] for _ in platform.sim.state.factories]
-    platform.sim.state.center_pool = []
-    row = run_game(db, mp, models)
-    assert mp.bots[0].deals >= 1
-    assert row.status == "completed"
-
-
-def test_illegal_model_move_is_rejected_then_session_aborts(db, monkeypatch):
-    platform, mp, models = setup(db, models=("GreedyPlayer", "GreedyPlayer"))
-    models["Alice"] = BadModel()
-    models["Bob"] = BadModel()
-    monkeypatch.setattr(S, "time", FakeClock())
-    row = run_game(db, mp, models)
-    assert platform.moves_applied == 0
-    assert row.status == "aborted"
-
-
-def test_model_exception_aborts_stuck_session(db, monkeypatch):
-    platform, mp, models = setup(db)
-    models["Alice"] = CrashModel()
-    models["Bob"] = CrashModel()
-    monkeypatch.setattr(S, "time", FakeClock())
-    assert run_game(db, mp, models).status == "aborted"
-
-
-def test_model_timeout_is_handled(db, monkeypatch):
-    platform, mp, models = setup(db)
-    models["Alice"] = HangModel()
-    models["Bob"] = HangModel()
-    monkeypatch.setattr(S, "time", FakeClock())
-    assert run_game(db, mp, models, move_timeout_sec=1).status == "aborted"
-
-
-def test_move_with_no_effect_is_not_recorded(db, monkeypatch):
-    platform, mp, models = setup(db, ignore_moves=True, ws_updates=False)
-    mp.bots[1].ignore_moves = True
-    mp.bots[1].ws_updates = False
-    monkeypatch.setattr(S, "time", FakeClock())
-    row = run_game(db, mp, models)
-    assert db.query(Move).filter(Move.session_id == "sess_test").count() == 0
-    assert row.status == "aborted"
-
-
-def test_launch_failure_marks_session_aborted(db):
-    platform, mp, models = setup(db)
-    mp.launch_error = RuntimeError("no browser")
-    row = run_game(db, mp, models)
-    assert row.status == "aborted"
-    assert mp.closed
-
-
-def test_humans_are_awaited_and_do_not_trigger_stuck_abort(db, monkeypatch):
-    platform, mp, models = setup(db)
-    mp.human_count = 1
-    row = run_game(db, mp, models)
-    assert mp.humans_waited
-    assert row.status == "completed"
-
-
-def test_game_that_ends_without_a_full_wall_row_is_not_completed(db):
-    platform, mp, models = setup(db)
-
-    class EarlyOver(FakeBot):
-        async def check_game_over(self):          # claims the game is over immediately
-            self.game_over = True
-            return True
-
-    mp.bots = [EarlyOver(platform, n, is_host=(i == 0)) for i, n in enumerate(NAMES)]
-    row = run_game(db, mp, models)
-    assert row.status == "aborted"
-
-
-def test_cancellation_is_clean(db):
-    platform, mp, models = setup(db)
-    models["Alice"] = HangModel()
-    models["Bob"] = HangModel()
-
-    async def go():
-        task = asyncio.create_task(S._run_multi_bot_game("sess_test", mp, models, db, 60, 60))
-        for _ in range(50):
-            await asyncio.sleep(0)
-        task.cancel()
-        await task
-
-    asyncio.run(go())
-    assert mp.closed
-
-
-def test_update_status_picks_highest_score_as_winner(db):
-    make_session(db)
-    S._update_db_status("sess_test", S.SessionStatus.COMPLETED, db, scores={"A": 3, "B": 9})
-    row = db.query(Session).first()
-    assert row.winner == "B" and row.completed_at is not None
-
-
-def test_states_equal_helper():
-    from app.models.schemas import GameStateData
-    a = GameStateData(factories=[[TileColor.RED]])
-    assert S._states_equal(a, a.model_copy(deep=True))
-    assert not S._states_equal(a, GameStateData(factories=[[TileColor.BLUE]]))
-    assert S._states_equal(None, None) and not S._states_equal(a, None)
+def test_fallback_after_repeated_illegal_proposals():
+    state = new_game(2, seed=9)
+    pipeline = TurnPipeline(
+        validator=Validator(),
+        tacticians={0: AlwaysIllegalTactician(), 1: GreedyTactician()},
+        profiler=None,
+        explainer=None,
+    )
+    record, move, _ = pipeline.run_turn(state, 1)
+    assert record["validation"]["ok"] is True
+    assert record["validation"]["attempts"] == 3  # 2 rejects + fallback
+    assert move.tiles_taken > 0

@@ -1,192 +1,119 @@
-const BASE = '/api';
+import type {
+  CreateSessionRequest,
+  HistoryResponse,
+  PlayerProfileDTO,
+  SessionDetailDTO,
+  SessionSummaryDTO,
+  TacticianInfoDTO,
+  WsEvent,
+} from "../types";
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+const BASE = "/api";
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
+    headers: { "Content-Type": "application/json" },
+    ...init,
   });
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail || `HTTP ${res.status}`);
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      detail = body.detail ?? JSON.stringify(body);
+    } catch {
+      /* keep statusText */
+    }
+    throw new Error(`${res.status} ${detail}`);
   }
-  return res.json();
+  return res.json() as Promise<T>;
 }
-
-// --- Types ---
-
-export interface PlayerSlotConfig {
-  slot: number;
-  type: string;
-  name?: string;
-}
-
-export interface SessionCreate {
-  room_name: string;
-  platform_url?: string;
-  browser_mode: 'headless' | 'headed';
-  players: PlayerSlotConfig[];
-  move_timeout_sec?: number;
-  stuck_abort_sec?: number;
-}
-
-export interface Session {
-  id: string;
-  room_name: string;
-  platform_url: string;
-  browser_mode: string;
-  status: string;
-  player_config: PlayerSlotConfig[];
-  profiler_config: null | Record<string, unknown>;
-  move_timeout_sec: number;
-  stuck_abort_sec: number;
-  final_scores: Record<string, number> | null;
-  winner: string | null;
-  created_at: string;
-  completed_at: string | null;
-}
-
-export interface GameAction {
-  source_type: string;
-  source_index: number | null;
-  color: string;
-  destination: string;
-  destination_row: number | null;
-}
-
-export interface MoveResponse {
-  step_id: number;
-  player_name: string;
-  system_tag: string | null;
-  action: GameAction;
-  decision_time_ms: number | null;
-  timestamp: string;
-  click_ms?: number;
-  ws_wait_ms?: number;
-  total_ms?: number;
-  legal_actions?: number;
-  explanation?: {
-    model: string;
-    chosen_score: number;
-    n_legal: number;
-    top_alternatives: { action: GameAction; score: number }[];
-    adaptation?: { reason: string; playing_as: string; target_archetype?: string };
-  } | null;
-  round?: number;
-  scores?: Record<string, number>;
-  board?: {
-    factories: string[][];
-    center_pool: string[];
-    players: {
-      name: string;
-      score: number;
-      pattern_lines: string[][];
-      wall: boolean[][];
-      floor_line: string[];
-    }[];
-  };
-}
-
-export interface SysLogEntry {
-  ts: string;
-  level: string;
-  player: string;
-  phase: string;
-  msg: string;
-  data?: Record<string, unknown>;
-}
-
-export interface PlayerState {
-  index: number;
-  name: string;
-  system_tag: string | null;
-  score: number;
-  pattern_lines: (string | null)[][];
-  wall: boolean[][];
-  floor_line: string[];
-  has_first_player_token: boolean;
-}
-
-export interface GameStateData {
-  timestamp: string;
-  session_id: string | null;
-  room_name: string;
-  round: number;
-  current_turn: string;
-  factories: string[][];
-  center_pool: string[];
-  players: PlayerState[];
-  game_over: boolean;
-}
-
-// --- API calls ---
 
 export const api = {
-  health: () => request<{ status: string }>('/health'),
+  health: () => request<{ status: string; version: string }>("/health"),
 
-  sessions: {
-    list: () => request<Session[]>('/sessions'),
-    get: (id: string) => request<Session>(`/sessions/${id}`),
-    create: (data: SessionCreate) =>
-      request<Session>('/sessions', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }),
-    start: (id: string) =>
-      request<{ status: string; session_id: string; message: string }>(
-        `/sessions/${id}/start`,
-        { method: 'POST' }
-      ),
-    stop: (id: string) =>
-      request<{ status: string }>(`/sessions/${id}/stop`, { method: 'POST' }),
-  },
+  listTacticians: () => request<TacticianInfoDTO[]>("/tacticians"),
 
-  players: {
-    list: () => request<{ players: { name: string; type: string }[]; profilers: { name: string; type: string }[] }>('/players'),
-  },
+  createSession: (payload: CreateSessionRequest) =>
+    request<SessionDetailDTO>("/sessions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
-  history: {
-    get: (sessionId: string) =>
-      request<{ session_id: string; room_name: string; total_moves: number; moves: MoveResponse[] }>(
-        `/history/${sessionId}`
-      ),
-    getState: (sessionId: string, step: number) =>
-      request<{ state: GameStateData }>(`/history/${sessionId}/state/${step}`),
-    exportGame: (sessionId: string) =>
-      request<Record<string, unknown>>(`/history/${sessionId}/export`),
-  },
+  listSessions: () => request<SessionSummaryDTO[]>("/sessions"),
 
-  profiler: {
-    listAnalyzers: () =>
-      request<{ analyzers: { name: string; description: string }[] }>('/profiler/analyzers'),
-    analyze: (sessionId: string, playerName: string, analyzerName = 'BasicProfileAnalyzer') =>
-      request<Record<string, unknown>>(
-        `/profiler/${sessionId}/analyze?player_name=${encodeURIComponent(playerName)}&analyzer_name=${encodeURIComponent(analyzerName)}`,
-        { method: 'POST' }
-      ),
-  },
+  getSession: (id: string) => request<SessionDetailDTO>(`/sessions/${id}`),
+
+  startSession: (id: string) =>
+    request<{ status: string }>(`/sessions/${id}/start`, { method: "POST" }),
+
+  stopSession: (id: string) =>
+    request<{ status: string }>(`/sessions/${id}/stop`, { method: "POST" }),
+
+  getHistory: (id: string) => request<HistoryResponse>(`/history/${id}`),
+
+  getProfiles: (id: string) =>
+    request<{ profiles: PlayerProfileDTO[] }>(`/profiles/${id}`),
+
+  exportUrl: (id: string) => `${BASE}/history/${id}/export`,
 };
 
-// --- WebSocket ---
+export interface WsHandle {
+  close: () => void;
+}
 
+/**
+ * Open the session WebSocket with automatic reconnect (exponential
+ * backoff, capped). Calls onEvent for each JSON event and onStatus with
+ * "connecting" | "open" | "closed".
+ */
 export function connectSessionWs(
   sessionId: string,
-  onMessage: (data: { type: string; data: unknown }) => void,
-  onClose?: () => void
-): WebSocket {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const ws = new WebSocket(`${protocol}//${window.location.host}/api/sessions/${sessionId}/ws`);
+  onEvent: (event: WsEvent) => void,
+  onStatus?: (status: "connecting" | "open" | "closed") => void,
+): WsHandle {
+  let ws: WebSocket | null = null;
+  let closed = false;
+  let attempts = 0;
+  let timer: number | undefined;
 
-  ws.onmessage = (event) => {
-    try {
-      const parsed = JSON.parse(event.data);
-      onMessage(parsed);
-    } catch {
-      console.warn('Failed to parse WS message:', event.data);
-    }
+  const url = `${window.location.protocol === "https:" ? "wss" : "ws"}://${
+    window.location.host
+  }${BASE}/sessions/${sessionId}/ws`;
+
+  const connect = () => {
+    if (closed) return;
+    onStatus?.("connecting");
+    ws = new WebSocket(url);
+    ws.onopen = () => {
+      attempts = 0;
+      onStatus?.("open");
+    };
+    ws.onmessage = (msg) => {
+      try {
+        onEvent(JSON.parse(msg.data as string) as WsEvent);
+      } catch {
+        /* ignore malformed frames */
+      }
+    };
+    ws.onclose = () => {
+      onStatus?.("closed");
+      if (!closed && attempts < 8) {
+        attempts += 1;
+        const delay = Math.min(500 * 2 ** attempts, 8000);
+        timer = window.setTimeout(connect, delay);
+      }
+    };
+    ws.onerror = () => {
+      ws?.close();
+    };
   };
 
-  ws.onclose = () => onClose?.();
-  ws.onerror = (e) => console.error('WS error:', e);
-
-  return ws;
+  connect();
+  return {
+    close: () => {
+      closed = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+      ws?.close();
+    },
+  };
 }

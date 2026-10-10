@@ -1,43 +1,25 @@
 # Python
 __pycache__/
-*.py[cod]
-*.so
-venv/
+*.pyc
+.venv/
+*.egg-info/
 .pytest_cache/
+build/
+dist/
 
 # Node
 node_modules/
-dist/
+frontend/dist/
 
-# IDE
-.vscode/
-.idea/
+# Data & experiments
+db/
+*.db
+*.db-wal
+*.db-shm
+experiments.jsonl
+mlruns/
 
-# Database
-db/*.db
-
-# OS
+# OS / editors
 .DS_Store
-*.swp
-
-# Playwright
-test-results/
-
-# Exploration artifacts
-backend/azul_*.png
-backend/azul_*.html
-backend/azul_findings.json
-
-# Env
-.env
-.env.local
-
-# Claude
-.claude/
-
-# Office lock files
-~$*
-
-# Coverage
-.coverage
-htmlcov/
+.idea/
+.vscode/

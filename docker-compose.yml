@@ -1,24 +1,70 @@
-# One command to run everything:   docker compose up --build
-# Then open http://localhost:8080
+# TILES stack.
+#
+#   docker compose up tiles                 # server + UI at :8000 (local mode)
+#   docker compose --profile live up        # live-play-capable variant
+#   docker compose --profile telemetry up   # + MLflow UI at :5000
+#   docker compose --profile dev up ui-dev  # hot-reload frontend at :5173
+
 services:
-  backend:
-    build: ./backend
-    environment:
-      TILES_DB_PATH: /data/tiles.db
-      TILES_FORCE_HEADLESS: "1"        # no display in a container, so browsers always run headless
+  tiles:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
     volumes:
-      - tiles-data:/data               # keeps sessions, moves and profiles between restarts
-    shm_size: "1gb"                    # Chromium needs more shared memory than Docker's 64MB default
+      - tiles-db:/data
+    environment:
+      # Uncomment to send ablation/tournament metrics to the mlflow service:
+      # MLFLOW_TRACKING_URI: http://mlflow:5000
+      # Uncomment to enable the LLM explainer / rule extractor:
+      # ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      PYTHONUNBUFFERED: "1"
     restart: unless-stopped
 
-  frontend:
-    build: ./frontend
+  tiles-live:
+    profiles: ["live"]
+    build:
+      context: .
+      dockerfile: Dockerfile.live
     ports:
-      - "8080:80"
-    depends_on:
-      backend:
-        condition: service_healthy
+      - "8000:8000"
+    volumes:
+      - tiles-db:/data
+    # Chromium in a container needs a bigger /dev/shm.
+    shm_size: "1gb"
+    environment:
+      PYTHONUNBUFFERED: "1"
     restart: unless-stopped
+
+  mlflow:
+    profiles: ["telemetry"]
+    image: ghcr.io/mlflow/mlflow:v2.22.0
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri /mlruns
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlruns
+    restart: unless-stopped
+
+  # Frontend dev server with hot reload, proxying /api to the tiles service.
+  ui-dev:
+    profiles: ["dev"]
+    image: node:22-alpine
+    working_dir: /ui
+    command: sh -c "npm ci --ignore-scripts && npx vite --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/ui
+      - ui-dev-node-modules:/ui/node_modules
+    environment:
+      # vite.config.ts proxies /api to this target inside the compose network
+      TILES_API_PROXY: http://tiles:8000
+    depends_on:
+      - tiles
 
 volumes:
-  tiles-data:
+  tiles-db:
+  mlflow-data:
+  ui-dev-node-modules:
