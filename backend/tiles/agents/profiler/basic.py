@@ -51,13 +51,19 @@ class BasicProfiler(Profiler):
         acc.add(move_features(state_before, action, move, decision_ms))
         self.predictor.observe(state_before, action, player)
 
+    def register_players(self, names: List[str]) -> None:
+        for i, name in enumerate(names):
+            self._names[i] = name
+
     def profile(self, player_index: int) -> PlayerProfile:
         acc = self._accumulators.get(player_index)
         traits = acc.traits() if acc else {}
         moves = acc.n if acc else 0
-        archetype, confidence = classify(traits)
         if moves == 0:
-            confidence = 0.0
+            # Nothing observed yet: don't pretend to classify.
+            archetype, confidence = "unprofiled", 0.0
+        else:
+            archetype, confidence = classify(traits)
         name = self._names.get(player_index, f"player_{player_index}")
         return PlayerProfile(
             player_index=player_index,

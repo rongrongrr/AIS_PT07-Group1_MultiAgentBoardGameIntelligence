@@ -9,7 +9,8 @@ Validator gating every state transition. Node -> report mapping:
     decide   -> "searching for moves"      (Tactician proposal)
     validate -> "validating the move"      (Validator gate; reject edge
                  routes back to `decide` once, then to a greedy fallback)
-    execute  -> state transition            (tiles.core.step)
+    execute  -> state transition            (tiles.core.step locally; the
+                 live adapter emits to the site instead)
     observe  -> Profiler ingests the move
     explain  -> "explaining the choice"    (Explainer rationale)
 
@@ -17,6 +18,17 @@ The graph is framework-free on purpose (no LLM decides routing — edges
 are explicit Python control flow), which is exactly the property the
 report selects LangGraph for; swapping this class for a
 ``langgraph.StateGraph`` is a mechanical translation of the same nodes.
+
+The pipeline is split in two halves so local and live play share the
+same decision logic:
+
+* :meth:`TurnPipeline.propose` runs sense → profile → decide → validate
+  and returns a :class:`Proposal` (no state mutation);
+* :meth:`TurnPipeline.conclude` runs observe → explain and builds the
+  TurnRecord, given however the move was executed.
+
+:meth:`TurnPipeline.run_turn` chains both around the local engine's
+``step``; the live adapter chains them around a Socket.IO emit.
 """
 
 from __future__ import annotations
@@ -29,11 +41,12 @@ from tiles.agents.base import (
     Decision,
     DecisionContext,
     Explainer,
+    PlayerProfile,
     Profiler,
     Tactician,
 )
 from tiles.agents.tacticians.heuristics import rank_actions
-from tiles.agents.validator import Validator
+from tiles.agents.validator import ValidationResult, Validator
 from tiles.core import (
     Action,
     GameState,
@@ -63,6 +76,24 @@ def round_result_to_dict(result: RoundResult) -> dict:
         "game_over": result.game_over,
         "bonuses": result.bonuses,
     }
+
+
+@dataclass
+class Proposal:
+    """Output of the sense → profile → decide → validate half-turn."""
+
+    ctx: DecisionContext
+    decision: Decision
+    validation: ValidationResult
+    attempts: int
+    profiles: Optional[Dict[int, PlayerProfile]]
+    decide_ms: float
+    validate_ms: float
+    tactician: Tactician
+
+    @property
+    def action(self) -> Action:
+        return self.decision.action
 
 
 @dataclass
@@ -100,27 +131,20 @@ class TurnPipeline:
         ranked = rank_actions(ctx.state, ctx.legal)
         return Decision(action=ranked[0][0], report=None)
 
-    # -- driver ---------------------------------------------------------------
+    # -- half turns -------------------------------------------------------------
 
-    def run_turn(
-        self, state: GameState, step_index: int
-    ) -> Tuple[dict, MoveResult, Optional[RoundResult]]:
-        """Execute one turn in place on ``state``.
+    def propose(self, state: GameState) -> Proposal:
+        """sense → profile → decide → validate (with the reject edge).
 
-        Returns ``(turn_record, move_result, round_result_or_None)``.
-        The turn record matches docs/API.md's TurnRecord shape.
+        Leaves ``state`` untouched; the returned proposal's action has
+        passed the Validator and is safe to execute.
         """
-        turn_start = time.perf_counter()
         player_index = state.current_player
-        round_number = state.round_number
         tactician = self.tacticians[player_index]
 
-        # sense
         state_before, legal = self._sense(state)
         if not legal:
             raise RuntimeError("no legal actions: state is inconsistent")
-
-        # profile
         profiles, opponent_policy = self._profile(state, tactician)
 
         ctx = DecisionContext(
@@ -131,13 +155,12 @@ class TurnPipeline:
             opponent_policy=opponent_policy,
         )
 
-        # decide -> validate loop (reject edge)
         decide_ms = 0.0
         validate_ms = 0.0
         attempts = 0
         decision: Optional[Decision] = None
-        last_validation = None
-        for attempt in range(self.max_decide_attempts):
+        last_validation: Optional[ValidationResult] = None
+        for _attempt in range(self.max_decide_attempts):
             t0 = time.perf_counter()
             candidate = self._decide(ctx, tactician)
             decide_ms += (time.perf_counter() - t0) * 1000
@@ -170,60 +193,112 @@ class TurnPipeline:
                     f"{last_validation.violation}"
                 )
 
-        # execute
-        move, round_result = step(state, decision.action)
+        return Proposal(
+            ctx=ctx,
+            decision=decision,
+            validation=last_validation,
+            attempts=attempts,
+            profiles=profiles,
+            decide_ms=decide_ms,
+            validate_ms=validate_ms,
+            tactician=tactician,
+        )
 
-        # observe
-        if self.profiler is not None:
-            self.profiler.observe(state_before, decision.action, move, decide_ms)
+    def conclude(
+        self,
+        proposal: Proposal,
+        move: Optional[MoveResult],
+        state_after: Optional[GameState],
+        step_index: int,
+        extra_timing: Optional[Dict[str, float]] = None,
+        extra_validation: Optional[dict] = None,
+        turn_start: Optional[float] = None,
+    ) -> dict:
+        """observe → explain, then build the TurnRecord (docs/API.md)."""
+        ctx = proposal.ctx
+        state_before = ctx.state
 
-        # explain
+        if self.profiler is not None and move is not None:
+            self.profiler.observe(
+                state_before, proposal.action, move, proposal.decide_ms
+            )
+
         explain_ms = 0.0
         explanation = None
         if self.explainer is not None:
             t0 = time.perf_counter()
-            explanation = self.explainer.explain(ctx, decision, move)
+            explanation = self.explainer.explain(ctx, proposal.decision, move)
             explain_ms = (time.perf_counter() - t0) * 1000
 
-        total_ms = (time.perf_counter() - turn_start) * 1000
+        timing = {
+            "decide_ms": round(proposal.decide_ms, 3),
+            "validate_ms": round(proposal.validate_ms, 3),
+        }
+        for key, value in (extra_timing or {}).items():
+            timing[key] = round(value, 3)
+        timing["explain_ms"] = round(explain_ms, 3)
+        if turn_start is not None:
+            timing["total_ms"] = round((time.perf_counter() - turn_start) * 1000, 3)
+        else:
+            timing["total_ms"] = round(sum(timing.values()), 3)
 
-        record = {
+        validation = {
+            "ok": bool(proposal.validation and proposal.validation.ok),
+            "violation": (
+                {
+                    "predicate": proposal.validation.violation.predicate,
+                    "message": proposal.validation.violation.message,
+                }
+                if proposal.validation and proposal.validation.violation
+                else None
+            ),
+            "attempts": proposal.attempts,
+        }
+        validation.update(extra_validation or {})
+
+        profiles = proposal.profiles
+        return {
             "step": step_index,
-            "round": round_number,
-            "player_index": player_index,
-            "player_name": state.players[player_index].name,
-            "tactician": tactician.name,
-            "action": decision.action.to_dict(),
+            "round": state_before.round_number,
+            "player_index": ctx.player_index,
+            "player_name": state_before.players[ctx.player_index].name,
+            "tactician": proposal.tactician.name,
+            "action": proposal.action.to_dict(),
             "state_before": state_before.to_dict(),
-            "state_after": state.to_dict(),
+            "state_after": state_after.to_dict() if state_after is not None else None,
             "explanation": explanation.to_dict() if explanation else None,
-            "report": decision.report.to_dict() if decision.report else None,
+            "report": (
+                proposal.decision.report.to_dict()
+                if proposal.decision.report
+                else None
+            ),
             "profiles": (
                 {
                     str(i): profile.to_dict()
                     for i, profile in profiles.items()
-                    if i != player_index
+                    if i != ctx.player_index
                 }
                 if profiles
                 else {}
             ),
-            "validation": {
-                "ok": bool(last_validation and last_validation.ok),
-                "violation": (
-                    {
-                        "predicate": last_validation.violation.predicate,
-                        "message": last_validation.violation.message,
-                    }
-                    if last_validation and last_validation.violation
-                    else None
-                ),
-                "attempts": attempts,
-            },
-            "timing": {
-                "decide_ms": round(decide_ms, 3),
-                "validate_ms": round(validate_ms, 3),
-                "explain_ms": round(explain_ms, 3),
-                "total_ms": round(total_ms, 3),
-            },
+            "validation": validation,
+            "timing": timing,
         }
+
+    # -- driver ---------------------------------------------------------------
+
+    def run_turn(
+        self, state: GameState, step_index: int
+    ) -> Tuple[dict, MoveResult, Optional[RoundResult]]:
+        """Execute one turn in place on ``state`` (local engine).
+
+        Returns ``(turn_record, move_result, round_result_or_None)``.
+        The turn record matches docs/API.md's TurnRecord shape.
+        """
+        turn_start = time.perf_counter()
+        proposal = self.propose(state)
+        move, round_result = step(state, proposal.action)
+        record = self.conclude(
+            proposal, move, state, step_index, turn_start=turn_start
+        )
         return record, move, round_result

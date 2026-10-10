@@ -1,10 +1,15 @@
-"""Round-robin tournaments with Elo tracking (report roadmap item)."""
+"""Round-robin tournaments with Elo tracking (report roadmap item).
+
+``run_tournament`` accepts optional ``on_progress(done, total, message)``
+and ``stop_check()`` hooks so the experiment runner can stream progress
+and abort between games; the existing ``on_game`` callback is kept.
+"""
 
 from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from tiles.sim.match import MatchConfig, MatchRunner
 
@@ -79,6 +84,8 @@ def run_tournament(
     seed: int = 0,
     profiler: Optional[str] = "basic",
     on_game=None,
+    on_progress: Optional[Callable[[int, int, str], None]] = None,
+    stop_check: Optional[Callable[[], bool]] = None,
 ) -> TournamentResult:
     """Round-robin between entrant specs.
 
@@ -90,9 +97,13 @@ def run_tournament(
     }
     result = TournamentResult(standings=list(standings.values()))
 
+    pairs = list(itertools.combinations(entrants, 2))
+    total = len(pairs) * games_per_pair
     game_no = 0
-    for a, b in itertools.combinations(entrants, 2):
+    for a, b in pairs:
         for g in range(games_per_pair):
+            if stop_check is not None and stop_check():
+                return result
             first, second = (a, b) if g % 2 == 0 else (b, a)
             config = MatchConfig(
                 players=[dict(first), dict(second)],
@@ -135,4 +146,10 @@ def run_tournament(
             if on_game:
                 on_game(record)
             game_no += 1
+            if on_progress is not None:
+                on_progress(
+                    game_no,
+                    total,
+                    f"{names[0]} vs {names[1]}: {match.scores[0]}-{match.scores[1]}",
+                )
     return result

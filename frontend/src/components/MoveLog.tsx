@@ -2,18 +2,34 @@ import { useState } from "react";
 import type { TurnRecordDTO } from "../types";
 import { describeAction } from "../types";
 
-function MoveRow({ record }: { record: TurnRecordDTO }) {
+function MoveRow({
+  record,
+  selected,
+  onSelect,
+}: {
+  record: TurnRecordDTO;
+  selected: boolean;
+  onSelect?: (record: TurnRecordDTO) => void;
+}) {
   const [open, setOpen] = useState(false);
+  const scores = record.state_after?.players.map((p) => p.score);
   return (
     <>
-      <tr className="move-row" onClick={() => setOpen(!open)}>
+      <tr
+        className={`move-row${selected ? " move-row-selected" : ""}`}
+        onClick={() => {
+          setOpen(!open);
+          onSelect?.(record);
+        }}
+      >
         <td className="muted small">{record.step}</td>
         <td>{record.player_name}</td>
         <td>
           <span className="action-chip">{describeAction(record.action)}</span>
         </td>
         <td className="muted small">{record.tactician}</td>
-        <td className="muted small">
+        <td className="muted small num">{scores ? scores.join(" : ") : ""}</td>
+        <td className="muted small num">
           {record.timing?.total_ms != null
             ? `${record.timing.total_ms.toFixed(0)} ms`
             : "—"}
@@ -22,12 +38,15 @@ function MoveRow({ record }: { record: TurnRecordDTO }) {
       </tr>
       {open && (
         <tr className="move-detail">
-          <td colSpan={6}>
+          <td colSpan={7}>
             {record.explanation?.text && <p>{record.explanation.text}</p>}
             <div className="small muted">
               decide {record.timing?.decide_ms?.toFixed(1) ?? "?"} ms · validate{" "}
-              {record.timing?.validate_ms?.toFixed(1) ?? "?"} ms · explain{" "}
-              {record.timing?.explain_ms?.toFixed(1) ?? "?"} ms
+              {record.timing?.validate_ms?.toFixed(1) ?? "?"} ms
+              {record.timing?.execute_ms != null && (
+                <span> · execute {record.timing.execute_ms.toFixed(0)} ms</span>
+              )}{" "}
+              · explain {record.timing?.explain_ms?.toFixed(1) ?? "?"} ms
               {record.validation && !record.validation.ok && (
                 <span className="error-text">
                   {" "}
@@ -45,7 +64,15 @@ function MoveRow({ record }: { record: TurnRecordDTO }) {
   );
 }
 
-export function MoveLog({ moves }: { moves: TurnRecordDTO[] }) {
+export function MoveLog({
+  moves,
+  selectedStep,
+  onSelect,
+}: {
+  moves: TurnRecordDTO[];
+  selectedStep?: number | null;
+  onSelect?: (record: TurnRecordDTO) => void;
+}) {
   const rounds = new Map<number, TurnRecordDTO[]>();
   for (const m of moves) {
     const list = rounds.get(m.round) ?? [];
@@ -69,17 +96,24 @@ export function MoveLog({ moves }: { moves: TurnRecordDTO[] }) {
               · {rounds.get(round)!.length} moves
             </span>
           </summary>
-          <table className="move-table">
-            <tbody>
-              {rounds
-                .get(round)!
-                .slice()
-                .sort((a, b) => a.step - b.step)
-                .map((m) => (
-                  <MoveRow key={m.step} record={m} />
-                ))}
-            </tbody>
-          </table>
+          <div className="table-scroll">
+            <table className="move-table">
+              <tbody>
+                {rounds
+                  .get(round)!
+                  .slice()
+                  .sort((a, b) => a.step - b.step)
+                  .map((m) => (
+                    <MoveRow
+                      key={m.step}
+                      record={m}
+                      selected={selectedStep === m.step}
+                      onSelect={onSelect}
+                    />
+                  ))}
+              </tbody>
+            </table>
+          </div>
         </details>
       ))}
     </div>

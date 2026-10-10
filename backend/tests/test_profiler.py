@@ -24,16 +24,18 @@ from tiles.sim.prediction_eval import (
 
 
 def test_classify_high_denial_is_aggressive_blocker():
+    # Realistic competent play with the blocker's defining deviations:
+    # high denial, floor and risk rates, frequent first-player token.
     traits = {
         "color_bias": 0.08,
-        "center_rate": 0.55,
-        "floor_rate": 0.30,
-        "completion_rate": 0.55,
-        "denial_avg": 0.35,
-        "risk_avg": 0.32,
-        "bonus_focus": 0.40,
-        "fpt_rate": 0.20,
-        "immediate_avg": 0.35,
+        "center_rate": 0.57,
+        "floor_rate": 0.26,
+        "completion_rate": 0.60,
+        "denial_avg": 0.33,
+        "risk_avg": 0.28,
+        "bonus_focus": 0.41,
+        "fpt_rate": 0.16,
+        "immediate_avg": 0.40,
     }
     archetype, confidence = classify(traits)
     assert archetype == "aggressive_blocker"
@@ -43,16 +45,17 @@ def test_classify_high_denial_is_aggressive_blocker():
 
 
 def test_classify_low_risk_completer_is_cautious_optimizer():
+    # Sound play that avoids denial, the floor and the first-player token.
     traits = {
         "color_bias": 0.08,
-        "center_rate": 0.40,
-        "floor_rate": 0.05,
-        "completion_rate": 0.78,
+        "center_rate": 0.49,
+        "floor_rate": 0.15,
+        "completion_rate": 0.63,
         "denial_avg": 0.08,
-        "risk_avg": 0.06,
-        "bonus_focus": 0.45,
-        "fpt_rate": 0.05,
-        "immediate_avg": 0.50,
+        "risk_avg": 0.12,
+        "bonus_focus": 0.40,
+        "fpt_rate": 0.04,
+        "immediate_avg": 0.40,
     }
     archetype, _ = classify(traits)
     assert archetype == "cautious_optimizer"

@@ -135,6 +135,8 @@ class MatchRunner:
             player_names=[p["name"] for p in self.config.players],
         )
 
+        if self.profiler is not None:
+            self.profiler.register_players([p.name for p in state.players])
         if self.ledger is not None:
             self.ledger.create_session(
                 self.session_id,

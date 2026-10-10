@@ -31,7 +31,10 @@ def _mcts_profiled(**kwargs) -> Tactician:
     from .mcts import MCTSTactician
 
     kwargs.setdefault("use_opponent_model", True)
-    return MCTSTactician(**kwargs)
+    tactician = MCTSTactician(**kwargs)
+    # Records/telemetry are keyed by the registry name, not the class.
+    tactician.name = "mcts_profiled"
+    return tactician
 
 
 TACTICIANS: Dict[str, Callable[..., Tactician]] = {

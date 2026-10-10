@@ -4,13 +4,17 @@ Isolates the Profiler's contribution by playing the same MCTS Tactician
 with and without profiler-predicted opponent policies injected into the
 search (the report's headline experiment), against a fixed heuristic
 opponent. Metrics land in MLflow when installed, else a JSONL file.
+
+``run_ablation`` accepts optional ``on_progress(done, total, message)``
+and ``stop_check()`` hooks so the experiment runner can stream progress
+and abort between games; the CLI entry point is unchanged.
 """
 
 from __future__ import annotations
 
 import statistics
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from tiles.sim.match import MatchConfig, MatchRunner
 from tiles.telemetry import get_tracker
@@ -26,6 +30,9 @@ BLOCKER_WEIGHTS = {
     "bonus_potential": 0.4,
     "denial": 2.5,
 }
+
+ProgressHook = Callable[[int, int, str], None]
+StopCheck = Callable[[], bool]
 
 
 @dataclass
@@ -61,6 +68,10 @@ def _run_condition(
     games: int,
     seed: int,
     tracker,
+    on_progress: Optional[ProgressHook] = None,
+    stop_check: Optional[StopCheck] = None,
+    progress_offset: int = 0,
+    progress_total: int = 0,
 ) -> ConditionResult:
     result = ConditionResult(name=name)
     with tracker.run(
@@ -73,6 +84,8 @@ def _run_condition(
         },
     ):
         for g in range(games):
+            if stop_check is not None and stop_check():
+                break
             # Alternate seats to cancel first-player advantage.
             subject_seat = g % 2
             players = [
@@ -116,6 +129,13 @@ def _run_condition(
                 },
                 step=g,
             )
+            if on_progress is not None:
+                on_progress(
+                    progress_offset + g + 1,
+                    progress_total or games,
+                    f"{name}: game {g + 1}/{games} "
+                    f"({'won' if won else 'lost'} {subject_score}-{blocker_score})",
+                )
         tracker.log_metrics(
             {
                 "win_rate": result.wins / max(result.games, 1),
@@ -132,6 +152,9 @@ def run_ablation(
     simulations: int = 200,
     seed: int = 0,
     tracker_backend: str = "auto",
+    on_progress: Optional[ProgressHook] = None,
+    stop_check: Optional[StopCheck] = None,
+    verbose: bool = True,
 ) -> List[ConditionResult]:
     """Three conditions, most-ablated first:
 
@@ -151,12 +174,27 @@ def run_ablation(
         ),
     ]
     results = []
-    for name, tactician, config, profiler in conditions:
-        print(f"[ablation] running condition {name!r} ({games} games)...")
+    total = games * len(conditions)
+    for i, (name, tactician, config, profiler) in enumerate(conditions):
+        if stop_check is not None and stop_check():
+            break
+        if verbose:
+            print(f"[ablation] running condition {name!r} ({games} games)...")
         result = _run_condition(
-            name, tactician, config, profiler, games, seed, tracker
+            name,
+            tactician,
+            config,
+            profiler,
+            games,
+            seed,
+            tracker,
+            on_progress=on_progress,
+            stop_check=stop_check,
+            progress_offset=i * games,
+            progress_total=total,
         )
-        print(f"[ablation]   {result.to_dict()}")
+        if verbose:
+            print(f"[ablation]   {result.to_dict()}")
         results.append(result)
     return results
 

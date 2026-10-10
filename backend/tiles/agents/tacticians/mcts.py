@@ -281,6 +281,13 @@ class MCTSTactician(Tactician):
         candidates = []
         for i in order[:8]:
             n = root.edge_n[i]
+            # The heuristic decomposition of the candidate is a genuine
+            # search artifact (it is what the prior was computed from), so
+            # the Explainer can state a primary driver and the XAI audit
+            # can check it against this breakdown.
+            _, components = score_action(ctx.state, root.actions[i])
+            notes = {k: float(v) for k, v in components.items()}
+            notes["visit_share"] = n / simulations_run if simulations_run else 0.0
             candidates.append(
                 CandidateMove(
                     action=root.actions[i],
@@ -288,6 +295,7 @@ class MCTSTactician(Tactician):
                     visits=n,
                     prior=root.priors[i],
                     principal_variation=self._principal_variation(root, i),
+                    notes=notes,
                 )
             )
         report = SearchReport(

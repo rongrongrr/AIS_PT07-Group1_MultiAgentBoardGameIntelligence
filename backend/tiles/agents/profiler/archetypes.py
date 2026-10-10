@@ -14,11 +14,17 @@ import random
 from typing import Dict, List, Sequence, Tuple
 
 # Trait signatures live on the same 0..1 scales produced by
-# PlayerFeatureAccumulator.traits(). They are calibrated against the
-# *realized* trait ranges of simulated players (competent play clusters
-# tightly: completion ~0.6, center ~0.55, denial ~0.15), so the
-# signatures encode deviations from sound baseline play rather than
-# caricatures. tempo_ms is deliberately excluded.
+# PlayerFeatureAccumulator.traits(). They are *data-calibrated*: each
+# signature is the centroid of the trait vectors realized by the
+# reference preset that defines the archetype (20 games per preset,
+# calibration seed 11, see experiments/kinds/archetype_discovery.py).
+# Competent play clusters tightly (completion ~0.6, center ~0.5), so the
+# archetypes differ mainly on the discriminative traits — denial, floor
+# and risk rates, first-player-token rate, bonus focus — and distances
+# are measured in *standardized* units (TRAIT_SCALE = pooled standard
+# deviation of each trait over the calibration population) so that a
+# low-variance trait like denial_avg counts as much as a noisy one like
+# center_rate. tempo_ms is deliberately excluded.
 ARCHETYPES: Dict[str, dict] = {
     "aggressive_blocker": {
         "description": (
@@ -26,49 +32,49 @@ ARCHETYPES: Dict[str, dict] = {
             "not just the board."
         ),
         "signature": {
-            "color_bias": 0.08,
-            "center_rate": 0.55,
-            "floor_rate": 0.28,
-            "completion_rate": 0.55,
-            "denial_avg": 0.30,
-            "risk_avg": 0.30,
-            "bonus_focus": 0.40,
-            "fpt_rate": 0.18,
-            "immediate_avg": 0.35,
+            "color_bias": 0.081,
+            "center_rate": 0.572,
+            "floor_rate": 0.240,
+            "completion_rate": 0.602,
+            "denial_avg": 0.292,
+            "risk_avg": 0.260,
+            "bonus_focus": 0.420,
+            "fpt_rate": 0.152,
+            "immediate_avg": 0.400,
         },
     },
     "cautious_optimizer": {
         "description": (
             "Minimizes floor penalties, fills lines it can complete, "
-            "avoids speculative picks."
+            "avoids speculative picks and rarely takes the first-player token."
         ),
         "signature": {
-            "color_bias": 0.08,
-            "center_rate": 0.40,
-            "floor_rate": 0.08,
-            "completion_rate": 0.75,
-            "denial_avg": 0.10,
-            "risk_avg": 0.08,
-            "bonus_focus": 0.45,
-            "fpt_rate": 0.06,
-            "immediate_avg": 0.50,
+            "color_bias": 0.079,
+            "center_rate": 0.500,
+            "floor_rate": 0.175,
+            "completion_rate": 0.626,
+            "denial_avg": 0.104,
+            "risk_avg": 0.146,
+            "bonus_focus": 0.411,
+            "fpt_rate": 0.055,
+            "immediate_avg": 0.402,
         },
     },
     "set_collector": {
         "description": (
-            "Chases color sets and column bonuses; strong color "
-            "preferences over immediate points."
+            "Chases color sets and column bonuses; completes lines for "
+            "bonus progress over immediate points."
         ),
         "signature": {
-            "color_bias": 0.15,
-            "center_rate": 0.50,
-            "floor_rate": 0.15,
-            "completion_rate": 0.68,
-            "denial_avg": 0.12,
-            "risk_avg": 0.15,
-            "bonus_focus": 0.55,
-            "fpt_rate": 0.10,
-            "immediate_avg": 0.42,
+            "color_bias": 0.071,
+            "center_rate": 0.523,
+            "floor_rate": 0.182,
+            "completion_rate": 0.651,
+            "denial_avg": 0.158,
+            "risk_avg": 0.164,
+            "bonus_focus": 0.465,
+            "fpt_rate": 0.099,
+            "immediate_avg": 0.406,
         },
     },
     "greedy_scorer": {
@@ -77,46 +83,84 @@ ARCHETYPES: Dict[str, dict] = {
             "placements, opportunistic rather than positional."
         ),
         "signature": {
-            "color_bias": 0.08,
-            "center_rate": 0.55,
-            "floor_rate": 0.20,
-            "completion_rate": 0.72,
-            "denial_avg": 0.15,
-            "risk_avg": 0.20,
-            "bonus_focus": 0.45,
-            "fpt_rate": 0.13,
-            "immediate_avg": 0.55,
+            "color_bias": 0.074,
+            "center_rate": 0.522,
+            "floor_rate": 0.196,
+            "completion_rate": 0.637,
+            "denial_avg": 0.159,
+            "risk_avg": 0.171,
+            "bonus_focus": 0.435,
+            "fpt_rate": 0.101,
+            "immediate_avg": 0.433,
         },
     },
     "risk_taker": {
         "description": (
-            "Accepts floor penalties and grabs the first-player token to "
-            "control tempo; volatile scoring."
+            "Grabs the first-player token and drafts from the center to "
+            "control tempo; accepts floor penalties; volatile scoring."
         ),
         "signature": {
-            "color_bias": 0.10,
-            "center_rate": 0.65,
-            "floor_rate": 0.45,
-            "completion_rate": 0.50,
-            "denial_avg": 0.18,
-            "risk_avg": 0.45,
-            "bonus_focus": 0.40,
-            "fpt_rate": 0.30,
-            "immediate_avg": 0.35,
+            "color_bias": 0.069,
+            "center_rate": 0.580,
+            "floor_rate": 0.196,
+            "completion_rate": 0.634,
+            "denial_avg": 0.208,
+            "risk_avg": 0.191,
+            "bonus_focus": 0.452,
+            "fpt_rate": 0.164,
+            "immediate_avg": 0.412,
         },
     },
 }
 
-_SOFTMAX_TEMP = 0.05
+#: Pooled standard deviation of each trait over the calibration
+#: population; distances are measured in these units.
+TRAIT_SCALE: Dict[str, float] = {
+    "color_bias": 0.031,
+    "center_rate": 0.055,
+    "floor_rate": 0.060,
+    "completion_rate": 0.042,
+    "denial_avg": 0.109,
+    "risk_avg": 0.082,
+    "bonus_focus": 0.057,
+    "fpt_rate": 0.053,
+    "immediate_avg": 0.052,
+}
+
+# Softmax temperature for the confidence, in standardized-distance units.
+_SOFTMAX_TEMP = 0.3
 
 
 def _distance(traits: Dict[str, float], signature: Dict[str, float]) -> float:
-    """RMS distance over the signature's keys (missing traits count as 0)."""
+    """RMS *standardized* distance over the signature's keys (missing
+    traits count as 0; each difference is divided by the trait's pooled
+    standard deviation)."""
     sq = sum(
-        (traits.get(key, 0.0) - target) ** 2
+        ((traits.get(key, 0.0) - target) / TRAIT_SCALE.get(key, 1.0)) ** 2
         for key, target in signature.items()
     )
     return math.sqrt(sq / len(signature))
+
+
+def standardize(vectors: List[Sequence[float]]) -> List[List[float]]:
+    """Z-score each column of ``vectors`` (pure Python); constant columns
+    are left at 0. Used before clustering so every trait counts equally."""
+    if not vectors:
+        return []
+    dim = len(vectors[0])
+    n = len(vectors)
+    means = [sum(v[d] for v in vectors) / n for d in range(dim)]
+    stds = [
+        math.sqrt(sum((v[d] - means[d]) ** 2 for v in vectors) / n)
+        for d in range(dim)
+    ]
+    return [
+        [
+            (v[d] - means[d]) / stds[d] if stds[d] > 1e-12 else 0.0
+            for d in range(dim)
+        ]
+        for v in vectors
+    ]
 
 
 def classify(traits: Dict[str, float]) -> Tuple[str, float]:

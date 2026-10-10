@@ -203,6 +203,10 @@ class Profiler(abc.ABC):
     def profiles(self, num_players: int) -> Dict[int, PlayerProfile]:
         return {i: self.profile(i) for i in range(num_players)}
 
+    def register_players(self, names: List[str]) -> None:
+        """Optional: announce who sits where before any move is observed
+        (so early profiles carry real names). Default: no-op."""
+
 
 class Explainer(abc.ABC):
     """Builds natural-language rationales from decision artifacts."""

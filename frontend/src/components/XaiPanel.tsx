@@ -1,46 +1,6 @@
-import type { PlayerProfileDTO, TurnRecordDTO } from "../types";
+import type { TurnRecordDTO } from "../types";
 import { describeAction, sameAction } from "../types";
-
-function ProfileCard({ profile }: { profile: PlayerProfileDTO }) {
-  const traits = Object.entries(profile.traits ?? {});
-  return (
-    <div className="profile-card">
-      <div className="profile-card-header">
-        <span className="player-name">{profile.player_name}</span>
-        <span className="archetype-chip">{profile.archetype}</span>
-      </div>
-      <div className="confidence-row">
-        <span className="small muted">
-          confidence · {profile.moves_observed} moves
-        </span>
-        <div className="bar-track">
-          <div
-            className="bar-fill"
-            style={{ width: `${Math.round(profile.confidence * 100)}%` }}
-          />
-        </div>
-      </div>
-      {traits.length > 0 && (
-        <div className="traits">
-          {traits.map(([name, value]) => (
-            <div key={name} className="trait-row">
-              <span className="trait-name">{name.replace(/_/g, " ")}</span>
-              <div className="bar-track bar-track-sm">
-                <div
-                  className="bar-fill"
-                  style={{
-                    width: `${Math.round(Math.min(1, Math.max(0, value)) * 100)}%`,
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      {profile.summary && <p className="small muted">{profile.summary}</p>}
-    </div>
-  );
-}
+import { ProfileCard } from "./ProfileCard";
 
 export function XaiPanel({ record }: { record: TurnRecordDTO | null }) {
   if (!record) {
@@ -62,6 +22,8 @@ export function XaiPanel({ record }: { record: TurnRecordDTO | null }) {
     report?.candidates.find((c) => sameAction(c.action, chosen))
       ?.principal_variation ?? [];
   const profiles = Object.values(record.profiles ?? {});
+  const timing = record.timing ?? {};
+  const validation = record.validation;
 
   return (
     <aside className="xai-panel">
@@ -71,6 +33,7 @@ export function XaiPanel({ record }: { record: TurnRecordDTO | null }) {
         <span className="action-chip action-chip-primary">
           {describeAction(chosen)}
         </span>
+        <span className="muted small"> · {record.tactician} · step {record.step}</span>
       </div>
       {record.explanation ? (
         <>
@@ -140,6 +103,23 @@ export function XaiPanel({ record }: { record: TurnRecordDTO | null }) {
           </div>
         </>
       )}
+
+      <h4>Pipeline</h4>
+      <div className="small muted timing-row">
+        <span>decide {timing.decide_ms?.toFixed(1) ?? "?"} ms</span>
+        <span>validate {timing.validate_ms?.toFixed(1) ?? "?"} ms</span>
+        {timing.execute_ms != null && <span>execute {timing.execute_ms.toFixed(0)} ms</span>}
+        <span>explain {timing.explain_ms?.toFixed(1) ?? "?"} ms</span>
+        {validation && (
+          <span className={validation.ok ? "ok-text" : "error-text"}>
+            validator {validation.ok ? "ok" : "rejected"}
+            {validation.attempts && validation.attempts > 1
+              ? ` after ${validation.attempts} attempts`
+              : ""}
+            {validation.site_fallback ? " · site fallback" : ""}
+          </span>
+        )}
+      </div>
 
       {profiles.length > 0 && (
         <>

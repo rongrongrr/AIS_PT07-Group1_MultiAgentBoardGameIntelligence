@@ -1,27 +1,60 @@
-import { useState } from "react";
-import { SessionConfig } from "./views/SessionConfig";
-import { LiveMonitor } from "./views/LiveMonitor";
+import { useEffect, useState } from "react";
+import { api } from "./api/client";
+import { hrefFor, useHashRoute, VIEWS } from "./router";
+import type { HealthDTO } from "./types";
+import { Agents } from "./views/Agents";
+import { Dashboard } from "./views/Dashboard";
+import { Experiments } from "./views/Experiments";
+import { Monitor } from "./views/Monitor";
+import { Profiles } from "./views/Profiles";
 import { Replay } from "./views/Replay";
-
-type View = "config" | "monitor" | "replay";
+import { Rulebook } from "./views/Rulebook";
+import { Sessions } from "./views/Sessions";
 
 export default function App() {
-  const [view, setView] = useState<View>("config");
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const { route, navigate } = useHashRoute();
+  const [health, setHealth] = useState<HealthDTO | null>(null);
+  const [healthError, setHealthError] = useState(false);
 
-  const navItem = (v: View, label: string) => (
-    <button
-      className={`nav-item${view === v ? " nav-item-active" : ""}`}
-      onClick={() => setView(v)}
-    >
-      {label}
-    </button>
-  );
+  useEffect(() => {
+    const load = () =>
+      api
+        .health()
+        .then((h) => {
+          setHealth(h);
+          setHealthError(false);
+        })
+        .catch(() => setHealthError(true));
+    load();
+    const timer = window.setInterval(load, 30000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const view = (() => {
+    switch (route.view) {
+      case "sessions":
+        return <Sessions onStarted={(id) => navigate("monitor", id)} />;
+      case "monitor":
+        return <Monitor sessionId={route.id} />;
+      case "replay":
+        return <Replay sessionId={route.id} onPick={(id) => navigate("replay", id)} />;
+      case "profiles":
+        return <Profiles sessionId={route.id} onPick={(id) => navigate("profiles", id)} />;
+      case "experiments":
+        return <Experiments runId={route.id} onPick={(id) => navigate("experiments", id)} />;
+      case "rulebook":
+        return <Rulebook />;
+      case "agents":
+        return <Agents />;
+      default:
+        return <Dashboard />;
+    }
+  })();
 
   return (
     <div className="app">
       <header className="topbar">
-        <span className="brand">
+        <a className="brand" href={hrefFor("dashboard")}>
           <span className="brand-tiles">
             <span className="tile tile-blue tile-sm" />
             <span className="tile tile-yellow tile-sm" />
@@ -29,27 +62,48 @@ export default function App() {
           </span>
           TILES
           <span className="brand-sub">explainable multi-agent Azul</span>
-        </span>
+        </a>
         <nav>
-          {navItem("config", "New session")}
-          {navItem("monitor", "Monitor")}
-          {navItem("replay", "Replay")}
+          {VIEWS.map((v) => (
+            <a
+              key={v.name}
+              className={`nav-item${route.view === v.name ? " nav-item-active" : ""}`}
+              href={hrefFor(v.name)}
+            >
+              {v.label}
+            </a>
+          ))}
         </nav>
-      </header>
-      <main>
-        {view === "config" && (
-          <SessionConfig
-            onStarted={(id) => {
-              setSessionId(id);
-              setView("monitor");
-            }}
+        <div className="health">
+          <span
+            className={`ws-dot ${healthError ? "ws-closed" : health ? "ws-open" : "ws-connecting"}`}
+            title={
+              healthError
+                ? "backend unreachable — start it with `tiles serve`"
+                : health
+                  ? `backend ok · v${health.version}`
+                  : "checking backend…"
+            }
           />
-        )}
-        {view === "monitor" && (
-          <LiveMonitor sessionId={sessionId} onPick={setSessionId} />
-        )}
-        {view === "replay" && <Replay />}
-      </main>
+          {health && health.live_available === false && (
+            <span
+              className="cap-badge"
+              title="Live play on buddyboardgames.com is unavailable: pip install 'tiles[live]' && playwright install chromium"
+            >
+              no live
+            </span>
+          )}
+          {health && health.llm_available === false && (
+            <span
+              className="cap-badge"
+              title="LLM explainer/extractor unavailable: set ANTHROPIC_API_KEY on the backend"
+            >
+              no llm
+            </span>
+          )}
+        </div>
+      </header>
+      <main>{view}</main>
     </div>
   );
 }

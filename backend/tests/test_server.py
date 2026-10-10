@@ -49,7 +49,9 @@ def test_session_lifecycle_history_and_export(client):
 
     detail = client.get(f"/api/sessions/{session_id}").json()
     assert detail["result"]["steps"] > 10
-    assert detail["latest_state"] is not None
+    assert detail["state"] is not None
+    assert detail["scores"] and detail["winner_name"] in ("A", "B")
+    assert detail["players"][0]["tactician"] == "greedy"
 
     history = client.get(f"/api/history/{session_id}").json()
     moves = history["moves"]

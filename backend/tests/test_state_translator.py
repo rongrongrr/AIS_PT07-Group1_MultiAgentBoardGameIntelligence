@@ -258,3 +258,135 @@ def test_infer_center_pick_to_floor():
 def test_infer_returns_none_on_no_change():
     state = site_state_to_game_state(make_site_game())
     assert infer_action(state, state.clone(), 0) is None
+
+
+# ---------------------------------------------------------------------------
+# Current (2026) protocol generation: raw-WebSocket JSON frames, playerOrder /
+# playerTurnIndex, centerTiles, wall.rows + value.type cells, floorLines.lines
+# ---------------------------------------------------------------------------
+
+
+def v2_cell(color=None, selected=False, **extra):
+    cell = {"selected": selected, **extra}
+    if color:
+        cell["value"] = {"type": color}
+    return cell
+
+
+def make_site_game_v2(**overrides):
+    def player(score=0, pattern=None, wall_cells=None, floor=None, fpt=False):
+        colors = ["blue", "yellow", "red", "black", "white"]
+        p = {
+            "name": "?",
+            "score": score,
+            "patternLines": {"lines": [[v2_cell() for _ in range(r + 1)] for r in range(5)]},
+            "wall": {"rows": [[v2_cell(colors[(c - r) % 5]) for c in range(5)] for r in range(5)]},
+            "floorLines": {"lines": [v2_cell(penalty=-1) for _ in range(7)]},
+            "hasFirstPlayerToken": fpt,
+            "tilesChosen": [],
+        }
+        for row, color, count in pattern or []:
+            for i in range(count):
+                p["patternLines"]["lines"][row][row - i] = v2_cell(color, selected=True)
+        for r, c in wall_cells or []:
+            p["wall"]["rows"][r][c]["selected"] = True
+        for i, color in enumerate(floor or []):
+            p["floorLines"]["lines"][i] = v2_cell(color, selected=True, penalty=-1)
+        return p
+
+    game = {
+        "room": "tiles-v2",
+        "gameStarted": True,
+        "roundInProgress": True,
+        "playerOrder": ["Beta", "Alpha"],  # seat order differs from dict order
+        "playerTurnIndex": 1,
+        "factories": [
+            [{"type": "blue"}, {"type": "blue"}, {"type": "red"}, {"type": "yellow"}],
+            [{"type": "black"}, {"type": "black"}, {"type": "white"}, {"type": "blue"}],
+            [], [], [],
+        ],
+        "centerTiles": [{"type": "firstPlayer"}, {"type": "red"}, {"type": "yellow"}],
+        "tileBag": [{"type": "white"}] * 3 + [{"type": "red"}],
+        "discardedTiles": [{"type": "black"}],
+        "players": {
+            "Alpha": player(score=14, pattern=[(1, "blue", 1), (2, "red", 3)],
+                            wall_cells=[(0, 2), (2, 0)], floor=["blue"]),
+            "Beta": player(score=18, pattern=[(0, "white", 1), (3, "red", 2)],
+                           wall_cells=[(0, 1)]),
+        },
+    }
+    game.update(overrides)
+    return game
+
+
+def test_parse_frame_json_and_keepalives():
+    from tiles.engine.protocol import parse_frame, room_link
+
+    event, payload = parse_frame('{"type":"takeTurnResponse","payload":{"success":true,"game":{"round":1}}}')
+    assert event == "takeTurnResponse" and payload["game"]["round"] == 1
+    assert parse_frame("ping") is None and parse_frame("pong") is None
+    assert parse_frame('{"nope": 1}') is None
+    assert parse_frame("") is None
+    # legacy Socket.IO frames still parse
+    assert parse_frame('42["joinRoomResponse",{"success":true}]')[0] == "joinRoomResponse"
+    # join link: base64 room (and name), never the plain string
+    link = room_link("https://buddyboardgames.com/azul", "fun-1", "Alice")
+    assert link.startswith("https://buddyboardgames.com/azul?room=ZnVuLTE=")
+    assert "&name=QWxpY2U=" in link
+
+
+def test_translate_v2_seat_order_and_turn():
+    state = site_state_to_game_state(make_site_game_v2(), round_number=3)
+    assert [p.name for p in state.players] == ["Beta", "Alpha"]
+    assert state.current_player == 1  # playerTurnIndex -> Alpha
+    assert state.round_number == 3
+    assert state.center[RED] == 1 and state.center[YELLOW] == 1 and state.center_has_fpt
+    assert state.factories[0][BLUE] == 2 and state.factories[1][BLACK] == 2
+    assert state.bag == [0, 0, 1, 0, 3] and state.lid == [0, 0, 0, 1, 0]
+    assert not state.is_game_over
+
+
+def test_translate_v2_boards():
+    state = site_state_to_game_state(make_site_game_v2())
+    beta, alpha = state.players
+    assert alpha.score == 14
+    assert alpha.pattern_colors[1] == BLUE and alpha.pattern_counts[1] == 1
+    assert alpha.pattern_colors[2] == RED and alpha.pattern_counts[2] == 3
+    assert alpha.wall_has(0, 2) and alpha.wall_has(2, 0) and not alpha.wall_has(0, 0)
+    assert alpha.floor == [BLUE]
+    assert beta.pattern_colors[0] == WHITE and beta.pattern_counts[3] == 2
+    assert beta.wall_has(0, 1)
+    assert legal_actions(state)
+
+
+def test_translate_v2_first_player_token_and_game_over():
+    game = make_site_game_v2(centerTiles=[{"type": "red"}])
+    game["players"]["Beta"]["hasFirstPlayerToken"] = True
+    state = site_state_to_game_state(game)
+    assert not state.center_has_fpt
+    assert state.players[0].floor.count(FIRST_PLAYER) == 1
+    assert state.next_first_player == 0
+
+    # Game over is derived: round finished + a completed wall row.
+    done = make_site_game_v2(roundInProgress=False)
+    for c in range(5):
+        done["players"]["Alpha"]["wall"]["rows"][0][c]["selected"] = True
+    assert site_state_to_game_state(done).is_game_over
+    assert not site_state_to_game_state(make_site_game_v2(roundInProgress=False)).is_game_over
+
+
+def test_v2_roundtrip_through_inverse_mapping():
+    from tiles.core import new_game
+    from tiles.engine.state_translator import game_state_to_site_game
+
+    original = new_game(3, seed=4, player_names=["a", "b", "c"])
+    original.round_number = 2
+    original.current_player = 2
+    site = game_state_to_site_game(original)
+    assert "centerTiles" in site and "rows" in site["players"]["a"]["wall"]
+    back = site_state_to_game_state(site, round_number=2)
+    assert back.factories == original.factories
+    assert back.center == original.center and back.center_has_fpt
+    assert back.current_player == 2 and back.round_number == 2
+    assert back.bag == original.bag
+    assert [p.name for p in back.players] == ["a", "b", "c"]
