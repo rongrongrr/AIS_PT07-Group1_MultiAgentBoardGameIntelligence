@@ -36,6 +36,7 @@ from .state import (
     color_name,
     wall_col_for,
     wall_color_at,
+    winner_index,
 )
 
 __all__ = [

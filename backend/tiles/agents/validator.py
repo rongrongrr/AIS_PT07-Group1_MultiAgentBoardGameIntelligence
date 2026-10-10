@@ -4,13 +4,13 @@ The Validator is intentionally *not* an LLM and never guesses: it wraps
 the symbolic rules engine (``tiles.core.rules``) and produces
 machine-readable predicate failures. The turn orchestrator
 (``tiles.orchestration.turn_graph``) routes a rejected proposal back to
-the Tactician with the error trace, forming the self-correcting loop
-described in the architecture report.
+the Tactician with the violation in ``DecisionContext.violation``,
+forming the self-correcting loop described in the architecture report.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional
 
 from tiles.core import (
@@ -43,23 +43,11 @@ class ValidationResult:
 
 @dataclass
 class Validator:
-    """Rules authority for one session. Stateless apart from an audit
-    trail of every check it performed (useful for the ledger/XAI)."""
-
-    audit_trail: List[dict] = field(default_factory=list)
+    """Rules authority for one session. Stateless."""
 
     def legal_actions(self, state: GameState) -> List[Action]:
         return legal_actions(state)
 
     def validate(self, state: GameState, action: Action) -> ValidationResult:
         violation = check_action(state, action)
-        result = ValidationResult(ok=violation is None, violation=violation)
-        self.audit_trail.append(
-            {
-                "player_index": state.current_player,
-                "round": state.round_number,
-                "action": action.to_dict(),
-                **result.to_dict(),
-            }
-        )
-        return result
+        return ValidationResult(ok=violation is None, violation=violation)

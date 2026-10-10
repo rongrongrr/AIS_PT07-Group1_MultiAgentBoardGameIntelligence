@@ -180,7 +180,8 @@ export interface SessionSummaryDTO {
 
 export interface SessionResultDTO {
   scores: number[];
-  winner: number;
+  /** null when the victory is shared (score and completed rows tied). */
+  winner: number | null;
   steps: number;
   duration_s?: number;
 }
@@ -222,7 +223,7 @@ export type WsEvent =
   | { type: "round"; round: number; result: RoundResultDTO }
   | {
       type: "game_over";
-      winner: number;
+      winner: number | null;
       scores: number[];
       bonuses?: unknown;
     }

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
 from tiles.ledger.store import Ledger
@@ -42,4 +42,3 @@ class AppState:
     #: the running event loop, captured at startup; worker threads use it
     #: to fan events out to WebSocket subscribers.
     loop: Optional[asyncio.AbstractEventLoop] = None
-    extras: dict = field(default_factory=dict)

@@ -17,20 +17,19 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from tiles.experiments.runner import ExperimentManager
 from tiles.ledger.store import Ledger
-from tiles.server.routers import health, history, profiles, rulebook, sessions, stats
+from tiles.server.routers import (
+    experiments,
+    health,
+    history,
+    profiles,
+    rulebook,
+    sessions,
+    stats,
+)
 from tiles.server.sessions import SessionManager
 from tiles.server.state import VERSION, AppState
-
-
-def _experiment_manager(ledger: Ledger):
-    """The experiments module is optional at import time so the core
-    server keeps working while it is being developed/installed."""
-    try:
-        from tiles.experiments.runner import ExperimentManager
-    except ImportError:  # pragma: no cover
-        return None
-    return ExperimentManager(ledger)
 
 
 def create_app(db_path: str = "db/tiles.db") -> FastAPI:
@@ -39,7 +38,7 @@ def create_app(db_path: str = "db/tiles.db") -> FastAPI:
     state = AppState(
         ledger=ledger,
         sessions=SessionManager(ledger),
-        experiments=_experiment_manager(ledger),
+        experiments=ExperimentManager(ledger),
     )
 
     @asynccontextmanager
@@ -47,12 +46,10 @@ def create_app(db_path: str = "db/tiles.db") -> FastAPI:
         loop = asyncio.get_running_loop()
         state.loop = loop
         state.sessions.loop = loop
-        if state.experiments is not None:
-            state.experiments.loop = loop
+        state.experiments.loop = loop
         yield
         state.sessions.shutdown()
-        if state.experiments is not None:
-            state.experiments.shutdown()
+        state.experiments.shutdown()
 
     app = FastAPI(title="TILES", version=VERSION, lifespan=lifespan)
     app.state.tiles = state
@@ -69,13 +66,7 @@ def create_app(db_path: str = "db/tiles.db") -> FastAPI:
     app.include_router(profiles.router)
     app.include_router(rulebook.router)
     app.include_router(stats.router)
-    if state.experiments is not None:
-        try:
-            from tiles.server.routers import experiments
-
-            app.include_router(experiments.router)
-        except ImportError:  # pragma: no cover
-            pass
+    app.include_router(experiments.router)
 
     dist = Path(
         os.environ.get(
@@ -89,6 +80,3 @@ def create_app(db_path: str = "db/tiles.db") -> FastAPI:
         app.mount("/", StaticFiles(directory=dist, html=True), name="ui")
 
     return app
-
-
-app = create_app()

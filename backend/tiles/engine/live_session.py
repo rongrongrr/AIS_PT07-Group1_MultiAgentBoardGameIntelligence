@@ -38,7 +38,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
 
 from tiles.agents.base import Explainer, Profiler, Tactician
 from tiles.agents.validator import Validator
-from tiles.core import GameState, apply_action
+from tiles.core import GameState, apply_action, winner_index
 from tiles.orchestration import TurnPipeline
 
 from .protocol import DEFAULT_PLATFORM_URL, room_link
@@ -591,7 +591,7 @@ class LiveSession:
 
     async def _finish(self, state: GameState) -> Dict[str, Any]:
         scores = state.scores()
-        winner = max(range(len(scores)), key=lambda i: scores[i]) if scores else None
+        winner = winner_index(state.players)  # None = shared win
         players = [p.name for p in state.players]
         result = {
             "status": "completed",

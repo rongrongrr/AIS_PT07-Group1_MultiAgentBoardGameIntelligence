@@ -103,9 +103,10 @@ class AzulAECEnv(AECEnv):
         self._scores = new_scores
 
         if round_result is not None and round_result.game_over:
-            winner = self.state_.winner()
+            winner = self.state_.winner()  # None = shared win
             for i, a in enumerate(self.agents):
-                self.rewards[a] += 10.0 if i == winner else -10.0
+                if winner is not None:
+                    self.rewards[a] += 10.0 if i == winner else -10.0
                 self.terminations[a] = True
         elif round_result is not None:
             deal_round(self.state_, self._rng)

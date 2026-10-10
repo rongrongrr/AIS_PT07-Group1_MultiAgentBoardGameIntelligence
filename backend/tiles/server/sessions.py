@@ -25,6 +25,9 @@ from tiles.ledger.store import Ledger
 from .schemas import SessionCreate
 
 EVENT_BUFFER = 500
+#: Finished sessions kept in memory (their events stay replayable); older
+#: ones are dropped and served from the ledger instead.
+MAX_FINISHED_IN_MEMORY = 20
 _TERMINAL = ("completed", "aborted", "failed", "stalled")
 
 
@@ -35,6 +38,31 @@ class SessionError(Exception):
         super().__init__(detail)
         self.status_code = status_code
         self.detail = detail
+
+
+def _validate_tactician_config(name: str, tactician: str, config: dict) -> None:
+    """Reject unknown or out-of-range Tactician settings up front, so a
+    bad config is a 422 here rather than a failed game later."""
+    from tiles.agents.catalog import TACTICIAN_INFO
+
+    for param in TACTICIAN_INFO.get(tactician, {}).get("params", []):
+        if param["name"] not in config or config[param["name"]] is None:
+            continue
+        value = config[param["name"]]
+        numeric = (int,) if param["type"] == "int" else (int, float)
+        if isinstance(value, bool) or not isinstance(value, numeric):
+            raise SessionError(
+                422, f"{name}: {param['name']} must be of type {param['type']}"
+            )
+        low, high = param.get("min"), param.get("max")
+        if (low is not None and value < low) or (high is not None and value > high):
+            raise SessionError(
+                422, f"{name}: {param['name']} must be between {low} and {high}"
+            )
+    try:
+        make_tactician(tactician, **config)
+    except (TypeError, ValueError) as exc:
+        raise SessionError(422, f"{name}: invalid {tactician} config ({exc})") from None
 
 
 def validate_session_config(config: SessionCreate) -> None:
@@ -57,6 +85,7 @@ def validate_session_config(config: SessionCreate) -> None:
         elif p.tactician not in TACTICIANS:
             raise SessionError(422, f"unknown tactician {p.tactician!r}")
         else:
+            _validate_tactician_config(p.name, p.tactician, p.config)
             bots += 1
     if bots == 0:
         raise SessionError(422, "at least one machine player is required")
@@ -178,8 +207,26 @@ class SessionManager:
         self.ledger = ledger
         self.sessions: Dict[str, ManagedSession] = {}
         self.loop: Optional[asyncio.AbstractEventLoop] = None
+        # Guards each session's event buffer and subscriber list together,
+        # so a new subscriber neither misses nor duplicates an event.
+        self._lock = threading.Lock()
 
     # -- event fan-out (called from worker threads) ----------------------------
+
+    def subscribe(self, session: ManagedSession) -> asyncio.Queue:
+        """Queue pre-filled with the buffered events and registered for
+        new ones, atomically with respect to ``publish``."""
+        queue: asyncio.Queue = asyncio.Queue()
+        with self._lock:
+            for event in session.events:
+                queue.put_nowait(event)
+            session.subscribers.append(queue)
+        return queue
+
+    def unsubscribe(self, session: ManagedSession, queue: asyncio.Queue) -> None:
+        with self._lock:
+            if queue in session.subscribers:
+                session.subscribers.remove(queue)
 
     def publish(self, session: ManagedSession, event: dict) -> None:
         kind = event.get("type")
@@ -202,12 +249,30 @@ class SessionManager:
                     session.completed_at = _now()
         elif kind == "log" and event.get("level") == "error":
             session.error = event.get("message")
-        session.events.append(event)
-        if len(session.events) > EVENT_BUFFER:
-            del session.events[: len(session.events) - EVENT_BUFFER]
+        with self._lock:
+            session.events.append(event)
+            if len(session.events) > EVENT_BUFFER:
+                del session.events[: len(session.events) - EVENT_BUFFER]
+            queues = list(session.subscribers)
         if self.loop is not None:
-            for queue in list(session.subscribers):
-                self.loop.call_soon_threadsafe(queue.put_nowait, event)
+            for queue in queues:
+                try:
+                    self.loop.call_soon_threadsafe(queue.put_nowait, event)
+                except RuntimeError:  # loop closed
+                    pass
+        if kind == "status" and session.status in _TERMINAL:
+            self._evict_finished()
+
+    def _evict_finished(self) -> None:
+        """Drop the oldest finished sessions beyond the in-memory cap;
+        the ledger still has everything they recorded."""
+        finished = [
+            s for s in list(self.sessions.values())
+            if s.status in _TERMINAL and not s.subscribers
+        ]
+        finished.sort(key=lambda s: s.completed_at or "")
+        for session in finished[: max(0, len(finished) - MAX_FINISHED_IN_MEMORY)]:
+            self.sessions.pop(session.id, None)
 
     def set_status(self, session: ManagedSession, status: str) -> None:
         try:
@@ -410,7 +475,8 @@ class SessionManager:
             live = self.sessions.get(row["id"])
             out.append(live.summary() if live else summary_from_row(row))
             seen.add(row["id"])
-        out.extend(s.summary() for sid, s in self.sessions.items() if sid not in seen)
+        # list(): worker threads may evict finished sessions concurrently.
+        out.extend(s.summary() for sid, s in list(self.sessions.items()) if sid not in seen)
         out.sort(key=lambda s: s.get("created_at") or "", reverse=True)
         return out
 
@@ -424,5 +490,5 @@ class SessionManager:
             raise SessionError(404, "session not found")
 
     def shutdown(self) -> None:
-        for session in self.sessions.values():
+        for session in list(self.sessions.values()):
             session.stop_event.set()

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 
 from tiles.server.schemas import SessionCreate
@@ -79,11 +77,9 @@ async def session_ws(websocket: WebSocket, session_id: str) -> None:
         await websocket.close(code=4404)
         return
     await websocket.accept()
-    queue: asyncio.Queue = asyncio.Queue()
-    # Replay buffered events so late subscribers catch up.
-    for event in list(session.events):
-        await websocket.send_json(event)
-    session.subscribers.append(queue)
+    # subscribe() pre-fills the queue with buffered history, atomically
+    # with the subscription, so late subscribers catch up without gaps.
+    queue = manager.subscribe(session)
     try:
         while True:
             event = await queue.get()
@@ -91,5 +87,4 @@ async def session_ws(websocket: WebSocket, session_id: str) -> None:
     except WebSocketDisconnect:
         pass
     finally:
-        if queue in session.subscribers:
-            session.subscribers.remove(queue)
+        manager.unsubscribe(session, queue)

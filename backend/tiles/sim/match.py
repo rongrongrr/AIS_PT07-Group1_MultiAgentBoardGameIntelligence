@@ -19,10 +19,8 @@ from tiles.orchestration import TurnPipeline, round_result_to_dict
 def _make_profiler(name: Optional[str]) -> Optional[Profiler]:
     if not name:
         return None
-    try:
-        from tiles.agents.profiler import make_profiler
-    except ImportError:
-        return None
+    from tiles.agents.profiler import make_profiler
+
     return make_profiler(name)
 
 
@@ -59,7 +57,7 @@ class MatchConfig:
 class MatchResult:
     session_id: str
     scores: List[int]
-    winner: int
+    winner: Optional[int]  # None when stopped early or a shared win
     winner_name: str
     steps: int
     rounds: int
@@ -122,6 +120,7 @@ class MatchRunner:
             tacticians=self.tacticians,
             profiler=self.profiler,
             explainer=self.explainer,
+            seed=config.seed,
         )
 
     # -- driver ---------------------------------------------------------------
@@ -196,14 +195,12 @@ class MatchRunner:
             if self.ledger is not None:
                 self.ledger.save_profiles(self.session_id, profiles)
 
-        winner = state.winner() if state.is_game_over else 0
+        winner = state.winner()  # None if aborted or a shared win
         result = MatchResult(
             session_id=self.session_id,
             scores=state.scores(),
-            winner=winner if winner is not None else 0,
-            winner_name=state.players[winner].name
-            if winner is not None
-            else "",
+            winner=winner,
+            winner_name=state.players[winner].name if winner is not None else "",
             steps=step_index,
             rounds=state.round_number,
             duration_s=time.perf_counter() - start,

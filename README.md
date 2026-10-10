@@ -401,7 +401,7 @@ source .venv/bin/activate
 pytest
 ```
 
-The suite has 130 tests across 15 files. It covers the rules of the game,
+The suite has 145 tests across 16 files. It covers the rules of the game,
 each Tactician, the Profiler, the Explainer, the turn pipeline, the database,
 the API, every experiment, rule extraction, and the live-play loop against a
 simulated site.

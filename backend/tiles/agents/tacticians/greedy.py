@@ -24,7 +24,8 @@ class GreedyTactician(Tactician):
     name = "greedy"
 
     def __init__(self, weights: Optional[Dict[str, float]] = None) -> None:
-        self.weights = dict(weights or DEFAULT_WEIGHTS)
+        # Partial weights override the defaults; missing keys keep them.
+        self.weights = {**DEFAULT_WEIGHTS, **(weights or {})}
 
     def decide(self, ctx: DecisionContext) -> Decision:
         start = time.perf_counter()

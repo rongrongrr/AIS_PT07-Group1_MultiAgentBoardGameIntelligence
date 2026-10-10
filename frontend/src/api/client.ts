@@ -15,7 +15,6 @@ import type {
   SessionDetailDTO,
   SessionSummaryDTO,
   StatsDTO,
-  AgentInfoDTO,
   WsEvent,
 } from "../types";
 
@@ -47,7 +46,6 @@ export const api = {
   health: () => request<HealthDTO>("/health"),
 
   agents: () => request<AgentsDTO>("/agents"),
-  listTacticians: () => request<AgentInfoDTO[]>("/tacticians"),
 
   // -- sessions ------------------------------------------------------------
   createSession: (payload: CreateSessionRequest) =>

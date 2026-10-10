@@ -102,7 +102,6 @@ class MCTSTactician(Tactician):
         self.simulations = simulations
         self.c_puct = c_puct
         self.time_budget_ms = time_budget_ms
-        self.use_opponent_model = use_opponent_model
         self.uses_opponent_model = use_opponent_model
 
     # -- node construction ------------------------------------------------
@@ -123,7 +122,7 @@ class MCTSTactician(Tactician):
 
         used_model = False
         if (
-            self.use_opponent_model
+            self.uses_opponent_model
             and opponent_policy is not None
             and node.player != root_player
         ):
@@ -235,7 +234,7 @@ class MCTSTactician(Tactician):
         root = _Node(ctx.state.clone(), terminal=False, needs_deal=False)
         used_model = self._init_edges(root, root_player, ctx.opponent_policy)
 
-        budget_ms = self.time_budget_ms or ctx.time_budget_ms
+        budget_ms = self.time_budget_ms
         simulations_run = 0
         for _ in range(self.simulations):
             if (
@@ -306,7 +305,7 @@ class MCTSTactician(Tactician):
             notes={
                 "strategy": "PUCT MCTS with determinized redeals",
                 "c_puct": self.c_puct,
-                "opponent_model_enabled": self.use_opponent_model,
+                "opponent_model_enabled": self.uses_opponent_model,
             },
         )
         return Decision(action=candidates[0].action, report=report)

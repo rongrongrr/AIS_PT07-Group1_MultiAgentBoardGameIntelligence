@@ -74,10 +74,10 @@ A session is one game.
 | Field | Notes |
 |---|---|
 | `mode` | `local` (default) or `live`. |
-| `players` | Two to four seats. Names must be unique. `tactician` is one of `random`, `greedy`, `minimax`, `mcts`, `mcts_profiled`, or `human` (live mode only). At least one seat must be a bot. `config` holds that Tactician's parameters. |
+| `players` | Two to four seats. Names must be unique. `tactician` is one of `random`, `greedy`, `minimax`, `mcts`, `mcts_profiled`, or `human` (live mode only). At least one seat must be a bot. `config` holds that Tactician's parameters; unknown or out-of-range values are rejected with `422`. |
 | `profiler` | `basic` (default) or `null` to switch profiling off. |
 | `explainer` | `template` (default), `llm`, or `null`. |
-| `seed` | Optional. The same seed gives the same local game. |
+| `seed` | Optional. The same seed gives the same local game, including every Tactician's choices. |
 | `move_delay_ms` | Pause between moves, to make a game watchable. Default `0`. |
 | `live` | Required when `mode` is `live`: `room_name`, `platform_url` (default `https://buddyboardgames.com/azul`) and `headless` (default `true`). |
 
@@ -85,7 +85,8 @@ A session is one game.
 
 Every session response includes `id`, `mode`, `status`, `players`, `profiler`,
 `explainer`, `seed`, `created_at`, `completed_at`, `scores` (by seat), `winner`
-(seat index), `winner_name`, `steps`, `rounds`, and for live games `room_name`
+(seat index, or `null` for a game that was stopped or ended in a shared win:
+equal score and equal completed rows), `winner_name`, `steps`, `rounds`, and for live games `room_name`
 and `room_url`. The single-session response adds `state` (the current board),
 `result`, `move_delay_ms`, `live` and `error`.
 
@@ -114,7 +115,7 @@ last started.
 | `state` | `step`, `state` | After the opening deal (`step` 0) and after every move. |
 | `move` | `step`, `record` | A move has been made. `record` is the turn record described below. |
 | `round` | `round`, `result` | A round has ended. `result` holds tilings, floor penalties, scores and any bonuses. |
-| `game_over` | `winner`, `scores`, `bonuses` | The game has finished. |
+| `game_over` | `winner` (`null` for a shared win), `scores`, `bonuses` | The game has finished. |
 | `log` | `level`, `message`, `phase`, `player` | Something worth noting happened, mostly in live games. |
 
 ### The board (`state`)

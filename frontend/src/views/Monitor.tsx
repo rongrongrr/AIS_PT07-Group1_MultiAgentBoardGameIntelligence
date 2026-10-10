@@ -57,7 +57,7 @@ export function Monitor({ sessionId }: { sessionId: string | null }) {
   const [live, setLive] = useState<LiveStatus | null>(null);
   const [wsStatus, setWsStatus] = useState<WsStatus>("connecting");
   const [selected, setSelected] = useState<TurnRecordDTO | null>(null);
-  const [gameOver, setGameOver] = useState<{ winner: number; scores: number[] } | null>(null);
+  const [gameOver, setGameOver] = useState<{ winner: number | null; scores: number[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [stopping, setStopping] = useState(false);
 
@@ -234,7 +234,11 @@ export function Monitor({ sessionId }: { sessionId: string | null }) {
 
       {gameOver && (
         <div className="winner-banner">
-          🏆 {playerNames[gameOver.winner] ?? `player ${gameOver.winner + 1}`} wins — final scores{" "}
+          🏆{" "}
+          {gameOver.winner === null
+            ? "Shared victory"
+            : `${playerNames[gameOver.winner] ?? `player ${gameOver.winner + 1}`} wins`}{" "}
+          — final scores{" "}
           {gameOver.scores.join(" : ")}
         </div>
       )}

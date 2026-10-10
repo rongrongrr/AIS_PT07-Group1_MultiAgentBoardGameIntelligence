@@ -115,9 +115,9 @@ games.
 ### Validator (`agents/validator.py`)
 
 A thin layer over the rules engine. It lists the legal moves for the current
-board, checks each proposed move, and keeps an audit trail of every check. If
-the Tactician proposes an illegal move, the pipeline asks it once more; if the
-second proposal is also illegal, the pipeline takes the top-ranked heuristic
+board and checks each proposed move. If the Tactician proposes an illegal move,
+the pipeline asks it once more, passing the rule it broke in
+`DecisionContext.violation`; if the second proposal is also illegal, the pipeline takes the top-ranked heuristic
 move instead. An illegal move cannot reach the board.
 
 ### Tacticians (`agents/tacticians/`)
@@ -285,7 +285,9 @@ the experiment manager or the ledger. If a built web app is present, the server
 also serves it.
 
 Because running games are held in memory, a server restart loses them. Recorded
-history is unaffected.
+history is unaffected. Finished sessions stay in memory (so their event stream
+can be replayed) up to the 20 most recent; older ones are served from the
+ledger.
 
 The web app (`frontend/`) is a React and TypeScript single-page app with no
 other runtime dependencies. It reads state over REST and follows live games and

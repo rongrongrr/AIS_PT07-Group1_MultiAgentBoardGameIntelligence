@@ -365,12 +365,9 @@ def main(argv=None) -> int:
     p = sub.add_parser("verify-rules", help="rulebook extraction benchmark")
     p.set_defaults(func=cmd_verify_rules)
 
-    try:
-        from tiles.experiments.cli import add_experiment_commands
-    except ImportError:  # pragma: no cover — experiments module optional
-        add_experiment_commands = None
-    if add_experiment_commands is not None:
-        add_experiment_commands(sub)
+    from tiles.experiments.cli import add_experiment_commands
+
+    add_experiment_commands(sub)
 
     p = sub.add_parser("serve", help="start the API server")
     p.add_argument("--host", default="127.0.0.1")

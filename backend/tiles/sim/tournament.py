@@ -113,9 +113,10 @@ def run_tournament(
             )
             match = MatchRunner(config).run()
             names = [first["name"], second["name"]]
-            winner_name = names[match.winner]
-            loser_name = names[1 - match.winner]
-            tie = match.scores[0] == match.scores[1]
+            tie = match.winner is None  # shared win (score and rows tied)
+            if not tie:
+                winner_name = names[match.winner]
+                loser_name = names[1 - match.winner]
 
             sa, sb = standings[names[0]], standings[names[1]]
             sa.points_for += match.scores[0]

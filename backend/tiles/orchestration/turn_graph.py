@@ -8,7 +8,8 @@ Validator gating every state transition. Node -> report mapping:
     profile  -> "profiling the opponent"   (Profiler outputs injected)
     decide   -> "searching for moves"      (Tactician proposal)
     validate -> "validating the move"      (Validator gate; reject edge
-                 routes back to `decide` once, then to a greedy fallback)
+                 routes back to `decide` once with the violation in the
+                 context, then to a greedy fallback)
     execute  -> state transition            (tiles.core.step locally; the
                  live adapter emits to the site instead)
     observe  -> Profiler ingests the move
@@ -33,6 +34,7 @@ same decision logic:
 
 from __future__ import annotations
 
+import random
 import time
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Tuple
@@ -105,7 +107,13 @@ class TurnPipeline:
     profiler: Optional[Profiler] = None
     explainer: Optional[Explainer] = None
     max_decide_attempts: int = 2
-    timings: dict = field(default_factory=dict)
+    #: Seeds every decision's ``rng_seed`` so a seeded game replays exactly.
+    seed: Optional[int] = None
+    _rng: Optional[random.Random] = field(init=False, default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.seed is not None:
+            self._rng = random.Random(self.seed)
 
     # -- nodes ----------------------------------------------------------------
 
@@ -146,6 +154,7 @@ class TurnPipeline:
         if not legal:
             raise RuntimeError("no legal actions: state is inconsistent")
         profiles, opponent_policy = self._profile(state, tactician)
+        rng_seed = self._rng.getrandbits(32) if self._rng is not None else None
 
         ctx = DecisionContext(
             state=state_before,
@@ -153,6 +162,7 @@ class TurnPipeline:
             legal=legal,
             profiles=profiles,
             opponent_policy=opponent_policy,
+            rng_seed=rng_seed,
         )
 
         decide_ms = 0.0
@@ -173,13 +183,15 @@ class TurnPipeline:
             if validation.ok:
                 decision = candidate
                 break
-            # Reject edge: re-sense legality and let the tactician retry.
+            # Reject edge: hand the violation back and let the tactician retry.
             ctx = DecisionContext(
                 state=state_before,
                 player_index=player_index,
-                legal=self.validator.legal_actions(state),
+                legal=legal,
                 profiles=profiles,
                 opponent_policy=opponent_policy,
+                rng_seed=rng_seed,
+                violation=validation.violation,
             )
         if decision is None:
             decision = self._fallback_decision(ctx)

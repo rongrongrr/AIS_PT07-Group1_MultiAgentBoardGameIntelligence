@@ -161,6 +161,17 @@ class PlayerBoard:
         )
 
 
+def winner_index(players: List[PlayerBoard]) -> Optional[int]:
+    """Index of the winner among final boards: highest score, then most
+    completed wall rows; None when that still ties (a shared win)."""
+    if not players:
+        return None
+    keys = [(p.score, p.completed_rows()) for p in players]
+    best = max(keys)
+    leaders = [i for i, key in enumerate(keys) if key == best]
+    return leaders[0] if len(leaders) == 1 else None
+
+
 # ---------------------------------------------------------------------------
 # Game state
 # ---------------------------------------------------------------------------
@@ -223,17 +234,13 @@ class GameState:
         return [p.score for p in self.players]
 
     def winner(self) -> Optional[int]:
-        """Winning player index (ties broken by completed rows), or None."""
+        """Winning player index, or None if the game is not over or ends
+        in a shared win. Ties on score go to the player with more
+        completed wall rows; if that is tied too, the victory is shared
+        (official Azul rule)."""
         if not self.is_game_over:
             return None
-        best = max(
-            range(self.num_players),
-            key=lambda i: (
-                self.players[i].score,
-                self.players[i].completed_rows(),
-            ),
-        )
-        return best
+        return winner_index(self.players)
 
     def iter_players(self) -> Iterator[PlayerBoard]:
         return iter(self.players)
@@ -283,6 +290,11 @@ class GameState:
             current_player=d.get("current_player", 0),
             round_number=d.get("round", 1),
             phase=d.get("phase", PHASE_DRAFTING),
+            # Whoever holds the token on their floor leads the next round.
+            next_first_player=next(
+                (i for i, p in enumerate(players) if p.has_first_player_token()),
+                None,
+            ),
         )
         return state
 

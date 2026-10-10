@@ -20,7 +20,7 @@ import abc
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from tiles.core import Action, GameState, MoveResult
+from tiles.core import Action, GameState, MoveResult, RuleViolation
 
 
 # ---------------------------------------------------------------------------
@@ -65,8 +65,11 @@ class DecisionContext:
     # injected by the orchestrator so search-based tacticians can bias
     # opponent nodes with the Profiler's predictions.
     opponent_policy: Optional[object] = None
-    time_budget_ms: Optional[float] = None
+    # Seed for any randomness in this decision; set by the orchestrator
+    # when the session is seeded, so seeded games are reproducible.
     rng_seed: Optional[int] = None
+    # Set on a retry: why the Validator rejected the previous proposal.
+    violation: Optional[RuleViolation] = None
 
 
 @dataclass
