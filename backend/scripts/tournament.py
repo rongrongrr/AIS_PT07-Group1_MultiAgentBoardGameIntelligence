@@ -24,10 +24,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.azul.game import play_game  # noqa: E402
 from app.ml.greedy_player import GreedyPlayer  # noqa: E402
 from app.ml.random_player import RandomPlayer  # noqa: E402
+from app.ml.mcts_player import ConditionedMCTSPlayer, MCTSPlayer  # noqa: E402
 from app.ml.minimax_player import MinimaxPlayer  # noqa: E402
 from app.ml.rollout_player import RolloutPlayer  # noqa: E402
 
-PLAYERS = {"GreedyPlayer": GreedyPlayer, "RandomPlayer": RandomPlayer, "RolloutPlayer": RolloutPlayer, "MinimaxPlayer": MinimaxPlayer}
+PLAYERS = {"GreedyPlayer": GreedyPlayer, "RandomPlayer": RandomPlayer, "RolloutPlayer": RolloutPlayer, "MinimaxPlayer": MinimaxPlayer,
+           "MCTSPlayer": MCTSPlayer, "ConditionedMCTSPlayer": ConditionedMCTSPlayer}
 
 
 def wilson(wins: float, n: int, z: float = 1.96):
@@ -42,7 +44,7 @@ def wilson(wins: float, n: int, z: float = 1.96):
 
 def make(name: str, seed: int):
     cls = PLAYERS[name]
-    return cls(seed=seed) if name in ("RandomPlayer", "RolloutPlayer") else cls()
+    return cls(seed=seed) if name in ("RandomPlayer", "RolloutPlayer", "MCTSPlayer", "ConditionedMCTSPlayer") else cls()
 
 
 async def run_pair(a: str, b: str, games: int, seed: int) -> dict:
@@ -81,12 +83,21 @@ async def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--players", nargs="+", default=list(PLAYERS), choices=list(PLAYERS))
     ap.add_argument("--out", help="write JSON results here")
+    ap.add_argument("--mlflow", action="store_true", help="log each pairing as an MLflow run")
     args = ap.parse_args()
 
     results = []
     for a, b in itertools.combinations(args.players, 2):
         r = await run_pair(a, b, args.games, args.seed)
         results.append(r)
+        if args.mlflow:
+            from app import tracking
+            tracking.log_run(
+                tracking.EVALUATION_EXPERIMENT, f"tournament {a} vs {b}",
+                params={"a": a, "b": b, "games": r["games"], "seed": args.seed},
+                metrics={f"win_rate.{a}": r[a]["win_rate"], f"win_rate.{b}": r[b]["win_rate"],
+                         f"mean_score.{a}": r[a]["mean_score"], f"mean_score.{b}": r[b]["mean_score"]},
+                tags={"kind": "tournament"}, artifacts={"result": r})
         print(f"{a} vs {b} ({r['games']} games): "
               f"{a} {r[a]['win_rate']:.1%} {r[a]['ci95']} avg {r[a]['mean_score']} | "
               f"{b} {r[b]['win_rate']:.1%} {r[b]['ci95']} avg {r[b]['mean_score']}")

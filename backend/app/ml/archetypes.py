@@ -78,6 +78,31 @@ def move_record(state, player_index: int, action) -> dict:
     }
 
 
+def state_from_record(record: dict):
+    """Rebuild a GameStateData from a ledger-format move record's pre-move board (or None)."""
+    from app.models.schemas import GameStateData, PlayerState, TileColor
+
+    board = record.get("board")
+    if not board:
+        return None
+    try:
+        players = [
+            PlayerState(
+                index=i, name=p["name"], score=p.get("score", 0),
+                pattern_lines=[[TileColor(c) for c in row] for row in p["pattern_lines"]],
+                wall=[list(map(bool, r)) for r in p.get("wall") or [[False] * 5 for _ in range(5)]],
+                floor_line=[TileColor(c) for c in p.get("floor_line", [])],
+            )
+            for i, p in enumerate(board["players"])
+        ]
+        return GameStateData(
+            factories=[[TileColor(c) for c in f] for f in board["factories"]],
+            center_pool=list(board["center_pool"]), players=players,
+        )
+    except (KeyError, ValueError):
+        return None
+
+
 def _picked_count(board: dict, action: dict) -> int:
     color = action["color"]
     if action["source_type"] == "factory":

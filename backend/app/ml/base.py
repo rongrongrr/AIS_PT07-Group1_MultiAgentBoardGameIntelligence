@@ -16,6 +16,10 @@ class MachinePlayer(ABC):
         """Given the current game state and player index, return the action to take."""
         ...
 
+    def clone(self) -> "MachinePlayer":
+        """A fresh instance for one game (per-game state must not be shared between sessions)."""
+        return type(self)()
+
     def observe(self, record: dict, observer_name: str) -> None:
         """Called after every move in the game (including this player's own).
 

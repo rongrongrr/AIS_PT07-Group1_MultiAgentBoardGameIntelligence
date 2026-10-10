@@ -188,6 +188,44 @@ class ArchetypeProfileAnalyzer(ProfileAnalyzer):
         return profile
 
 
+class SequenceProfileAnalyzer(ProfileAnalyzer):
+    """BasicProfileAnalyzer statistics plus an archetype from the sequence model (Transformer/GRU
+    over the player's move sequence), with saliency-based reasons."""
+
+    def __init__(self, model):
+        self._basic = BasicProfileAnalyzer()
+        self._model = model
+
+    @property
+    def name(self) -> str:
+        return "SequenceProfileAnalyzer"
+
+    @property
+    def description(self) -> str:
+        return f"Basic statistics plus a {self._model.kind} sequence model over the move sequence."
+
+    def analyze(self, player_name: str, moves: List[dict]) -> dict:
+        profile = self._basic.analyze(player_name, moves)
+        if "total_moves" not in profile:
+            return profile
+        pred = self._model.predict(moves, player_name)
+        if pred is None:
+            profile["archetype"] = None
+            profile["summary"] += " Archetype: no moves with board snapshots to classify."
+            return profile
+        profile.update({
+            "archetype": pred.archetype,
+            "archetype_confidence": pred.confidence,
+            "archetype_scores": pred.scores,
+            "archetype_reasons": [{"feature": r["feature"], "value": r["importance"], "z": 0,
+                                   "meaning": r["meaning"]} for r in pred.standout_features],
+            "model_kind": self._model.kind,
+        })
+        profile["summary"] += (f" Archetype ({self._model.kind}): {pred.archetype} "
+                               f"({pred.confidence:.0%} confidence).")
+        return profile
+
+
 class AnalyzerRegistry:
     """Registry for pluggable profile analyzers."""
 
@@ -204,6 +242,13 @@ class AnalyzerRegistry:
                 self.register(ArchetypeProfileAnalyzer(ArchetypeClassifier.load(DEFAULT_MODEL_PATH)))
         except Exception:  # missing numpy/model or feature mismatch: keep the basic analyzer only
             logger.exception("Archetype analyzer unavailable")
+        try:
+            from app.ml.sequence_profiler import DEFAULT_SEQ_MODEL_PATH, SequenceProfiler
+
+            if DEFAULT_SEQ_MODEL_PATH.exists():
+                self.register(SequenceProfileAnalyzer(SequenceProfiler.load(DEFAULT_SEQ_MODEL_PATH)))
+        except Exception:  # torch not installed or model mismatch
+            logger.warning("Sequence profile analyzer unavailable", exc_info=True)
 
     def register(self, analyzer: ProfileAnalyzer):
         self._analyzers[analyzer.name] = analyzer

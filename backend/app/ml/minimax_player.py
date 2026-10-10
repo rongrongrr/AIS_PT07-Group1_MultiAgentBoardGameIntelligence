@@ -122,3 +122,74 @@ class MinimaxPlayer(GreedyPlayer):
         logger.info(f"[{self.name}] {best.color.value} {best.source_type.value}[{best.source_index}] -> "
                     f"{best.destination.value}[{best.destination_row}] value={value:.1f} nodes={self.nodes}")
         return best
+
+
+class ConditionedMinimaxPlayer(MinimaxPlayer):
+    """Minimax whose opponent nodes consider the moves that opponent's inferred play style prefers.
+
+    The adversarial search still allows every candidate reply, but the beam at an opponent's node is
+    chosen with that opponent's inferred heuristic weights instead of the generic ones, so the
+    replies actually examined are the ones that style is likely to play (profiler conditioning).
+    """
+
+    _name = "ConditionedMinimaxPlayer"
+
+    def __init__(self, min_observed: int = 6, min_confidence: float = 0.5, **kw):
+        super().__init__(**kw)
+        self.min_observed = min_observed
+        self.min_confidence = min_confidence
+        self._models: dict = {}
+        self._opp_weights: dict = {}
+        self._inferred: dict = {}
+        self._names: List[str] = []
+
+    def observe(self, record: dict, observer_name: str) -> None:
+        if record["player_name"] == observer_name:
+            return
+        from app.ml.archetypes import state_from_record
+        from app.ml.opponent_model import OpponentModel
+        from app.models.schemas import DestinationType, SourceType, TileColor
+
+        state = state_from_record(record)
+        if state is None:
+            return
+        idx = next((i for i, p in enumerate(state.players) if p.name == record["player_name"]), None)
+        if idx is None:
+            return
+        a = record["action"]
+        action = GameAction(source_type=SourceType(a["source_type"]), source_index=a["source_index"],
+                            color=TileColor(a["color"]), destination=DestinationType(a["destination"]),
+                            destination_row=a["destination_row"])
+        self._models.setdefault(record["player_name"], OpponentModel()).observe(state, idx, action)
+
+    def _candidates(self, sim: GameSim) -> List[GameAction]:
+        name = self._names[sim.current] if sim.current < len(self._names) else None
+        w = self._opp_weights.get(name, self.weights)
+        idx = sim.current
+        player = sim.state.players[idx]
+        ranked = sorted(get_legal_actions(sim.state, idx), key=lambda a: _score_action(sim.state, player, a, w),
+                        reverse=True)
+        top = ranked[: self.beam]
+        floor = next((a for a in ranked if a.destination.value == "floor"), None)
+        if floor is not None and floor not in top:
+            top.append(floor)
+        return top
+
+    async def decide(self, game_state: GameStateData, player_index: int) -> GameAction:
+        from app.ml.opponent_model import STYLE_LIBRARY
+
+        self._names = [p.name for p in game_state.players]
+        self._opp_weights, self._inferred = {}, {}
+        for name, model in self._models.items():
+            if model.observed >= self.min_observed:
+                style, p = model.likely_style()
+                if p >= self.min_confidence:
+                    self._opp_weights[name] = STYLE_LIBRARY[style]
+                    self._inferred[name] = {"style": style, "confidence": round(p, 3), "moves_observed": model.observed}
+        action = await super().decide(game_state, player_index)
+        self.last_explanation["adaptation"] = {
+            "opponents": self._inferred, "playing_as": "minimax",
+            "reason": ("searching replies as: " + ", ".join(f"{n} ~ {e['style']}" for n, e in self._inferred.items()))
+            if self._inferred else "not enough confident opponent evidence; generic reply ordering",
+        }
+        return action
