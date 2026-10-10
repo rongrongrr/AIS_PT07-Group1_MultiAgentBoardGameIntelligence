@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from tiles.auth import api_key_ok
 from tiles.models.db import init_db
-from tiles.routers import feedback, history, players, profiler, sessions
+from tiles.routers import feedback, history, players, profiler, sessions, tournament
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,6 +55,7 @@ app.include_router(players.action_router, prefix="/api/player", tags=["players"]
 app.include_router(history.router, prefix="/api/history", tags=["history"])
 app.include_router(profiler.router, prefix="/api/profiler", tags=["profiler"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["feedback"])
+app.include_router(tournament.router, prefix="/api/tournament", tags=["tournament"])
 
 
 @app.middleware("http")

@@ -15,7 +15,7 @@ Every feature in the progress report's implementation table, plus the deliverabl
 | 7 | **Opponent modelling (predictive opponent policy)** | Planned | **Done** | `OpponentModel`: style posterior + next-move prediction, used by the conditioned search players | top-1 81-98% on in-library opponents vs ~18% chance; ~55% on out-of-library lookahead players (no better than a fixed heuristic) | does not generalise to lookahead opponents; humans untested |
 | 8 | Game state telemetry | Done | **Done** | per-move decision / click / websocket-wait / total ms, legal-move counts, system log over WebSocket | live games; logged to MLflow | n/a |
 | 9 | Action trace ledger | Done | **Done** | SQLite ledger: every move with the board before it, scores, timings, alternatives, rationale; JSON export | tests, live games | append-only by convention (not enforced by the database) |
-| 10 | Multi-agent orchestration | Done | **Done** | 2-4 Chromium bots per session, host creates room and starts only when the roster is confirmed; Docker deployment | consecutive live games, 2-4 players, local and Docker; recorded in `docs/evidence/` | human joining via room link not tested live |
+| 10 | Multi-agent orchestration | Done | **Done** | 2-4 Chromium bots per session, host creates room and starts only when the roster is confirmed; Docker deployment | consecutive live games, 2-4 players, local and Docker; recorded in `docs/evidence/` | human slot tested live with an outside scripted browser (not a person); human moves are inferred from the board and recorded |
 | 11 | **Visualization and replay** | Done (no playback) | **Done** | live monitor, round-grouped move log, **Replay with play / pause / prev / next / jump / speed / jump-to-round**, winner banner, export | 9 Vitest tests; real-browser check against Docker (`docs/evidence/ui_replay.png`) | n/a |
 | 12 | **Explainability (decision explanations tied to search internals)** | Partial | **Done** | top-3 alternatives with scores, **natural-language rationale and commentary** from engine facts (optional LLM rewrite), opponent read, rating widget, text-vs-scores control condition | every claim re-derived by simulating the move, >1,500 positions, all match; 51/51 live moves carried rationales | **human study: instrument and protocol ready, no participant data yet**; LLM rewrite not run live |
 | 13 | **Experiment tracking (MLflow)** | Planned | **Done** | automatic logging of every finished game (config, scores, latency, telemetry, ledger); `--mlflow` on the evaluation scripts; optional UI service | tests; verified in Docker | n/a |
@@ -59,8 +59,20 @@ Every feature in the progress report's implementation table, plus the deliverabl
 | Item | Status |
 |---|---|
 | External-model API (register an HTTP model as a player; reference action endpoint) | **Done** |
-| Profiler ingest / insights endpoints | Not implemented (profiles are computed on demand) |
-| Authentication | Not implemented (run locally only) |
+| Profiler ingest / insights endpoints | **Done** (`GET /api/profiler/{id}/insights`, `POST /api/profiler/ingest`, `GET /api/profiler/stream/{id}/insights`); live insights panel in the Game Monitor and a profile overlay in the Replay |
+| Authentication | **Done**, optional: set `TILES_API_KEY` to require `X-API-Key` (HTTP) / `?api_key=` (WebSocket); the UI prompts for it. Off by default for local use |
+| Human players in a session | **Done**: moves of players outside TILES are inferred from the board and recorded, so profilers and adaptive bots can model them |
+| Leaderboard (tournament results in the UI) | **Done**: Leaderboard tab reads `models/elo_results.json` |
+
+## Merged stage-2 components (teammate's `feature/stage2` work)
+
+| Component | Status | Notes |
+|---|---|---|
+| Core engine, 300-slot action space, predicate-level Validator, PettingZoo env | **Done**, in use | Cross-checked against the live-runtime rules over full games (`tests/test_bridge.py`) |
+| PUCT MCTS with profiler priors, paranoid minimax | **Done**, playable live as `TilesMCTS`, `TilesProfiledMCTS`, `TilesMinimax` | Strength measured in EVALUATION.md section 18 |
+| Ledger, telemetry, turn pipeline, `tiles` CLI, ablation / prediction-eval | **Done** | Offline simulations only |
+| `tiles/rulebook` verifier | **Done** | 19/19 specs verified against the core engine |
+| Socket.IO live adapter and its server | **Not kept** | The site no longer speaks Socket.IO; see MERGE_NOTES.md |
 
 ## What is still outstanding (needs people, not code)
 
@@ -68,4 +80,4 @@ Every feature in the progress report's implementation table, plus the deliverabl
 2. Apply [REPORT_CORRECTIONS.md](REPORT_CORRECTIONS.md) to the report PDF and write the technical paper (Phase 2).
 3. Individual accomplishment reports (git history is concentrated in one author; document non-code contributions).
 4. Identify a sponsor or users for the customer-feedback criterion.
-5. Try human players joining through the room link, and, if an API key is available, run the LLM extractor and explainer.
+5. Try real people joining through the room link (an outside scripted browser has been tested), and, if an API key is available, run the LLM extractor and explainer.

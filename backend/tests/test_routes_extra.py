@@ -304,3 +304,20 @@ def create_with_key(client):
         {"slot": 0, "type": "GreedyPlayer", "name": "A"}, {"slot": 1, "type": "RandomPlayer", "name": "B"}]})
     assert r.status_code == 200
     return r.json()["id"]
+
+
+def test_tournament_leaderboard(client, tmp_path, monkeypatch):
+    from tiles.routers import tournament as T
+    monkeypatch.setattr(T, "RESULTS_PATH", tmp_path / "missing.json")
+    assert client.get("/api/tournament").json() == {"available": False}
+    f = tmp_path / "r.json"
+    f.write_text(json.dumps({"ranking": [{"player": "A", "elo": 1500, "mean_score": 50}], "win_rates": {}}))
+    monkeypatch.setattr(T, "RESULTS_PATH", f)
+    body = client.get("/api/tournament").json()
+    assert body["available"] and body["ranking"][0]["player"] == "A"
+
+
+def test_shipped_leaderboard_file_is_valid():
+    from tiles.routers import tournament as T
+    data = json.loads(T.RESULTS_PATH.read_text())
+    assert data["ranking"] == sorted(data["ranking"], key=lambda r: -r["elo"])

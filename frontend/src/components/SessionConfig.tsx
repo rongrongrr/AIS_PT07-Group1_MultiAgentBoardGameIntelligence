@@ -15,8 +15,8 @@ export default function SessionConfig({ onCreated }: { onCreated?: (id: string) 
   const [roomName, setRoomName] = useState('');
   const [browserMode, setBrowserMode] = useState<'headless' | 'headed'>('headed');
   const [playerSlots, setPlayerSlots] = useState<PlayerSlotConfig[]>([
-    { slot: 0, type: 'MinimaxPlayer', name: 'Alice' },
-    { slot: 1, type: 'MinimaxPlayer', name: 'Bob' },
+    { slot: 0, type: 'TilesMCTS', name: 'Alice' },
+    { slot: 1, type: 'TilesMCTS', name: 'Bob' },
   ]);
   const [moveTimeout, setMoveTimeout] = useState(10);
   const [stuckAbort, setStuckAbort] = useState(3);
@@ -51,7 +51,7 @@ export default function SessionConfig({ onCreated }: { onCreated?: (id: string) 
     const nextName = defaultNames[playerSlots.length] || `Player${playerSlots.length + 1}`;
     setPlayerSlots([
       ...playerSlots,
-      { slot: playerSlots.length, type: 'MinimaxPlayer', name: nextName },
+      { slot: playerSlots.length, type: 'TilesMCTS', name: nextName },
     ]);
   }
 

@@ -46,10 +46,11 @@ npm install && npm run dev                          # http://localhost:5173 (pro
 
 | Player | Strategy |
 |---|---|
-| **`MinimaxPlayer`** (default) | Depth-3 alpha-beta search over the exact in-round game tree with greedy playouts. Highest Elo in the round robin (1741); beats the lookahead player 81% and the heuristic 88%. |
+| **`TilesMCTS`** (default) | Stage-2 PUCT MCTS on the core engine with determinised redeals. Strongest player measured: beats `MinimaxPlayer` 81% and `MCTSPlayer` 75% over 40 games each (EVALUATION.md section 18). |
+| `MinimaxPlayer` | Depth-3 alpha-beta search over the exact in-round game tree with greedy playouts. Highest Elo among the original players (1741 in the round robin of EVALUATION.md section 8); beats the lookahead player 81% and the heuristic 88%. |
 | `MCTSPlayer` | UCT tree search over the same tree. Statistically tied with Minimax (Elo 1738). |
 | `ConditionedMCTSPlayer`, `ConditionedMinimaxPlayer` | The same searches, but opponents are simulated as the play style the opponent model infers from their moves (profiler conditioning). |
-| `TilesMCTS`, `TilesProfiledMCTS`, `TilesMinimax` | The teammate-built Decision Stack tacticians from `tiles/agents/` (PUCT MCTS with determinised redeals, the same with profiler-predicted opponent priors, paranoid minimax), running on the bit-packed core engine and bridged into live play by `tiles/bridge.py`. Strength vs the `ml/` players: see EVALUATION.md section 11. |
+| `TilesMCTS`, `TilesProfiledMCTS`, `TilesMinimax` | The teammate-built Decision Stack tacticians from `tiles/agents/` (PUCT MCTS with determinised redeals, the same with profiler-predicted opponent priors, paranoid minimax), running on the bit-packed core engine and bridged into live play by `tiles/bridge.py`. Strength vs the `ml/` players: see EVALUATION.md section 18. |
 | `RolloutPlayer` | Shortlists heuristic moves and simulates the rest of the round for each. |
 | `GreedyPlayer` | One-ply heuristic (wall points, line progress, bonus potential, floor penalties). Baseline. |
 | `ColorCollectorPlayer`, `RusherPlayer`, `RecklessPlayer`, `BlockerPlayer` | The same heuristic engine with different weights: distinct play styles used to train and test the profilers. |
@@ -165,6 +166,9 @@ Command-line (no browser needed): `cd backend && pip install -e . && tiles tourn
 | `GET` | `/api/history/{id}/export` | Full game JSON ([format](backend/EXPORT_FORMAT.md)) |
 | `GET` | `/api/history/{id}/state/{step}`, `/states` | State snapshots |
 | `GET` | `/api/profiler/analyzers` | Available analyzers |
+| `GET` | `/api/profiler/{id}/insights[?upto_step=]` | Profile of every player so far (live panel, replay overlay) |
+| `POST` | `/api/profiler/ingest` | Push a move record from any source; get the player's running profile (`GET /api/profiler/stream/{id}/insights`) |
+| `GET` | `/api/tournament` | Latest saved Elo tournament (Leaderboard tab) |
 | `POST` | `/api/profiler/{id}/analyze?player_name=&analyzer_name=` | Profile a player |
 | `POST` / `GET` | `/api/feedback`, `/api/feedback/summary`, `/api/feedback/{id}` | Explanation ratings and statistics |
 
@@ -173,12 +177,11 @@ Command-line (no browser needed): `cd backend && pip install -e . && tiles tourn
 - **Live play works end to end** on buddyboardgames.com for 2-4 bot players (Docker and local): consecutive live games completed with no errors and no floor fallbacks at roughly 300-450 ms per move; ledger scores match the platform's final scores. Details and the defects found along the way: EVALUATION.md section 7.
 - **The platform is a third-party dependency and has changed before.** It speaks JSON `{"type", "payload"}` over a plain WebSocket (not Socket.IO). Decisions, turn detection, dealing and scores use the platform's WebSocket state; the DOM parser is only a fallback. If the site changes again, run with `TILES_DEBUG_FRAMES` and compare against `tests/fixtures/live_frames.json`.
 - A session is only `completed` if the final board shows a finished wall row; the host starts only once the platform has confirmed every expected player.
-- **Not tested live:** human players joining through the room link (roster logic is unit-tested).
+- **Human players:** a `human` slot waits for an outside player; their moves are inferred from the board and recorded, so profilers can analyse them. Tested live with an outside scripted browser (`scripts/live_human_join_check.py`), **not with a real person**.
 - **No participant data yet** for the human-centred explanation study (instrument and protocol are ready; the team has to run it).
 - **LLM components** (rule extractor, explainer rewrite) are implemented against an interface and tested with stubs only; no API key was available to run them.
 - **Profilers and the opponent model are trained on simulated bot play**; accuracy on human players is unknown. Opponent modelling inside the search gave at most a small gain (+2.7 margin points).
-- Not implemented: authentication; the PRD's profiler ingest / insights endpoints.
-- The API has no authentication and accepts any http(s) `platform_url` and remote-model URL; run it locally only.
+- Authentication is optional (`TILES_API_KEY`, a shared secret); the API accepts any http(s) `platform_url` and remote-model URL, so do not expose it publicly.
 
 ## Tech stack
 

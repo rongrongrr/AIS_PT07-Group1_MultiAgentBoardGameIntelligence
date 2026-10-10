@@ -49,6 +49,7 @@ async def main():
     ap.add_argument("--players", nargs="+", default=["RandomPlayer", "GreedyPlayer", "BlockerPlayer", "RolloutPlayer", "MinimaxPlayer"],
                     choices=list(FACTORIES))
     ap.add_argument("--mlflow", action="store_true")
+    ap.add_argument("--save", help="write results as JSON (the UI Leaderboard tab reads models/elo_results.json)")
     a = ap.parse_args()
 
     res = await round_robin({n: FACTORIES[n] for n in a.players}, a.deals, a.seed)
@@ -61,6 +62,14 @@ async def main():
     print(f"{'':<22}" + "".join(f"{n[:9]:>10}" for n in names))
     for r in names:
         print(f"{r:<22}" + "".join(f"{'-':>10}" if r == c else f"{res.win_rate(r, c):>10.2f}" for c in names))
+    if a.save:
+        import datetime
+        import json
+        out = {"generated": datetime.date.today().isoformat(), "games": res.n_games, "deals_per_pair": a.deals, "seed": a.seed,
+               "ranking": [{"player": n, "elo": round(e), "mean_score": round(res.mean_score[n], 1)} for n, e in res.ranking()],
+               "win_rates": {r: {c: round(res.win_rate(r, c), 2) for c in names if c != r} for r in names}}
+        Path(a.save).write_text(json.dumps(out, indent=2))
+        print(f"saved {a.save}")
     if a.mlflow:
         from tiles import tracking
         tracking.log_run(tracking.EVALUATION_EXPERIMENT, "elo tournament",

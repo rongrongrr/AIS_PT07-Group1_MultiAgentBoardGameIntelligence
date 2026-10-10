@@ -1,0 +1,82 @@
+{
+  "generated": "2026-10-10",
+  "games": 180,
+  "deals_per_pair": 6,
+  "seed": 3,
+  "ranking": [
+    {
+      "player": "TilesMCTS",
+      "elo": 1661,
+      "mean_score": 53.0
+    },
+    {
+      "player": "TilesProfiledMCTS",
+      "elo": 1649,
+      "mean_score": 52.9
+    },
+    {
+      "player": "MinimaxPlayer",
+      "elo": 1550,
+      "mean_score": 52.7
+    },
+    {
+      "player": "MCTSPlayer",
+      "elo": 1537,
+      "mean_score": 56.1
+    },
+    {
+      "player": "TilesMinimax",
+      "elo": 1359,
+      "mean_score": 39.2
+    },
+    {
+      "player": "GreedyPlayer",
+      "elo": 1244,
+      "mean_score": 46.4
+    }
+  ],
+  "win_rates": {
+    "TilesMCTS": {
+      "TilesProfiledMCTS": 0.67,
+      "MinimaxPlayer": 0.67,
+      "MCTSPlayer": 0.67,
+      "TilesMinimax": 0.83,
+      "GreedyPlayer": 1.0
+    },
+    "TilesProfiledMCTS": {
+      "TilesMCTS": 0.33,
+      "MinimaxPlayer": 0.71,
+      "MCTSPlayer": 0.83,
+      "TilesMinimax": 0.92,
+      "GreedyPlayer": 0.92
+    },
+    "MinimaxPlayer": {
+      "TilesMCTS": 0.33,
+      "TilesProfiledMCTS": 0.29,
+      "MCTSPlayer": 0.42,
+      "TilesMinimax": 0.83,
+      "GreedyPlayer": 1.0
+    },
+    "MCTSPlayer": {
+      "TilesMCTS": 0.33,
+      "TilesProfiledMCTS": 0.17,
+      "MinimaxPlayer": 0.58,
+      "TilesMinimax": 0.83,
+      "GreedyPlayer": 0.96
+    },
+    "TilesMinimax": {
+      "TilesMCTS": 0.17,
+      "TilesProfiledMCTS": 0.08,
+      "MinimaxPlayer": 0.17,
+      "MCTSPlayer": 0.17,
+      "GreedyPlayer": 0.71
+    },
+    "GreedyPlayer": {
+      "TilesMCTS": 0,
+      "TilesProfiledMCTS": 0.08,
+      "MinimaxPlayer": 0,
+      "MCTSPlayer": 0.04,
+      "TilesMinimax": 0.29
+    }
+  }
+}

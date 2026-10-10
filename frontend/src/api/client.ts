@@ -179,6 +179,10 @@ export const api = {
     summary: () => request<Record<string, unknown>>('/feedback/summary'),
   },
 
+  tournament: {
+    latest: () => request<TournamentResults>('/tournament'),
+  },
+
   profiler: {
     insights: (sessionId: string, uptoStep?: number) =>
       request<{ total_moves: number; analyzer: string; insights: PlayerInsight[] }>(
@@ -202,6 +206,15 @@ export interface PlayerInsight {
   archetype_confidence?: number | null;
   archetype_reasons?: { feature: string; meaning: string }[];
   summary: string;
+}
+
+export interface TournamentResults {
+  available: boolean;
+  generated?: string;
+  games?: number;
+  deals_per_pair?: number;
+  ranking?: { player: string; elo: number; mean_score: number }[];
+  win_rates?: Record<string, Record<string, number>>;
 }
 
 // --- WebSocket ---

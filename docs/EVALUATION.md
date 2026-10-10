@@ -124,6 +124,7 @@ The same engine was run on buddyboardgames.com through the production path (API 
 | `live_game_2p_rollout_vs_greedy.json` | RolloutPlayer vs GreedyPlayer | completed, 5 rounds, 52 moves, 44-30 |
 | `live_game_2p_greedy_vs_blocker.json` | GreedyPlayer vs BlockerPlayer | completed, 5 rounds, 52 moves, 36-50 |
 | `live_game_4p_mixed.json` | Rollout, Greedy, Blocker, Rollout | completed, 5 rounds, 83 moves, 66/51/58/69 |
+| `live_game_4p_core_tacticians.json` | TilesMCTS, TilesProfiledMCTS, Minimax, Greedy (after the stage-2 merge) | completed, 67/44/58/59, TilesMCTS wins |
 
 After the final fixes, 7 consecutive live games (3 four-player, 4 two-player) completed with no errors, no warnings and no floor fallbacks, at roughly 300-440 ms per move. Final scores in the ledger were checked against the platform's own final message (they match).
 
@@ -136,6 +137,8 @@ Running live exposed defects that no offline test could, all now fixed and cover
 5. **Games could start with fewer players than configured**: the host's Start button is enabled with one player. The host now starts only when the platform has confirmed the whole roster, and joining is retried and fails loudly.
 6. **Page load timed out** waiting for "network idle", which this site never reaches; loading is now retried.
 7. **Live state never reached the browser UI** (a timestamp that could not be serialised killed the WebSocket); fixed.
+
+**Human slot (outside client).** A session with one bot and one `human` slot was run live in Docker four times (`backend/scripts/live_human_join_check.py`). The "human" is a separate Chromium browser that joins the room by name and plays random legal moves, so this tests the host waiting for an outside player, starting once it has joined, alternating turns with it, and ledger recording; it does **not** test a real person's clicking or timing. All four games completed. Because TILES does not control the human, its moves are inferred from the board by matching legal moves against what appeared (including the last move of a round or the game, where the platform already shows the scored board): in the last run 28 of the outside client's 29 moves were recorded, with no inference failures logged (the first run, before the round-end rule was added, recorded 24 of 27; a later run with `TilesMCTS` as the bot recorded 25 of 26). The recorded game is `docs/evidence/live_game_2p_bot_vs_outside_client.json`. The profilers then analyse the human's moves like any other player's. A random-play stand-in was labelled ColorCollectorPlayer by the archetype classifier, which is a reminder that archetype labels on unseen play are hypotheses (section 3).
 
 Before fix 5, four consecutive four-player attempts aborted. The platform is third-party and changed once already; its message format is an external dependency (see README, limitations).
 
@@ -270,7 +273,41 @@ Every finished live game is logged to MLflow automatically (configuration, final
 
 - Play against human opponents, and archetype / sequence-model labels on human games.
 - The human-centred study of explanation quality (instrument ready, no data).
-- Joining of real human players through the room link (roster logic is unit-tested, no human involved).
+- Real people joining through the room link: only an outside scripted browser was tested (section 7); a person's clicking, timing and hesitation were not.
 - The LLM-based rule extractor and LLM explainer against a real model.
 - Strength of the conditioned Minimax player against plain Minimax.
 - Headed (visible-window) mode and long-running stability beyond the live games listed in section 7.
+
+## 18. Stage-2 Decision Stack vs the original search players
+
+The teammate's branch brought its own search players (`tiles/agents/tacticians`: PUCT MCTS, optionally biased by a learned next-move predictor, and a paranoid minimax) running on the bit-packed core engine. They play live through `tiles/bridge.py` (`TilesMCTS`, `TilesProfiledMCTS`, `TilesMinimax`) and were compared with the original `MinimaxPlayer` and `MCTSPlayer` in the same simulation, same deals, both seats (`scripts/elo_tournament.py`). Before comparing, the two rules engines were checked against each other: `tests/test_bridge.py` plays random 2-4 player games through both and finds identical legal moves on every turn and identical scores after every round and at the end.
+
+**Six players, 6 deals per pair (12 games per pair, 180 games):**
+
+| Rank | Player | Elo | Mean score |
+|---|---|---|---|
+| 1 | TilesMCTS | 1661 | 53.0 |
+| 2 | TilesProfiledMCTS | 1649 | 52.9 |
+| 3 | MinimaxPlayer | 1550 | 52.7 |
+| 4 | MCTSPlayer | 1537 | 56.1 |
+| 5 | TilesMinimax | 1359 | 39.2 |
+| 6 | GreedyPlayer | 1244 | 46.4 |
+
+**Four players, 20 deals per pair (40 games per pair, 240 games, seed 7); win rate of row against column:**
+
+| | TilesMCTS | TilesProfiledMCTS | MinimaxPlayer | MCTSPlayer |
+|---|---|---|---|---|
+| TilesMCTS | - | 0.49 | **0.81** | **0.75** |
+| TilesProfiledMCTS | 0.51 | - | **0.72** | **0.68** |
+| MinimaxPlayer | 0.19 | 0.28 | - | 0.55 |
+| MCTSPlayer | 0.25 | 0.33 | 0.45 | - |
+
+Elo: TilesMCTS 1603, TilesProfiledMCTS 1586, MinimaxPlayer 1409, MCTSPlayer 1402.
+
+Findings, with their limits:
+
+* **The stage-2 PUCT MCTS is the strongest player in the repository.** It beats the original Minimax 81% and the original MCTS 75% over 40 games each (a 95% interval on 40 games is roughly +/-15 points, so both margins are clearly above 50%). It is therefore the default player in the UI. The first, smaller run (12 games per pair) showed the same ordering with a 67% lead, which on its own was within noise; the larger run is what settles it. Mean scores are about equal (51 vs 52), so it wins more games rather than scoring more points.
+* **Profiler priors do not help it.** TilesProfiledMCTS against TilesMCTS is 51-49 over 40 games, i.e. no measurable effect, consistent with the small effect found for the original conditioned search (section 9). The opponents in this test are fixed-algorithm bots, which the predictor can only partly model; whether it helps against humans is untested.
+* **The stage-2 minimax is the weakest search player** (Elo 1359, 17% against the original Minimax); the original alpha-beta stays in the product as `MinimaxPlayer`.
+* Decision time in live games: about 0.6 s per move for the profiled MCTS (max 1.2 s), about 0.04 s for TilesMinimax, against a 10 s move limit.
+* One live game in Docker, `TilesProfiledMCTS` vs `TilesMinimax`, completed without errors (51-13, 50 moves).
