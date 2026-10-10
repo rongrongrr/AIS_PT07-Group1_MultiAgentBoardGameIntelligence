@@ -1,3 +1,4 @@
+import { titleCase } from "../format";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { Board } from "../components/Board";
@@ -82,24 +83,24 @@ export function Replay({
       <div className="monitor-header">
         <select value={sessionId ?? ""} onChange={(e) => onPick(e.target.value)}>
           <option value="" disabled>
-            pick a session…
+            Pick a session…
           </option>
           {sessions.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.id} — {s.players.map((p) => p.name).join(" vs ")} ({s.status})
+              {s.id} — {s.players.map((p) => p.name).join(" vs ")} ({titleCase(s.status)})
             </option>
           ))}
         </select>
         {sessionId && (
           <>
             <a className="btn-ghost" href={`#/monitor/${sessionId}`}>
-              monitor
+              Monitor
             </a>
             <a className="btn-ghost" href={`#/profiles/${sessionId}`}>
-              profiles
+              Profiles
             </a>
             <a className="btn-ghost" href={api.exportUrl(sessionId)}>
-              export JSON
+              Export JSON
             </a>
           </>
         )}
@@ -125,7 +126,7 @@ export function Replay({
                 setPlaying(!playing);
               }}
             >
-              {playing ? "❚❚" : "▶ play"}
+              {playing ? "❚❚" : "▶ Play"}
             </button>
             <button
               className="btn-ghost"
@@ -137,7 +138,7 @@ export function Replay({
             <button className="btn-ghost" onClick={() => setStep(moves.length - 1)} disabled={step === moves.length - 1}>
               ⏭
             </button>
-            <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} title="playback speed">
+            <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} title="Playback speed">
               {SPEEDS.map((s) => (
                 <option key={s.ms} value={s.ms}>
                   {s.label}
@@ -152,12 +153,12 @@ export function Replay({
               onChange={(e) => setStep(Number(e.target.value))}
             />
             <span className="small muted">
-              move {step + 1}/{moves.length} — round {current?.round}:{" "}
+              Move {step + 1}/{moves.length} — Round {current?.round}:{" "}
               {current ? `${current.player_name} ${describeAction(current.action)}` : ""}
             </span>
           </div>
           <div className="round-jumps">
-            <span className="small muted">jump to round:</span>
+            <span className="small muted">Jump to round:</span>
             {[...roundStarts.entries()].map(([round, index]) => (
               <button
                 key={round}

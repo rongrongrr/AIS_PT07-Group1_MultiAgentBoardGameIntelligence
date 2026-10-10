@@ -1,3 +1,5 @@
+import { titleCase } from "./format";
+
 /** DTOs mirroring docs/API.md and the backend's to_dict() serializers. */
 
 export type ColorName = "blue" | "yellow" | "red" | "black" | "white";
@@ -492,11 +494,11 @@ export interface StatsDTO {
 export function describeAction(a: ActionDTO): string {
   const src =
     a.source_type === "center"
-      ? "center"
-      : `factory ${(a.source_index ?? 0) + 1}`;
+      ? "Center"
+      : `Factory ${(a.source_index ?? 0) + 1}`;
   const dst =
-    a.destination === "floor" ? "floor" : `row ${(a.destination_row ?? 0) + 1}`;
-  return `${a.color}: ${src} → ${dst}`;
+    a.destination === "floor" ? "Floor" : `Row ${(a.destination_row ?? 0) + 1}`;
+  return `${titleCase(a.color)}: ${src} → ${dst}`;
 }
 
 export function sameAction(a: ActionDTO, b: ActionDTO): boolean {

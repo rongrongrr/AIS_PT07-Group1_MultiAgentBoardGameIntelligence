@@ -12,3 +12,4 @@ frontend/dist
 **/*.db-wal
 backend/tests
 docs
+frontend/coverage

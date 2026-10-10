@@ -1,3 +1,4 @@
+import { titleCase } from "../format";
 import type { TileName } from "../types";
 
 export function Tile({
@@ -11,7 +12,7 @@ export function Tile({
 }) {
   if (tile === "firstPlayer") {
     return (
-      <span className={`tile tile-fpt tile-${size}`} title="first player token">
+      <span className={`tile tile-fpt tile-${size}`} title="First Player Token">
         1
       </span>
     );
@@ -19,7 +20,7 @@ export function Tile({
   return (
     <span
       className={`tile tile-${tile} tile-${size}${dimmed ? " tile-dim" : ""}`}
-      title={tile}
+      title={titleCase(tile)}
     />
   );
 }

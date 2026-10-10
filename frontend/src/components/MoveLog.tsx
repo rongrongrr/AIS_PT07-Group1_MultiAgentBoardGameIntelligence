@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { titleCase } from "../format";
 import type { TurnRecordDTO } from "../types";
 import { describeAction } from "../types";
 
@@ -27,7 +28,7 @@ function MoveRow({
         <td>
           <span className="action-chip">{describeAction(record.action)}</span>
         </td>
-        <td className="muted small">{record.tactician}</td>
+        <td className="muted small">{titleCase(record.tactician)}</td>
         <td className="muted small num">{scores ? scores.join(" : ") : ""}</td>
         <td className="muted small num">
           {record.timing?.total_ms != null
@@ -41,20 +42,20 @@ function MoveRow({
           <td colSpan={7}>
             {record.explanation?.text && <p>{record.explanation.text}</p>}
             <div className="small muted">
-              decide {record.timing?.decide_ms?.toFixed(1) ?? "?"} ms · validate{" "}
+              Decide {record.timing?.decide_ms?.toFixed(1) ?? "?"} ms · Validate{" "}
               {record.timing?.validate_ms?.toFixed(1) ?? "?"} ms
               {record.timing?.execute_ms != null && (
-                <span> · execute {record.timing.execute_ms.toFixed(0)} ms</span>
+                <span> · Execute {record.timing.execute_ms.toFixed(0)} ms</span>
               )}{" "}
-              · explain {record.timing?.explain_ms?.toFixed(1) ?? "?"} ms
+              · Explain {record.timing?.explain_ms?.toFixed(1) ?? "?"} ms
               {record.validation && !record.validation.ok && (
                 <span className="error-text">
                   {" "}
-                  · rejected: {record.validation.violation?.message}
+                  · Rejected: {record.validation.violation?.message}
                 </span>
               )}
               {record.validation?.attempts && record.validation.attempts > 1 && (
-                <span> · attempts {record.validation.attempts}</span>
+                <span> · Attempts {record.validation.attempts}</span>
               )}
             </div>
           </td>
@@ -93,7 +94,7 @@ export function MoveLog({
             Round {round}
             <span className="muted small">
               {" "}
-              · {rounds.get(round)!.length} moves
+              · {rounds.get(round)!.length} Moves
             </span>
           </summary>
           <div className="table-scroll">

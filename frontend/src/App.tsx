@@ -61,7 +61,7 @@ export default function App() {
             <span className="tile tile-red tile-sm" />
           </span>
           TILES
-          <span className="brand-sub">explainable multi-agent Azul</span>
+          <span className="brand-sub">Explainable Multi-Agent Azul</span>
         </a>
         <nav>
           {VIEWS.map((v) => (
@@ -79,9 +79,9 @@ export default function App() {
             className={`ws-dot ${healthError ? "ws-closed" : health ? "ws-open" : "ws-connecting"}`}
             title={
               healthError
-                ? "backend unreachable — start it with `tiles serve`"
+                ? "Backend unreachable — start it with `tiles serve`"
                 : health
-                  ? `backend ok · v${health.version}`
+                  ? `Backend OK · v${health.version}`
                   : "checking backend…"
             }
           />
@@ -90,7 +90,7 @@ export default function App() {
               className="cap-badge"
               title="Live play on buddyboardgames.com is unavailable: pip install 'tiles[live]' && playwright install chromium"
             >
-              no live
+              No Live
             </span>
           )}
           {health && health.llm_available === false && (
@@ -98,7 +98,7 @@ export default function App() {
               className="cap-badge"
               title="LLM explainer/extractor unavailable: set ANTHROPIC_API_KEY on the backend"
             >
-              no llm
+              No LLM
             </span>
           )}
         </div>

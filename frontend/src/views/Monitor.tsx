@@ -1,3 +1,4 @@
+import { titleCase } from "../format";
 import { useCallback, useEffect, useState } from "react";
 import { api, connectSessionWs, type WsStatus } from "../api/client";
 import { Board } from "../components/Board";
@@ -159,7 +160,7 @@ export function Monitor({ sessionId }: { sessionId: string | null }) {
       .then(refresh)
       .catch((e) => {
         setStopping(false);
-        setError(`stop failed: ${e.message}`);
+        setError(`Stop failed: ${e.message}`);
       });
   };
 
@@ -168,23 +169,23 @@ export function Monitor({ sessionId }: { sessionId: string | null }) {
       <div className="monitor-header">
         <span className="mono small">{sessionId}</span>
         {session && <StatusBadge status={session.status} />}
-        {session && <span className="mode-chip">{session.mode}</span>}
-        <span className={`ws-dot ws-${wsStatus}`} title={`websocket: ${wsStatus}`} />
-        {wsStatus !== "open" && <span className="small muted">polling</span>}
+        {session && <span className="mode-chip">{titleCase(session.mode)}</span>}
+        <span className={`ws-dot ws-${wsStatus}`} title={`WebSocket: ${titleCase(wsStatus)}`} />
+        {wsStatus !== "open" && <span className="small muted">Polling</span>}
         <span className="spacer" />
         {running && (
           <button className="btn-ghost" onClick={stop} disabled={stopping}>
-            {stopping ? "stopping…" : "stop"}
+            {stopping ? "Stopping…" : "Stop"}
           </button>
         )}
         <a className="btn-ghost" href={`#/replay/${sessionId}`}>
-          replay
+          Replay
         </a>
         <a className="btn-ghost" href={`#/profiles/${sessionId}`}>
-          profiles
+          Profiles
         </a>
         <a className="btn-ghost" href={api.exportUrl(sessionId)}>
-          export JSON
+          Export JSON
         </a>
       </div>
 
@@ -194,23 +195,23 @@ export function Monitor({ sessionId }: { sessionId: string | null }) {
       {(isLive || (live && live.status !== "running")) && (
         <div className={`live-strip live-${live?.status ?? session?.status ?? "created"}`}>
           <strong>{isLive ? "Live platform" : "Session"}</strong>
-          <span>· {live?.status ?? session?.status}</span>
+          <span>· {titleCase(live?.status ?? session?.status)}</span>
           {isLive && (live?.roomName ?? session?.room_name ?? session?.live?.room_name) && (
             <span>
-              · room <code>{live?.roomName ?? session?.room_name ?? session?.live?.room_name}</code>
+              · Room <code>{live?.roomName ?? session?.room_name ?? session?.live?.room_name}</code>
             </span>
           )}
           {(live?.roomUrl || session?.room_url) && (
             <a href={live?.roomUrl ?? session?.room_url ?? "#"} target="_blank" rel="noreferrer">
-              join link ↗
+              Join link ↗
             </a>
           )}
           {live?.waiting && live.waiting.length > 0 && (
-            <span>· waiting for: {live.waiting.join(", ")}</span>
+            <span>· Waiting for: {live.waiting.join(", ")}</span>
           )}
           {isLive && (
             <span className="muted small">
-              humans: open the link (room pre-filled), enter a name, click Play — the host bot starts once everyone is in
+              Humans: open the link (room pre-filled), enter a name, click Play — the host bot starts once everyone is in
             </span>
           )}
         </div>
@@ -225,10 +226,10 @@ export function Monitor({ sessionId }: { sessionId: string | null }) {
             >
               <span className="player-name">{p.name}</span>
               <span className="player-score">{p.score}</span>
-              {session?.players[i] && <span className="muted small">{session.players[i].tactician}</span>}
+              {session?.players[i] && <span className="muted small">{titleCase(session.players[i].tactician)}</span>}
             </div>
           ))}
-          <span className="muted small">round {state.round}</span>
+          <span className="muted small">Round {state.round}</span>
         </div>
       )}
 
@@ -237,8 +238,8 @@ export function Monitor({ sessionId }: { sessionId: string | null }) {
           🏆{" "}
           {gameOver.winner === null
             ? "Shared victory"
-            : `${playerNames[gameOver.winner] ?? `player ${gameOver.winner + 1}`} wins`}{" "}
-          — final scores{" "}
+            : `${playerNames[gameOver.winner] ?? `Player ${gameOver.winner + 1}`} wins`}{" "}
+          — Final scores{" "}
           {gameOver.scores.join(" : ")}
         </div>
       )}

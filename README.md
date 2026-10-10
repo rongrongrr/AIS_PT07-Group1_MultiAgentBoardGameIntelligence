@@ -403,8 +403,8 @@ simulated site.
 Tests that depend on an optional extra are skipped when that extra is not
 installed.
 
-The web app has no tests of its own. `npm run build` in `frontend/` type-checks
-it.
+The web app has its own tests (`npm test` in `frontend/`, or `npm run coverage`
+for the 80% coverage gate). `npm run build` also type-checks it.
 
 ## Good to know
 

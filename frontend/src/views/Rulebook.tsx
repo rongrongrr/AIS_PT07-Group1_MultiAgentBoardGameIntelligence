@@ -1,3 +1,4 @@
+import { titleCase } from "../format";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { RulebookDTO, RulebookSearchDTO, RulesDTO } from "../types";
@@ -57,7 +58,7 @@ export function Rulebook() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && runSearch()}
-            placeholder="e.g. what happens when the floor line overflows?"
+            placeholder="e.g. What happens when the floor line overflows?"
           />
           <button className="btn-primary" onClick={runSearch} type="button">
             Search
@@ -115,10 +116,10 @@ export function Rulebook() {
             <h3 className="no-margin">Extracted rules</h3>
             <span className="spacer" />
             <label className="field-inline small">
-              extractor
+              Extractor
               <select value={extractor} onChange={(e) => setExtractor(e.target.value)}>
-                <option value="deterministic">deterministic (retrieval + parsing)</option>
-                <option value="llm">llm (Claude; needs API key)</option>
+                <option value="deterministic">Deterministic (Retrieval + Parsing)</option>
+                <option value="llm">LLM (Claude; Needs API Key)</option>
               </select>
             </label>
           </div>
@@ -130,7 +131,7 @@ export function Rulebook() {
                   <div className="stat-label">Verification accuracy</div>
                   <div className="stat-value">{Math.round(rules.accuracy * 100)}%</div>
                   <div className="stat-hint muted small">
-                    {rules.verified}/{rules.checked} verified · {rules.skipped} skipped · ran {rules.extractor}
+                    {rules.verified}/{rules.checked} Verified · {rules.skipped} Skipped · Ran {titleCase(rules.extractor)}
                   </div>
                 </div>
               </div>
@@ -138,11 +139,11 @@ export function Rulebook() {
                 <table className="data-table rules-table">
                   <thead>
                     <tr>
-                      <th>rule</th>
-                      <th>kind</th>
-                      <th>predicate</th>
-                      <th>parameters</th>
-                      <th>status</th>
+                      <th>Rule</th>
+                      <th>Kind</th>
+                      <th>Predicate</th>
+                      <th>Parameters</th>
+                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -152,13 +153,13 @@ export function Rulebook() {
                           <div>{r.id}</div>
                           <div className="small muted">§{r.section}</div>
                         </td>
-                        <td>{r.kind}</td>
+                        <td>{titleCase(r.kind)}</td>
                         <td className="mono small">{r.predicate ?? "—"}</td>
                         <td className="mono small params-cell">
                           {Object.keys(r.parameters ?? {}).length ? JSON.stringify(r.parameters) : "—"}
                         </td>
                         <td>
-                          <span className={`status-badge status-${r.status}`}>{r.status}</span>
+                          <span className={`status-badge status-${r.status}`}>{titleCase(r.status)}</span>
                           {r.detail && <div className="small error-text">{r.detail}</div>}
                         </td>
                       </tr>

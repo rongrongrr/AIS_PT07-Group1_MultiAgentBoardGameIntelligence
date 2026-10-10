@@ -39,7 +39,7 @@ export function SeriesChart({ series }: { series: SeriesDTO }) {
       <h4>{series.title}</h4>
       {plot}
       <details className="chart-table">
-        <summary className="small muted">table view</summary>
+        <summary className="small muted">Table view</summary>
         <table className="data-table">
           <thead>
             <tr>

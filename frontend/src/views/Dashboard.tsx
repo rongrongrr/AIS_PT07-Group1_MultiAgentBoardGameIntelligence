@@ -1,3 +1,4 @@
+import { titleCase } from "../format";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { BarChart } from "../components/charts/BarChart";
@@ -99,25 +100,25 @@ export function Dashboard() {
             ) : (
               <>
                 <BarChart
-                  labels={tacticians.map((t) => t.name)}
-                  series={[{ name: "win rate", values: tacticians.map((t) => t.win_rate) }]}
-                  yLabel="win rate"
+                  labels={tacticians.map((t) => titleCase(t.name))}
+                  series={[{ name: "Win Rate", values: tacticians.map((t) => t.win_rate) }]}
+                  yLabel="Win Rate"
                   format={(v) => `${Math.round(v * 100)}%`}
                 />
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>tactician</th>
-                      <th>games</th>
-                      <th>wins</th>
-                      <th>avg score</th>
-                      <th>avg decide</th>
+                      <th>Tactician</th>
+                      <th>Games</th>
+                      <th>Wins</th>
+                      <th>Avg Score</th>
+                      <th>Avg Decide</th>
                     </tr>
                   </thead>
                   <tbody>
                     {tacticians.map((t) => (
                       <tr key={t.name}>
-                        <td>{t.name}</td>
+                        <td>{titleCase(t.name)}</td>
                         <td className="num">{t.games}</td>
                         <td className="num">{t.wins}</td>
                         <td className="num">{formatNumber(t.avg_score)}</td>
@@ -139,9 +140,9 @@ export function Dashboard() {
                   return (
                     <StatTile
                       key={key}
-                      label={key.replace("_ms", "")}
+                      label={titleCase(key.replace("_ms", ""))}
                       value={l?.p50 != null ? `${formatNumber(l.p50)} ms` : "—"}
-                      hint={l ? `p90 ${formatNumber(l.p90)} · max ${formatNumber(l.max)} ms` : "no data"}
+                      hint={l ? `P90 ${formatNumber(l.p90)} · Max ${formatNumber(l.max)} ms` : "No data"}
                     />
                   );
                 })}
@@ -153,9 +154,9 @@ export function Dashboard() {
                 <p className="muted small">Run a session with the Profiler enabled.</p>
               ) : (
                 <BarChart
-                  labels={archetypes.map(([n]) => n.replace(/_/g, " "))}
-                  series={[{ name: "players", values: archetypes.map(([, v]) => v) }]}
-                  yLabel="players"
+                  labels={archetypes.map(([n]) => titleCase(n))}
+                  series={[{ name: "Players", values: archetypes.map(([, v]) => v) }]}
+                  yLabel="Players"
                   height={200}
                 />
               )}

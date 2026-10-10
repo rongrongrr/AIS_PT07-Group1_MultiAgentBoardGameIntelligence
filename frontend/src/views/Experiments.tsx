@@ -1,3 +1,4 @@
+import { titleCase } from "../format";
 import { useCallback, useEffect, useState } from "react";
 import { api, connectExperimentWs, downloadJson } from "../api/client";
 import { SeriesChart } from "../components/charts/SeriesChart";
@@ -19,7 +20,7 @@ const ACTIVE = new Set(["created", "running"]);
 function cell(v: CellValue): string {
   if (v == null) return "—";
   if (typeof v === "number") return formatNumber(v, 3);
-  if (typeof v === "boolean") return v ? "yes" : "no";
+  if (typeof v === "boolean") return v ? "Yes" : "No";
   return v;
 }
 
@@ -31,7 +32,7 @@ function ResultView({ result }: { result: ExperimentResultDTO }) {
       {metrics.length > 0 && (
         <div className="stat-grid stat-grid-tight">
           {metrics.map(([k, v]) => (
-            <StatTile key={k} label={k.replace(/_/g, " ")} value={formatNumber(v, 3)} />
+            <StatTile key={k} label={titleCase(k)} value={formatNumber(v, 3)} />
           ))}
         </div>
       )}
@@ -46,7 +47,7 @@ function ResultView({ result }: { result: ExperimentResultDTO }) {
               <thead>
                 <tr>
                   {t.columns.map((c) => (
-                    <th key={c}>{c}</th>
+                    <th key={c}>{titleCase(c)}</th>
                   ))}
                 </tr>
               </thead>
@@ -67,7 +68,7 @@ function ResultView({ result }: { result: ExperimentResultDTO }) {
       ))}
       {result.raw !== undefined && (
         <details>
-          <summary className="small muted">raw result JSON</summary>
+          <summary className="small muted">Raw result JSON</summary>
           <pre className="json-block">{JSON.stringify(result.raw, null, 2)}</pre>
         </details>
       )}
@@ -141,7 +142,7 @@ function RunDetail({ runId, onChanged }: { runId: string; onChanged: () => void 
         <span className="spacer" />
         {active && (
           <button className="btn-ghost" onClick={() => api.stopExperiment(run.id).catch(() => undefined)}>
-            stop
+            Stop
           </button>
         )}
         {!active && (
@@ -153,22 +154,22 @@ function RunDetail({ runId, onChanged }: { runId: string; onChanged: () => void 
               }
             }}
           >
-            delete
+            Delete
           </button>
         )}
         <button className="btn-ghost" onClick={() => downloadJson(`${run.id}.json`, run)}>
-          download JSON
+          Download JSON
         </button>
       </div>
       <div className="small muted">
-        params:{" "}
+        Params:{" "}
         {Object.entries(run.params).map(([k, v]) => (
           <span key={k} className="action-chip">
-            {k}={String(v)}
+            {titleCase(k)}={String(v)}
           </span>
         ))}{" "}
-        · created {formatTime(run.created_at)}
-        {run.completed_at && ` · finished ${formatTime(run.completed_at)}`}
+        · Created {formatTime(run.created_at)}
+        {run.completed_at && ` · Finished ${formatTime(run.completed_at)}`}
       </div>
       {(active || progress.total > 0) && (
         <div className="progress">
@@ -183,9 +184,9 @@ function RunDetail({ runId, onChanged }: { runId: string; onChanged: () => void 
       {run.error && <div className="error-banner">{run.error}</div>}
       {logs.length > 0 && (
         <details open={active}>
-          <summary className="small muted">log · {logs.length}</summary>
+          <summary className="small muted">Log · {logs.length}</summary>
           <pre className="system-log">
-            {logs.map((l) => `${l.ts} [${l.level}] ${l.message}`).join("\n")}
+            {logs.map((l) => `${l.ts} [${titleCase(l.level)}] ${l.message}`).join("\n")}
           </pre>
         </details>
       )}
@@ -318,14 +319,14 @@ export function Experiments({
                       type="button"
                     >
                       <div className="run-item-head">
-                        <span>{r.title || r.kind}</span>
+                        <span>{r.title || titleCase(r.kind)}</span>
                         <StatusBadge status={r.status} />
                       </div>
                       <div className="bar-track bar-track-sm">
                         <div className="bar-fill" style={{ width: `${pct}%` }} />
                       </div>
                       <div className="small muted">
-                        {formatTime(r.created_at)} · {r.kind}
+                        {formatTime(r.created_at)} · {titleCase(r.kind)}
                       </div>
                     </button>
                   );
