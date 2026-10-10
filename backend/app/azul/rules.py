@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
+from app.azul.config import DEFAULT_RULES, RulesConfig
 from app.models.schemas import (
     DestinationType,
     GameAction,
@@ -23,7 +24,7 @@ WALL_PATTERN: List[List[TileColor]] = [
     [TileColor.YELLOW, TileColor.RED, TileColor.BLACK, TileColor.WHITE, TileColor.BLUE],
 ]
 
-FLOOR_PENALTIES = [-1, -1, -2, -2, -2, -3, -3]
+FLOOR_PENALTIES = list(DEFAULT_RULES.floor_penalties)
 
 
 def wall_column_for_color(row: int, color: TileColor) -> int:
@@ -195,15 +196,13 @@ def score_tile_placement(wall: List[List[bool]], row: int, col: int) -> int:
     return score
 
 
-def calculate_floor_penalty(floor_count: int) -> int:
+def calculate_floor_penalty(floor_count: int, config: RulesConfig = DEFAULT_RULES) -> int:
     """Calculate total penalty for tiles on the floor line."""
-    penalty = 0
-    for i in range(min(floor_count, len(FLOOR_PENALTIES))):
-        penalty += FLOOR_PENALTIES[i]
-    return penalty
+    penalties = config.floor_penalties
+    return sum(penalties[: min(floor_count, len(penalties))])
 
 
-def calculate_end_game_bonuses(wall: List[List[bool]]) -> dict:
+def calculate_end_game_bonuses(wall: List[List[bool]], config: RulesConfig = DEFAULT_RULES) -> dict:
     """Calculate end-of-game bonuses."""
     horizontal = 0
     vertical = 0
@@ -228,12 +227,8 @@ def calculate_end_game_bonuses(wall: List[List[bool]]) -> dict:
         if all(positions):
             color_complete += 1
 
-    return {
-        "horizontal": horizontal * 2,
-        "vertical": vertical * 7,
-        "color": color_complete * 10,
-        "total": horizontal * 2 + vertical * 7 + color_complete * 10,
-    }
+    h, v, c = horizontal * config.row_bonus, vertical * config.column_bonus, color_complete * config.color_bonus
+    return {"horizontal": h, "vertical": v, "color": c, "total": h + v + c}
 
 
 def is_game_over(state: GameStateData) -> bool:

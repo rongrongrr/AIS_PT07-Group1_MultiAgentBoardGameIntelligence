@@ -20,6 +20,7 @@ import random
 from dataclasses import dataclass, field
 from typing import Awaitable, Callable, Dict, List, Optional, Sequence
 
+from app.azul.config import DEFAULT_RULES, RulesConfig
 from app.azul.rules import (
     calculate_end_game_bonuses,
     calculate_floor_penalty,
@@ -38,13 +39,13 @@ from app.models.schemas import (
 )
 
 FIRST_PLAYER = "firstPlayer"
-TILES_PER_COLOR = 20
-TILES_PER_FACTORY = 4
+TILES_PER_COLOR = DEFAULT_RULES.tiles_per_color
+TILES_PER_FACTORY = DEFAULT_RULES.tiles_per_factory
 FLOOR_SLOTS = 7
 
 
-def factory_count(num_players: int) -> int:
-    return {2: 5, 3: 7, 4: 9}[num_players]
+def factory_count(num_players: int, rules: RulesConfig = DEFAULT_RULES) -> int:
+    return rules.factory_count(num_players)
 
 
 def _val(t) -> str:
@@ -66,6 +67,7 @@ class GameSim:
     rng: random.Random = field(default_factory=random.Random)
     current: int = 0  # index of the player to move
     finished: bool = False
+    rules: RulesConfig = DEFAULT_RULES
 
     def copy(self) -> "GameSim":
         c = GameSim(
@@ -75,22 +77,25 @@ class GameSim:
             rng=random.Random(),
             current=self.current,
             finished=self.finished,
+            rules=self.rules,
         )
         c.rng.setstate(self.rng.getstate())
         return c
 
 
-def new_game(player_names: Sequence[str], seed: Optional[int] = None) -> GameSim:
+def new_game(player_names: Sequence[str], seed: Optional[int] = None,
+             rules: RulesConfig = DEFAULT_RULES) -> GameSim:
     if not 2 <= len(player_names) <= 4:
         raise ValueError("Azul supports 2-4 players")
     rng = random.Random(seed)
-    bag = [c for c in TileColor.all_colors() for _ in range(TILES_PER_COLOR)]
+    bag = [c for c in TileColor.all_colors() for _ in range(rules.tiles_per_color)]
     rng.shuffle(bag)
     players = [PlayerState(index=i, name=n) for i, n in enumerate(player_names)]
     sim = GameSim(
         state=GameStateData(room_name="sim", players=players, round=0),
         bag=bag,
         rng=rng,
+        rules=rules,
     )
     deal_round(sim)
     return sim
@@ -109,9 +114,9 @@ def deal_round(sim: GameSim) -> None:
     s = sim.state
     s.round += 1
     s.factories = []
-    for _ in range(factory_count(len(s.players))):
+    for _ in range(factory_count(len(s.players), sim.rules)):
         tiles = []
-        for _ in range(TILES_PER_FACTORY):
+        for _ in range(sim.rules.tiles_per_factory):
             t = _draw(sim)
             if t is not None:
                 tiles.append(t)
@@ -181,7 +186,7 @@ def score_round(sim: GameSim) -> None:
                 sim.lid.extend(line[1:])
                 player.pattern_lines[row] = []
 
-        player.score = max(0, player.score + calculate_floor_penalty(floor_size(player)))
+        player.score = max(0, player.score + calculate_floor_penalty(floor_size(player), sim.rules))
         sim.lid.extend(player.floor_line)
         player.floor_line = []
         if player.has_first_player_token:
@@ -191,7 +196,7 @@ def score_round(sim: GameSim) -> None:
 
 def finish_game(sim: GameSim) -> Dict[str, int]:
     for p in sim.state.players:
-        p.score += calculate_end_game_bonuses(p.wall)["total"]
+        p.score += calculate_end_game_bonuses(p.wall, sim.rules)["total"]
     sim.finished = True
     sim.state.game_over = True
     return {p.name: p.score for p in sim.state.players}
@@ -218,6 +223,7 @@ async def play_game(
     player_names: Sequence[str],
     seed: Optional[int] = None,
     max_rounds: int = 20,
+    rules: RulesConfig = DEFAULT_RULES,
     on_move: Optional[Callable[[GameSim, int, GameAction], None]] = None,
     observers: Optional[Sequence[Optional[Callable[[dict, str], None]]]] = None,
 ) -> Dict:
@@ -229,7 +235,7 @@ async def play_game(
     from app.azul.rules import get_legal_actions
     from app.ml.archetypes import move_record
 
-    sim = new_game(player_names, seed)
+    sim = new_game(player_names, seed, rules)
     moves = 0
     while not sim.finished and sim.state.round <= max_rounds:
         while not round_over(sim.state):
