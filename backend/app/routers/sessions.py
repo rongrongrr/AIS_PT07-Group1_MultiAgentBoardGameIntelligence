@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session as DBSession
 
 from app.azul.rules import get_legal_actions, is_game_over
 from app.engine.play_engine import BotBrowser, MultiPlayerSession
+from app import tracking
+from app.explain.explainer import Explainer
 from app.ml.archetypes import move_record
 from app.ml.registry import registry
 from app.models.db import Move, Session, get_db, GameState as GameStateModel
@@ -508,7 +510,8 @@ async def _run_multi_bot_game(
                     "ws_wait_ms": ws_wait_ms,
                     "total_ms": total_ms,
                     "fell_back_to_floor": fell_back,
-                    "explanation": getattr(model, "last_explanation", None) or None,
+                    "explanation": _explain(state, player_index, action, getattr(model, "last_explanation", None)),
+                    "commentary": _commentary(state, player_index, action),
                     "legal_actions": n_legal,
                     "round": cur_round,
                     "scores": cur_scores,
@@ -594,6 +597,8 @@ async def _run_multi_bot_game(
             _update_db_status(session_id, SessionStatus.ABORTED, db, scores=scores)
         else:
             _update_db_status(session_id, SessionStatus.COMPLETED, db, scores=scores)
+        # experiment tracking (MLflow); runs in a thread and can never fail the game
+        asyncio.create_task(asyncio.to_thread(tracking.log_session_run, session_id))
 
     except asyncio.CancelledError:
         logger.info(f"[{session_id}] Game cancelled")
@@ -604,6 +609,28 @@ async def _run_multi_bot_game(
         await mp.close_all()
         _active_sessions.pop(session_id, None)
         _session_tasks.pop(session_id, None)
+
+
+_explainer = Explainer()
+
+
+def _explain(state, player_index, action, model_explanation):
+    """Model explanation (alternatives, adaptation) plus a natural-language rationale and its facts."""
+    try:
+        out = _explainer.explain(state, player_index, action, model_explanation)
+    except Exception:
+        logger.exception("explainer failed")
+        return model_explanation or None
+    merged = dict(model_explanation or {})
+    merged["rationale"], merged["facts"] = out["rationale"], out["facts"]
+    return merged
+
+
+def _commentary(state, player_index, action):
+    try:
+        return _explainer.commentary(state, player_index, action)
+    except Exception:
+        return None
 
 
 def _states_equal(a: Optional[GameStateData], b: Optional[GameStateData]) -> bool:

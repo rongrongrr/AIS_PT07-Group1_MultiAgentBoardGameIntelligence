@@ -74,6 +74,23 @@ class Move(Base):
     __table_args__ = (UniqueConstraint("session_id", "step_id"),)
 
 
+class ExplanationFeedback(Base):
+    """A participant's rating of one move's explanation (human-centred evaluation)."""
+
+    __tablename__ = "explanation_feedback"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String, nullable=False)
+    step_id = Column(Integer, nullable=False)
+    rater = Column(String, nullable=False)
+    model = Column(String, nullable=True)             # which player model made the explained move
+    understandable = Column(Integer, nullable=False)  # 1-5
+    useful = Column(Integer, nullable=False)          # 1-5
+    trustworthy = Column(Integer, nullable=False)     # 1-5
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class PlayerProfile(Base):
     __tablename__ = "player_profiles"
 

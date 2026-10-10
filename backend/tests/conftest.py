@@ -6,6 +6,7 @@ import tempfile
 # Must be set before app.models.db is imported anywhere.
 _TMP = os.path.join(tempfile.gettempdir(), "tiles_pytest.db")
 os.environ.setdefault("TILES_DB_PATH", _TMP)
+os.environ.setdefault("TILES_MLFLOW_DISABLED", "1")   # tests that exercise tracking opt in
 
 import pytest  # noqa: E402
 

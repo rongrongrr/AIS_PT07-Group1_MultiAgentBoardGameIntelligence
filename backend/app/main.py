@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.models.db import init_db
-from app.routers import history, players, profiler, sessions
+from app.routers import feedback, history, players, profiler, sessions
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,6 +20,14 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    from app.models.db import SessionLocal
+    from app.routers.players import load_registered_players
+
+    db = SessionLocal()
+    try:
+        load_registered_players(db)       # remote players registered in earlier runs
+    finally:
+        db.close()
     yield
 
 
@@ -40,8 +48,10 @@ app.add_middleware(
 
 app.include_router(sessions.router, prefix="/api/sessions", tags=["sessions"])
 app.include_router(players.router, prefix="/api/players", tags=["players"])
+app.include_router(players.action_router, prefix="/api/player", tags=["players"])
 app.include_router(history.router, prefix="/api/history", tags=["history"])
 app.include_router(profiler.router, prefix="/api/profiler", tags=["profiler"])
+app.include_router(feedback.router, prefix="/api/feedback", tags=["feedback"])
 
 
 @app.get("/api/health")
