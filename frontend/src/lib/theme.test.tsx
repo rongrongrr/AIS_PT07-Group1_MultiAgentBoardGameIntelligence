@@ -17,10 +17,11 @@ beforeEach(() => { localStorage.clear(); document.documentElement.removeAttribut
 afterEach(() => { vi.restoreAllMocks(); delete (window as { matchMedia?: unknown }).matchMedia; });
 
 describe('theme helpers', () => {
-  it('reads only valid preferences and defaults to system', () => {
-    expect(readThemePref()).toBe('system');
+  it('reads only valid preferences and defaults to dark', () => {
+    expect(readThemePref()).toBe('dark');
     localStorage.setItem(THEME_KEY, 'light'); expect(readThemePref()).toBe('light');
-    localStorage.setItem(THEME_KEY, 'neon'); expect(readThemePref()).toBe('system');
+    localStorage.setItem(THEME_KEY, 'system'); expect(readThemePref()).toBe('system');
+    localStorage.setItem(THEME_KEY, 'neon'); expect(readThemePref()).toBe('dark');
   });
 
   it('resolves system from the operating system, and falls back to dark without matchMedia', () => {
@@ -38,11 +39,11 @@ function Probe() {
 }
 
 describe('useTheme', () => {
-  it('applies and persists the choice', () => {
-    mockOs(false);
+  it('applies and persists the choice, and stays dark by default even on a light OS', () => {
+    mockOs(true);
     render(<Probe />);
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
-    fireEvent.click(screen.getByRole('button'));                       // system -> light
+    fireEvent.click(screen.getByRole('button'));                       // dark -> light
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
     expect(localStorage.getItem(THEME_KEY)).toBe('light');
     fireEvent.click(screen.getByRole('button'));
@@ -51,6 +52,7 @@ describe('useTheme', () => {
 
   it('follows the operating system while set to system, and stops following otherwise', () => {
     const os = mockOs(false);
+    localStorage.setItem(THEME_KEY, 'system');
     const { unmount } = render(<Probe />);
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
     expect(os.listeners).toHaveLength(1);

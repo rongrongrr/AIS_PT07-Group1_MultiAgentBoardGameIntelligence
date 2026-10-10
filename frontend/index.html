@@ -9,7 +9,7 @@
       // Set the theme before the first paint so there is no dark flash for light-mode users.
       (function () {
         try {
-          var p = localStorage.getItem("tiles_theme") || "system";
+          var p = localStorage.getItem("tiles_theme") || "dark";
           var light = p === "light" || (p === "system" && window.matchMedia("(prefers-color-scheme: light)").matches);
           document.documentElement.setAttribute("data-theme", light ? "light" : "dark");
         } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }

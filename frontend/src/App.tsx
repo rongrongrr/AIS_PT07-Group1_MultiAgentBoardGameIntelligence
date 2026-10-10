@@ -141,9 +141,9 @@ export default function App() {
           Theme
           <select value={theme} onChange={(e) => setTheme(e.target.value as ThemePref)} aria-label="Colour theme"
                   className="bg-gray-800 text-xs rounded px-1.5 py-1 border border-gray-700">
-            <option value="system">System</option>
-            <option value="light">Light</option>
             <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="system">Match system</option>
           </select>
         </label>
         <label className="ml-3 flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap cursor-pointer"

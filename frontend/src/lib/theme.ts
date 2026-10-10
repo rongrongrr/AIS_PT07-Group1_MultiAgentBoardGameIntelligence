@@ -5,8 +5,8 @@ export type ThemePref = 'system' | 'light' | 'dark';
 export const THEME_KEY = 'tiles_theme';
 
 export function readThemePref(): ThemePref {
-  const v = readPref(THEME_KEY, 'system');
-  return v === 'light' || v === 'dark' ? v : 'system';
+  const v = readPref(THEME_KEY, 'dark');           // dark unless the user chose otherwise
+  return v === 'light' || v === 'system' ? v : 'dark';
 }
 
 /** The theme that is actually shown for a preference ("system" follows the operating system). */
