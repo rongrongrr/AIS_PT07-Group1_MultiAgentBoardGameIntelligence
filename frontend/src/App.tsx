@@ -3,6 +3,7 @@ import { api } from './api/client';
 import SessionConfig from './components/SessionConfig';
 import GameMonitor from './components/GameMonitor';
 import ProfileAnalyzer from './components/ProfileAnalyzer';
+import Replay from './components/Replay';
 import { useGameStore } from './stores/gameStore';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -26,7 +27,7 @@ function formatDuration(start: string, end: string | null): string {
 export default function App() {
   const { sessions, setSessions } = useGameStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'config' | 'monitor' | 'profile'>('config');
+  const [activeTab, setActiveTab] = useState<'config' | 'monitor' | 'replay' | 'profile'>('config');
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const resizing = useRef(false);
@@ -89,6 +90,14 @@ export default function App() {
               }`}
             >
               Game Monitor
+            </button>
+            <button
+              onClick={() => setActiveTab('replay')}
+              className={`px-3 py-1.5 rounded text-sm font-medium transition ${
+                activeTab === 'replay' ? 'bg-gray-800 text-teal-400' : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Replay
             </button>
             <button
               onClick={() => setActiveTab('profile')}
@@ -210,6 +219,10 @@ export default function App() {
           ) : activeTab === 'monitor' && selectedId && selected ? (
             <div className="flex-1 overflow-y-auto p-4">
               <GameMonitor sessionId={selectedId} session={selected} />
+            </div>
+          ) : activeTab === 'replay' && selectedId && selected ? (
+            <div className="flex-1 overflow-y-auto p-4">
+              <Replay sessionId={selectedId} />
             </div>
           ) : activeTab === 'profile' && selectedId && selected ? (
             <div className="flex-1 overflow-y-auto p-4">

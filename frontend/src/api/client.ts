@@ -64,7 +64,10 @@ export interface MoveResponse {
   ws_wait_ms?: number;
   total_ms?: number;
   legal_actions?: number;
+  commentary?: string | null;
+  sessionId?: string;
   explanation?: {
+    rationale?: string;
     model: string;
     chosen_score: number;
     n_legal: number;
@@ -153,6 +156,14 @@ export const api = {
       request<{ state: GameStateData }>(`/history/${sessionId}/state/${step}`),
     exportGame: (sessionId: string) =>
       request<Record<string, unknown>>(`/history/${sessionId}/export`),
+  },
+
+  feedback: {
+    submit: (body: {
+      session_id: string; step_id: number; rater: string;
+      understandable: number; useful: number; trustworthy: number; comment?: string;
+    }) => request<{ id: number }>('/feedback', { method: 'POST', body: JSON.stringify(body) }),
+    summary: () => request<Record<string, unknown>>('/feedback/summary'),
   },
 
   profiler: {

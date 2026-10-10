@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { api, connectSessionWs, type GameStateData, type MoveResponse, type SysLogEntry, type Session } from '../api/client';
 import { useGameStore } from '../stores/gameStore';
 import PlayerBoard, { FactoryDisplay, CenterPoolDisplay } from './PlayerBoard';
+import BoardSnapshot, { TILE_DOTS } from './BoardSnapshot';
+import FeedbackWidget from './FeedbackWidget';
 
 function formatDuration(start: string, end: string): string {
   const sec = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 1000);
@@ -10,247 +12,16 @@ function formatDuration(start: string, end: string): string {
   return min < 60 ? `${min}m ${sec % 60}s` : `${Math.floor(min / 60)}h ${min % 60}m`;
 }
 
-const TILE_DOTS: Record<string, string> = {
-  blue: 'bg-[#67c0dd]',
-  yellow: 'bg-[#ffff59]',
-  red: 'bg-[#f08080]',
-  black: 'bg-[#90ee90]',
-  white: 'bg-white',
-};
-
 const LOG_LEVEL_COLORS: Record<string, string> = {
   info: 'text-gray-400',
   warning: 'text-yellow-400',
   error: 'text-red-400',
 };
 
-const WALL_PATTERN = [
-  ['blue', 'yellow', 'red', 'black', 'white'],
-  ['white', 'blue', 'yellow', 'red', 'black'],
-  ['black', 'white', 'blue', 'yellow', 'red'],
-  ['red', 'black', 'white', 'blue', 'yellow'],
-  ['yellow', 'red', 'black', 'white', 'blue'],
-];
-
-const TILE_GHOST: Record<string, string> = {
-  blue: 'bg-[#67c0dd]/20 border border-[#67c0dd]/30',
-  yellow: 'bg-[#ffff59]/15 border border-[#ffff59]/25',
-  red: 'bg-[#f08080]/20 border border-[#f08080]/30',
-  black: 'bg-[#90ee90]/15 border border-[#90ee90]/25',
-  white: 'bg-white/10 border border-white/20',
-};
-
-const FLOOR_PENALTIES = [-1, -1, -2, -2, -2, -3, -3];
-const TS = 'w-5 h-5'; // tile size class
-
-function Tile({ color, highlight, ring }: { color?: string | null; highlight?: boolean; ring?: string }) {
-  if (!color || color === 'firstPlayer') {
-    return <div className={`${TS} rounded bg-gray-800 border border-gray-700`} />;
-  }
-  return (
-    <div
-      className={`${TS} rounded ${TILE_DOTS[color] || 'bg-gray-500'} ${
-        highlight ? 'ring-2 ring-red-400 scale-110 z-10' : ''
-      } ${ring || ''}`}
-      title={color}
-    />
-  );
-}
-
-function BoardSnapshot({ board, action, activePlayer }: {
-  board: NonNullable<MoveResponse['board']>;
-  action: MoveResponse['action'];
-  activePlayer: string;
-}) {
-  const srcFactory = action.source_type === 'factory' ? action.source_index : null;
-  const srcCenter = action.source_type === 'center';
-  const dstRow = action.destination === 'pattern_line' ? action.destination_row : null;
-  const dstFloor = action.destination === 'floor';
-  const pickedColor = action.color;
-
-  return (
-    <div className="bg-gray-800/60 rounded-xl p-4 space-y-4 border border-gray-700/50">
-      <div className="text-xs text-gray-500">Board state before this move</div>
-
-      {/* Factories row */}
-      <div className="flex flex-wrap items-center gap-3 justify-center">
-        {board.factories.map((f, fi) => {
-          const isSource = srcFactory === fi;
-          return (
-            <div
-              key={fi}
-              className={`bg-gray-700 rounded-full w-16 h-16 flex flex-wrap items-center justify-center gap-0.5 p-1 relative ${
-                isSource ? 'ring-3 ring-red-400 shadow-lg shadow-red-500/20' : ''
-              }`}
-            >
-              {f.length === 0 ? (
-                <span className="text-[9px] text-gray-600">empty</span>
-              ) : (
-                f.map((t, ti) => (
-                  <Tile
-                    key={ti}
-                    color={t}
-                    highlight={isSource && t === pickedColor}
-                  />
-                ))
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Center pool */}
-      {board.center_pool.length > 0 && (
-        <div className={`flex flex-wrap gap-1 justify-center py-2 px-4 rounded-lg ${
-          srcCenter ? 'bg-red-900/20 ring-2 ring-red-400' : 'bg-gray-800/40'
-        }`}>
-          {board.center_pool.map((t, i) => (
-            <Tile
-              key={i}
-              color={t}
-              highlight={srcCenter && t === pickedColor}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Player boards */}
-      {board.players.map((p) => {
-        const isActive = p.name === activePlayer;
-        return (
-          <div
-            key={p.name}
-            className={`rounded-xl p-4 ${
-              isActive
-                ? 'bg-gray-700/60 border-2 border-teal-500/60 shadow-lg shadow-teal-500/10'
-                : 'bg-gray-800/40 border border-gray-700/30'
-            }`}
-          >
-            {/* Player header */}
-            <div className="flex justify-between items-center mb-3">
-              <div className="flex items-center gap-2">
-                <span className={`font-bold text-sm ${isActive ? 'text-teal-300' : 'text-gray-300'}`}>
-                  {p.name}
-                </span>
-                {isActive && (
-                  <span className="text-[10px] px-1.5 py-0.5 bg-teal-700 text-teal-200 rounded-full">
-                    making this move
-                  </span>
-                )}
-              </div>
-              <span className="text-lg font-bold text-teal-400">{p.score}</span>
-            </div>
-
-            <div className="flex gap-6 justify-center">
-              {/* Pattern Lines (pyramid — right-aligned, filled from right) */}
-              <div className="space-y-1">
-                <div className="text-[10px] text-gray-500 text-center mb-1">Pattern Lines</div>
-                {p.pattern_lines.map((row, ri) => {
-                  const isTargetRow = isActive && dstRow === ri;
-                  const capacity = ri + 1;
-                  const filled = row.length;
-                  const empty = capacity - filled;
-                  return (
-                    <div key={ri} className={`flex gap-0.5 justify-end items-center ${
-                      isTargetRow ? 'bg-yellow-500/10 rounded px-1 -mx-1' : ''
-                    }`}>
-                      {isTargetRow && (
-                        <span className="text-yellow-400 text-xs mr-1">&#8594;</span>
-                      )}
-                      {/* Empty slots (left side) */}
-                      {Array.from({ length: empty }).map((_, i) => (
-                        <div key={`e${i}`} className={`${TS} rounded bg-gray-900 border border-gray-600 ${
-                          isTargetRow ? 'ring-1 ring-yellow-400' : ''
-                        }`} />
-                      ))}
-                      {/* Filled tiles (right side, closest to wall) */}
-                      {Array.from({ length: filled }).map((_, i) => {
-                        const tile = row[i];
-                        return (
-                          <div key={`t${i}`} className={`${TS} rounded ${
-                            TILE_DOTS[tile] || 'bg-gray-500'
-                          } ${isTargetRow ? 'ring-1 ring-yellow-400' : ''}`} />
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Wall (5x5 grid) */}
-              <div className="space-y-1">
-                <div className="text-[10px] text-gray-500 text-center mb-1">Wall</div>
-                {WALL_PATTERN.map((wallRow, ri) => (
-                  <div key={ri} className="flex gap-0.5">
-                    {wallRow.map((wc, ci) => (
-                      <div
-                        key={ci}
-                        className={`${TS} rounded ${
-                          p.wall[ri]?.[ci]
-                            ? `${TILE_DOTS[wc] || 'bg-gray-500'} border border-white/30 shadow-sm`
-                            : `${TILE_GHOST[wc] || 'bg-gray-800/30 border border-gray-700/30'}`
-                        }`}
-                        title={`${wc}${p.wall[ri]?.[ci] ? ' (placed)' : ' (empty)'}`}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Floor line */}
-            <div className="mt-3 flex items-center gap-1 justify-center">
-              <span className="text-[10px] text-gray-500 mr-1">Floor:</span>
-              {FLOOR_PENALTIES.map((penalty, i) => (
-                <div key={i} className="text-center">
-                  <div className={`${TS} rounded ${
-                    p.floor_line[i]
-                      ? `${TILE_DOTS[p.floor_line[i]] || 'bg-gray-500'} ${
-                          isActive && dstFloor ? 'ring-1 ring-yellow-400' : ''
-                        }`
-                      : 'bg-gray-900 border border-gray-700'
-                  }`} />
-                  <div className="text-[9px] text-red-400/70 mt-0.5">{penalty}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-
-      {/* Move arrow annotation */}
-      <div className="flex items-center justify-center gap-2 py-1 text-xs">
-        <span className={`px-2 py-1 rounded ${
-          srcFactory !== null ? 'bg-red-900/30 text-red-300 ring-1 ring-red-500/50' : 'bg-red-900/30 text-red-300 ring-1 ring-red-500/50'
-        }`}>
-          {srcFactory !== null ? `Factory ${srcFactory + 1}` : 'Center'}
-        </span>
-        <span className="capitalize px-1.5 py-0.5 rounded" style={{
-          backgroundColor: `color-mix(in srgb, ${
-            pickedColor === 'blue' ? '#67c0dd' : pickedColor === 'red' ? '#f08080'
-            : pickedColor === 'yellow' ? '#ffff59' : pickedColor === 'black' ? '#90ee90' : '#ffffff'
-          } 30%, transparent)`
-        }}>
-          {pickedColor}
-        </span>
-        <svg width="24" height="12" className="text-red-400">
-          <line x1="0" y1="6" x2="16" y2="6" stroke="currentColor" strokeWidth="2"/>
-          <polygon points="16,2 24,6 16,10" fill="currentColor"/>
-        </svg>
-        <span className={`px-2 py-1 rounded ${
-          dstFloor ? 'bg-red-900/30 text-red-300' : 'bg-yellow-900/30 text-yellow-300 ring-1 ring-yellow-500/50'
-        }`}>
-          {dstFloor ? 'Floor' : `Row ${(dstRow ?? 0) + 1}`}
-        </span>
-        <span className="text-gray-500">by {activePlayer}</span>
-      </div>
-    </div>
-  );
-}
-
 const PLAYER_COLORS = ['text-blue-300', 'text-red-300', 'text-yellow-300', 'text-green-300'];
 
-function MoveRow({ m, isLast, playerIdx }: { m: MoveResponse; isLast: boolean; playerIdx: number }) {
+function MoveRow({ m: move, isLast, playerIdx, sessionId }: { m: MoveResponse; isLast: boolean; playerIdx: number; sessionId: string }) {
+  const m = { ...move, sessionId };
   const [expanded, setExpanded] = useState(false);
   const color = m.action.color;
   const source =
@@ -391,9 +162,13 @@ function MoveRow({ m, isLast, playerIdx }: { m: MoveResponse; isLast: boolean; p
             </div>
           )}
 
-          {/* Why this move: the model's top-scoring options */}
+          {/* Why this move: rationale, then the model's top-scoring options */}
           {m.explanation && (
             <div className="bg-gray-800/50 rounded p-2 space-y-1">
+              {m.explanation.rationale && (
+                <p className="text-[12px] text-gray-200 leading-relaxed">{m.explanation.rationale}</p>
+              )}
+              {m.commentary && <p className="text-[11px] italic text-gray-500">{m.commentary}</p>}
               <div className="text-[10px] text-gray-500">
                 Why this move ({m.explanation.model}, {m.explanation.n_legal} legal options)
               </div>
@@ -414,6 +189,9 @@ function MoveRow({ m, isLast, playerIdx }: { m: MoveResponse; isLast: boolean; p
                   </span>
                 </div>
               ))}
+              {m.explanation.rationale && m.sessionId && (
+                <FeedbackWidget sessionId={m.sessionId} stepId={m.step_id} />
+              )}
             </div>
           )}
 
@@ -507,7 +285,7 @@ function groupByRound(moves: MoveResponse[]): RoundData[] {
   return groups;
 }
 
-function RoundGroup({ round, moves: roundMoves, endScores, scoreChanges }: RoundData) {
+function RoundGroup({ round, moves: roundMoves, endScores, scoreChanges, sessionId }: RoundData & { sessionId: string }) {
   const [collapsed, setCollapsed] = useState(false);
   const playerNames = [...new Set(roundMoves.map((m) => m.player_name))];
 
@@ -555,6 +333,7 @@ function RoundGroup({ round, moves: roundMoves, endScores, scoreChanges }: Round
               m={m}
               isLast={i === roundMoves.length - 1}
               playerIdx={playerNames.indexOf(m.player_name)}
+              sessionId={sessionId}
             />
           ))}
           {/* Round end summary */}
@@ -829,6 +608,7 @@ export default function GameMonitor({ sessionId, session: externalSession }: {
             groupByRound(moves).map((group) => (
               <RoundGroup
                 key={group.round}
+                sessionId={sessionId}
                 {...group}
               />
             ))

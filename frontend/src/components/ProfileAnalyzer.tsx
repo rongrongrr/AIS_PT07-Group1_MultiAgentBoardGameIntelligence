@@ -150,7 +150,7 @@ export default function ProfileAnalyzer({ sessionId, session }: {
               {profile.archetype_reasons && profile.archetype_reasons.length > 0 && (
                 <ul className="text-xs text-gray-300 list-disc list-inside">
                   {profile.archetype_reasons.map((r) => (
-                    <li key={r.feature}>{r.meaning} ({r.feature} = {r.value}, z = {r.z})</li>
+                    <li key={r.feature}>{r.meaning} ({r.feature} = {r.value}{r.z ? `, z = ${r.z}` : ''})</li>
                   ))}
                 </ul>
               )}
