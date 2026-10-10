@@ -258,61 +258,72 @@ def action_to_site_moves(
 # ---------------------------------------------------------------------------
 
 
+def _drafting_signature(state: GameState) -> tuple:
+    """The parts of a state a single drafting move changes."""
+    return (
+        tuple(tuple(f) for f in state.factories),
+        tuple(state.center),
+        state.center_has_fpt,
+        tuple(_board_signature(b) + (tuple(sorted(b.floor)),) for b in state.players),
+    )
+
+
+def _tiled_signature(state: GameState) -> tuple:
+    """What wall-tiling leaves behind: walls and unfinished pattern lines
+    (the table may already be redealt, so it is ignored)."""
+    return tuple(_board_signature(b) for b in state.players)
+
+
+def _board_signature(board: PlayerBoard) -> tuple:
+    return (
+        board.wall,
+        tuple(
+            (board.pattern_counts[r], board.pattern_colors[r] if board.pattern_counts[r] else -1)
+            for r in range(5)
+        ),
+    )
+
+
 def infer_action(
     before: GameState, after: GameState, player_index: int
 ) -> Optional[Action]:
-    """Best-effort reconstruction of the drafting action a player took,
-    from two consecutive authoritative states. Returns None when the
-    transition is not a plain drafting move (e.g. a round boundary)."""
+    """Reconstruct the drafting action ``player_index`` took between two
+    consecutive authoritative states, or None if no legal move explains
+    the change (no move, a missed frame, or a pure redeal).
+
+    Every legal move is simulated and matched against ``after``, so the
+    result is always legal. A round-ending move is matched after
+    wall-tiling, because the platform shows that board already tiled.
+    """
+    from tiles.core import apply_action, legal_actions, resolve_round
+
     if player_index >= len(before.players) or player_index >= len(after.players):
         return None
+    probe = before.clone()
+    probe.current_player = player_index
+    candidates = legal_actions(probe)
 
-    # Source: a factory that had tiles and is now empty, or the center.
-    source_index: Optional[int] = None
-    color: Optional[int] = None
-    for i, (f_before, f_after) in enumerate(
-        zip(before.factories, after.factories)
-    ):
-        if any(f_before) and not any(f_after):
-            source_index = i
-            break
-    if source_index is None:
-        # Center pick: some center color count dropped to zero.
-        for c in range(NUM_COLORS):
-            if before.center[c] > 0 and after.center[c] == 0:
-                source_index = CENTER
-                color = c
-                break
-        if source_index is None:
-            return None
-    else:
-        # The chosen color is the one that did NOT land in the center.
-        moved_to_center = [
-            after.center[c] - before.center[c] for c in range(NUM_COLORS)
-        ]
-        candidates = [
-            c
-            for c in range(NUM_COLORS)
-            if before.factories[source_index][c] > 0
-            and moved_to_center[c] < before.factories[source_index][c]
-        ]
-        if len(candidates) != 1:
-            # Ambiguous (shouldn't happen on a clean transition).
-            if not candidates:
-                return None
-        color = candidates[0]
-
-    board_before = before.players[player_index]
-    board_after = after.players[player_index]
-    dest_row = -1  # floor by default
-    for row in range(5):
-        if (
-            board_after.pattern_counts[row] > board_before.pattern_counts[row]
-            and board_after.pattern_colors[row] == color
-        ):
-            dest_row = row
-            break
-    return Action(source_index=source_index, color=color, dest_row=dest_row)
+    target = _drafting_signature(after)
+    if target == _drafting_signature(before):
+        return None  # the same frame again: nothing was played
+    tiled_target = _tiled_signature(after)
+    tiled_matches: List[Tuple[Action, bool]] = []
+    for action in candidates:
+        sim = probe.clone()
+        try:
+            apply_action(sim, action)
+        except ValueError:
+            continue
+        if _drafting_signature(sim) == target:
+            return action
+        if sim.drafting_exhausted():
+            resolve_round(sim)
+            if _tiled_signature(sim) == tiled_target:
+                tiled_matches.append((action, sim.scores() == after.scores()))
+    if not tiled_matches:
+        return None
+    # Prefer the candidate whose scoring also agrees with the platform.
+    return next((a for a, scored in tiled_matches if scored), tiled_matches[0][0])
 
 
 # ---------------------------------------------------------------------------
