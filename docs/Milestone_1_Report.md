@@ -17,7 +17,7 @@ TILES is an AI-driven platform that automates gameplay on the board game Azul, e
 - Analyze player behavior through a pluggable profiling framework, including a learned play-style classifier
 - Visualize games in real time and provide post-game review of the move log
 
-The platform is built on a modern, extensible architecture (React + FastAPI + Playwright + SQLite) with 217 automated offline tests (rules, game engine, ML players, archetype pipeline, API, parsers, game-over detection) plus one manual live end-to-end test. Measured results are in [EVALUATION.md](EVALUATION.md).
+The platform is built on a modern, extensible architecture (React + FastAPI + Playwright + SQLite) with 333 automated backend tests (plus 9 frontend tests) (rules, game engine, ML players, archetype pipeline, API, parsers, game-over detection) plus one manual live end-to-end test. Measured results are in [EVALUATION.md](EVALUATION.md).
 
 ---
 
@@ -77,7 +77,7 @@ However, no existing platform connects a live game environment to a modular ML p
 | Tests | pytest, FastAPI TestClient |
 
 - **15 API endpoints** (REST + WebSocket)
-- **217 automated offline tests** (`python -m pytest`; 97% line coverage of `app/`)
+- **333 automated backend tests (plus 9 frontend tests)** (`python -m pytest`; 97% line coverage of `app/`)
 - **5 database tables** (sessions, game_states, moves, player_profiles, ml_models). `player_profiles` and `ml_models` are defined but not yet used.
 
 ---
@@ -154,7 +154,7 @@ Every completed game can be exported as a JSON document containing:
 | Feature | Status | Description |
 |---|---|---|
 | **Round transition handling** | Done | Rounds are driven by the platform's own round state (`roundInProgress`) plus an empty-board check, with a deal cool-down because the page also auto-deals. Verified over 7 consecutive live games (5 rounds each); recorded in `docs/evidence/`. |
-| **Human-bot mixed games** | 70% | Join links are generated and displayed. Bots wait for humans in the lobby. Needs end-to-end validation with real human players. |
+| **Human-bot mixed games** | Roster logic done; not tested live with a human | Join links are generated and displayed. Bots wait for humans in the lobby. Needs end-to-end validation with real human players. |
 | **Game-over detection** | Done | Derived from the platform's state (round finished and a wall row complete); text signals alone are not trusted (an early run was marked "completed" after 29 moves). A session is `completed` only if the final board shows a finished wall row. Confirmed on live games. |
 | **DOM state parser accuracy** | 75% | Pattern line state occasionally reads stale data after animations. Floor fallback mechanism compensates, but proper animation-wait logic would be more robust. |
 
@@ -164,9 +164,9 @@ Every completed game can be exported as a JSON document containing:
 
 The modular architecture is specifically designed to enable the following advanced capabilities:
 
-### 6.0 Not yet implemented (from the original proposal)
+### 6.0 Status of the proposal items
 
-Rulebook ingestion with RAG/LLMs, MCTS and minimax players, MLflow experiment tracking, a replay viewer with playback controls, external-model REST endpoints, and a human-centred evaluation of the explanations. Everything below is planned work.
+All items from the original proposal and this roadmap are now implemented (see [FEATURE_STATUS.md](FEATURE_STATUS.md) and [EVALUATION.md](EVALUATION.md)): rulebook ingestion with a benchmark, minimax and MCTS players with profiler conditioning, a Transformer sequence profiler, an opponent next-move model, reinforcement learning (TD(0)), natural-language rationales and commentary, a replay viewer with playback controls, MLflow tracking, an Elo tournament system with genetic-algorithm tuning, external-model integration, and Docker deployment. What remains needs people: running the human-centred explanation study, and trying human players joining through the room link. Sections 6.1-6.6 below are the original roadmap text, kept for reference.
 
 ### 6.1 Reinforcement Learning Player
 Train a neural network player using the recorded game data:

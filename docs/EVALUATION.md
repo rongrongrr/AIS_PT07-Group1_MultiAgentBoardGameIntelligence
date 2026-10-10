@@ -139,10 +139,138 @@ Running live exposed defects that no offline test could, all now fixed and cover
 
 Before fix 5, four consecutive four-player attempts aborted. The platform is third-party and changed once already; its message format is an external dependency (see README, limitations).
 
-## 8. Not evaluated
+## 8. Search players: minimax and MCTS
 
-- Play against human opponents, and archetype labels on human games.
-- Joining of real human players through the room link (the roster logic is unit-tested, but no human was involved).
-- Explanation quality or usefulness to users (no user study).
-- Move-prediction accuracy of an opponent model, minimax baseline, rule-extraction accuracy: these components do not exist.
-- Headed (visible-window) mode and long-running stability beyond the games listed above.
+`MinimaxPlayer` is a depth-limited alpha-beta search over the exact within-round game tree (beam of the 5 best moves per ply plus the best floor dump, greedy playouts at the depth limit). `MCTSPlayer` is UCT over the same tree with greedy playouts. Both value a position as *my score + board potential - w x opponents' score + potential*.
+
+**The opponent weight w matters.** Classical zero-sum play (w = 1.0) makes two searchers wreck each other's rounds. Measured on 20 games per cell (`MinimaxPlayer`, depth 3):
+
+| w | vs Rollout: win | vs Greedy: win / own score | mirror: own score |
+|---|---|---|---|
+| 1.0 | 0.90 | 0.95 / 60.1 | 31.2 |
+| **0.4** | 0.80 | 0.95 / **70.7** | **55.5** |
+
+Depth 2 was clearly weaker (0.57 against Rollout); depth 4 with a narrower beam was no better than depth 3. Default: depth 3, beam 5, w = 0.4.
+
+**Head to head** (`scripts/tournament.py`, both seats, same deals; 50 games per row, 95% Wilson CI):
+
+| Pairing | Result |
+|---|---|
+| Minimax vs Greedy | Minimax 88% (76-94%), mean score 66.1 vs 46.1 |
+| Minimax vs Rollout | **Minimax 81% (68-90%)**, 50.2 vs 39.7 |
+| MCTS vs Greedy (16 games) | MCTS 94% (72-99%), margin +25.6 |
+| MCTS vs Minimax (16 games) | MCTS 44% (23-67%), margin +0.9: a statistical tie |
+| MCTS vs Rollout (16 games) | MCTS 81% (57-93%), margin +8.7 |
+
+**Elo round robin** (`python scripts/elo_tournament.py --deals 10 --seed 3 --players RandomPlayer GreedyPlayer BlockerPlayer RolloutPlayer MinimaxPlayer MCTSPlayer`; 300 games; Elo from all results replayed in random order 20 times):
+
+| Rank | Player | Elo | Mean score |
+|---|---|---|---|
+| 1 | MinimaxPlayer | 1741 | 55.9 |
+| 2 | MCTSPlayer (120 iterations) | 1738 | 58.9 |
+| 3 | RolloutPlayer | 1681 | 50.9 |
+| 4 | BlockerPlayer | 1399 | 44.2 |
+| 5 | GreedyPlayer | 1361 | 47.6 |
+| 6 | RandomPlayer | 1079 | 0.8 |
+
+Minimax and MCTS are statistically indistinguishable; both clearly beat the one-ply heuristics. Live, in Docker, Minimax-vs-Minimax finished 48-51 (a realistic game) and Minimax won a 4-player game 84-48-55-38.
+
+## 9. Profiler conditioning of the search
+
+`ConditionedMCTSPlayer` and `ConditionedMinimaxPlayer` keep an opponent model per opponent (section 10) and, once it is confident (>= 6 observed moves, posterior >= 0.5), simulate / order that opponent's replies with the inferred style instead of the generic heuristic. `python scripts/evaluate_mcts.py --games 8 --seed 41`, margin against each opponent style (32 games per row):
+
+| Opponent style | Conditioned MCTS margin | Plain MCTS margin | Gain |
+|---|---|---|---|
+| Greedy | +27.6 | +25.5 | +2.1 |
+| ColorCollector | +39.1 | +30.9 | +8.2 |
+| Rusher | +28.8 | +29.3 | -0.5 |
+| Reckless | +20.0 | +18.2 | +1.8 |
+| Blocker | +17.7 | +15.6 | +2.1 |
+| **Mean** | | | **+2.7** |
+
+The mean gain is small and the per-row samples are small, so this is a weak positive effect, not a proven one (win rates were equal or lower for conditioned MCTS against three of five styles). The conditioned Minimax player is implemented and unit-tested; its strength against plain Minimax has not been measured.
+
+## 10. Opponent model: next-move prediction
+
+`OpponentModel` keeps a likelihood for each of 8 play styles from the moves observed so far and predicts the next move as the posterior-weighted mixture of the styles' softmax move distributions. `python scripts/evaluate_opponent_model.py --games 12 --seed 5` (about 240 predicted moves per row, after a 6-move warm-up; the model predicts each move before seeing it):
+
+| Opponent | top-1 | top-3 | Fixed balanced heuristic (top-1) | Uniform over legal moves |
+|---|---|---|---|---|
+| Greedy (in library) | 0.91 | 0.98 | 1.00 | 0.18 |
+| Blocker (in library) | 0.94 | 1.00 | 0.88 | 0.18 |
+| Reckless (in library) | 0.98 | 1.00 | 0.74 | 0.19 |
+| Rusher, 10% random moves | 0.85 | 0.96 | 0.84 | 0.21 |
+| ColorCollector, 20% random moves | 0.81 | 0.85 | 0.66 | 0.17 |
+| Rollout lookahead (**out of library**) | 0.55 | 0.71 | 0.59 | 0.13 |
+| Minimax depth 2 (**out of library**) | 0.56 | 0.80 | 0.60 | 0.14 |
+
+For opponents that play like one of its styles the model predicts the exact next move 81-98% of the time (chance is about 18%) and beats a fixed heuristic when the opponent is not the balanced style. **For lookahead players, which are not in its library, it is no better than the fixed heuristic.** Human opponents are untested.
+
+## 11. Sequence-model profiler
+
+A Transformer encoder (2 layers, 4 heads, width 48) or a GRU reads a player's move sequence (18 features per move) and predicts the style archetype. Training used random prefix truncation. `python scripts/train_sequence_profiler.py --games 1500 --seed 7` (2100 training, 450 validation, 450 held-out player-games; chance 20%):
+
+| Model | first 5 moves | first 10 | first 15 | full game |
+|---|---|---|---|---|
+| Feature logistic regression (whole game only) | - | - | - | 61.1% |
+| **Transformer** | **68.7%** | 70.0% | 73.8% | **78.0%** |
+| GRU | 65.1% | 72.0% | 74.7% | 77.6% |
+
+The sequence models beat the aggregate-feature classifier by about 17 points and can identify a style from the first 5 moves almost as well as the feature classifier does from a whole game. Unsupervised k-means clustering (section 3) did not separate the styles, so supervised models are used. Reasons for a label come from input-gradient saliency (which per-move features drove it). Trained on simulated bot play only; labels on human games are hypotheses. Both analyzers are available in the UI (`ArchetypeProfileAnalyzer`, `SequenceProfileAnalyzer`).
+
+## 12. Reinforcement learning (TD(0))
+
+`TDPlayer` learns a linear value function over after-states by TD(0) self-play (12 features: score margin, pending line points, floor cost, board structure, ...; reward = change in score margin plus the final result). `python scripts/train_td.py --games 800 --seed 3 --eval-games 60`:
+
+| | Win rate vs GreedyPlayer (95% CI) | Mean score margin |
+|---|---|---|
+| Untrained (all-zero value function) | 0.00 | -55.9 |
+| **TD-trained, 800 self-play games** (120 unseen games) | **0.47 (0.39-0.56)** | **-2.5** |
+
+Learning from zero knowledge, with no hand-written move scoring, the player reaches roughly parity with the hand-tuned heuristic but does not surpass it. Learned weights (positive = good for the mover): wall tiles +0.31, floor cost +0.29, pending line points +0.27, score margin +0.16, colour / column / row structure +0.10 / +0.08 / +0.07, line progress -0.14 (it prefers completing lines to partly filling many). The mean absolute TD error settled at about 0.05 after the first 100 games. A one-step linear value function is the limit here; combining the learned value with search is the obvious next step and was not done.
+
+## 13. Genetic-algorithm weight tuning
+
+`python scripts/tune_weights.py --generations 8 --population 16 --seed 5 --validate 60` evolves the nine heuristic weights (fitness = margin against a pool of Greedy, Blocker and Rusher players on shared deals). Best fitness rose from about 13 to 15-16 over 8 generations and the population mean from 5.5 to 10. The tuned weights (saved to `backend/models/ga_weights.json`) were then evaluated on deals the GA never saw (120 games):
+
+| Opponent | Tuned win rate (95% CI) | Margin |
+|---|---|---|
+| Default Greedy | 0.62 (0.53-0.70) | +3.6 |
+| Blocker | 0.45 (0.33-0.58) | -1.3 |
+| Rusher | 0.66 (0.53-0.77) | +5.2 |
+
+A modest gain: it beats the default weights and Rusher but not Blocker, and the tuned weights lower the end-game bonus term and raise the wall-completion term. The search players of section 8 are far stronger than any retuned one-ply heuristic.
+
+## 14. Rule extraction (rulebook ingestion)
+
+Pipeline: chunk the rulebook, rank passages per rule with TF-IDF, parse them into a structured rule set (16 fields: tile counts, factory counts per player count, pattern-line sizes, floor penalties, bonuses, wall layout, end trigger, token rules, scoring rules), verify against the engine, and build a `RulesConfig` that drives the validator and simulator. `python scripts/rule_extraction_benchmark.py --count 100 --seed 1`.
+
+* **Real corpus** (`docs/rules/azul_rules.md`): 16/16 fields match the engine and the wall layout rebuilds the standard wall. The extracted config plays games **identical** to the built-in rules (same seed, same scores), and a modified rulebook (different floor penalties and factory count) changes the game accordingly.
+* **Generated rulebooks** (randomised parameter values, so memorising the standard numbers cannot help; distractor sentences with unrelated numbers; 100 rulebooks per group, exact match per field):
+
+| Phrasing group | Field accuracy, first run | Whole rulebook exact, first run | After error analysis |
+|---|---|---|---|
+| dev (phrasings the parsers were written for) | 92.6% | 14% | 100% / 100% |
+| held-out | 52.5% | 0% | 100% / 100% (**no longer held out**) |
+| **fresh** (written after the parsers were frozen, run once) | **63.2%** | **0%** | 93.4% / 32% (**no longer held out**) |
+
+The honest generalisation estimate is the **fresh first-run figure: about 63% field accuracy, with no rulebook fully correct**. Error analysis (more passages ranked, query synonyms, per-field keyword gates, ordinal and signed-number forms) raised it, but the post-analysis numbers are not independent. Remaining weak fields on the fresh phrasings: floor penalties (64%), row bonus (62%), scoring in both directions (75%). A pluggable `LLMExtractor` that reads the same retrieved passages and returns JSON is wired and unit-tested with a stub; it has **not been benchmarked** (no API key in the development environment), and the rule-based extractor is what the numbers above describe.
+
+## 15. Explainability
+
+* **Rationales** (`app/explain`): each move gets a natural-language rationale and a one-line commentary built from engine-derived facts (tiles taken, line completion and the points it is worth, overflow and floor cost, first-player token, tiles passed to opponents, denial, margin over the next-best option, inferred opponent styles). In live Docker games 51 of 51 moves carried a rationale; they appear in the Game Monitor, the Replay and the export. An optional `LLMExplainer` rewrites the text from the facts only (stub-tested, not run live).
+* **Faithfulness** (`tests/test_explainer.py`): over more than 1,500 simulated positions every claim is re-derived by *simulating the move in the game engine* (tiles removed, line completed, floor spill, token, and the exact points awarded when the engine scores the round). All claims matched.
+* **Human-centred evaluation:** the instrument is built (1-5 ratings of understandable / useful / trustworthy per explained move, comment, per-model and overall statistics with 95% CIs, a text-vs-scores-only control condition at `?explain=scores`; see [HUMAN_EVALUATION_PROTOCOL.md](HUMAN_EVALUATION_PROTOCOL.md)). **No participant ratings have been collected**; this study has to be run by the team.
+
+## 16. Experiment tracking (MLflow)
+
+Every finished live game is logged to MLflow automatically (configuration, final scores, winning margin, per-model decision latency, per-move decision / click / websocket-wait / total ms, floor-fallback count, the full move ledger as an artifact), and the evaluation scripts log with `--mlflow` (tournaments, Elo, GA tuning, RL training). The store is a SQLite database (`mlruns/mlflow.db`; MLflow 3 no longer supports its plain file store). Tracking is optional and can never fail a game. View it with `docker compose --profile tracking up` (http://localhost:5000) or `mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`. Verified in Docker: a finished game appeared as a run with its telemetry.
+
+## 17. Not evaluated
+
+- Play against human opponents, and archetype / sequence-model labels on human games.
+- The human-centred study of explanation quality (instrument ready, no data).
+- Joining of real human players through the room link (roster logic is unit-tested, no human involved).
+- The LLM-based rule extractor and LLM explainer against a real model.
+- Strength of the conditioned Minimax player against plain Minimax.
+- Headed (visible-window) mode and long-running stability beyond the live games listed in section 7.

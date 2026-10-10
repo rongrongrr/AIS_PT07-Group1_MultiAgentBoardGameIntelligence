@@ -1,5 +1,7 @@
 # Corrections to the submitted progress report (PDF)
 
+> **Superseded rows:** several rows below describe features as "Planned" or "Partial" or suggest wording for a partly finished system. Those features are now implemented. Use the **final status table at the end of this file** and [FEATURE_STATUS.md](FEATURE_STATUS.md); keep the rest of this list only for the claims it corrects (tests, scores, ledger, architecture roles, citations).
+
 The PDF `AIS_PT07_STK05_Capstone_Group1_FirstGroupReport.pdf` is maintained outside this repo, so these are the edits to make there. "Evidence" points to what supports the replacement text. Page numbers are PDF-viewer pages. Items marked **decide** need a team decision, not just a wording change.
 
 ## Statements that the code does not support
@@ -15,7 +17,7 @@ The PDF `AIS_PT07_STK05_Capstone_Group1_FirstGroupReport.pdf` is maintained outs
 | p.8 | "Explainer builds the board snapshots, profile summaries, and (planned) natural-language rationales" | There is no Explainer component. Say: board snapshots and per-move top-3 alternatives are stored by the orchestrator and shown by the UI; natural-language rationales are planned. | no Explainer code |
 | p.7 | "GreedyPlayer... beats RandomPlayer 43-3" | "GreedyPlayer wins 200 of 200 simulated games against RandomPlayer (95% CI 98.1-100%), mean score 59.7 vs 0.8." (also in the p.12 table) | `python scripts/tournament.py --games 100 --seed 1` |
 | p.7 and p.12 | "ledger... full board-state snapshot" / "Immutable move recording" | "Append-only move ledger with the board state before each move." The database does not enforce immutability. | `models/db.py` |
-| p.12 table | "47 unit tests" | "217 automated offline tests (34 in the rules engine)" | `python -m pytest` |
+| p.12 table | "47 unit tests" | "333 automated backend tests (plus 9 frontend tests) (34 in the rules engine)" | `python -m pytest` |
 | p.12 table, Visualization & Replay | "Initial development done" for "Live monitoring and post-game review" with "winner banner" | Keep, but call it a move log, not replay, and note playback is not built. | frontend |
 | p.12 table, Multi-agent orchestration | "Supports 2-4 Chromium browsers per session" | Add: "Multi-round live play has not yet been verified over a recorded full game." | see README, Status |
 | p.10-11 Figures 5-6 | Screenshot of a "completed" game with 29 moves and a 2-0 score | Replace with a screenshot of a genuinely finished game, or remove. A finished Azul game needs at least one completed wall row. The earlier game-over detector could fire falsely; it has since been fixed. | `play_engine.py` |
@@ -49,3 +51,23 @@ The technical paper needs a results section: `docs/EVALUATION.md` is a starting 
 - p.12 table, Tactician (Heuristic): add the lookahead `RolloutPlayer` (98% win rate over 100 simulated games against the heuristic player, 95% CI 93-99.4%).
 - State plainly that opponent modelling inside the search gave no measurable benefit (docs/EVALUATION.md section 6). A negative result with the numbers is stronger than leaving it out.
 - Human players joining via the room link are still untested live.
+
+## Final implementation status table (replace the table on pp.11-13 with this)
+
+| Feature | Planned scope | Current status | Detail |
+|---|---|---|---|
+| Game state representation | JSON model for all Azul state variables | Done | `GameStateData` / `PlayerState` Pydantic models (factories, centre, pattern lines, wall, floor, scores, token); ledger-format converters. |
+| Deterministic Validator | Authoritative rules engine for state transitions | Done | Rules engine (legality, scoring, bonuses) plus state transitions and full-game simulation; every move is validated before execution; rule parameters can be driven by ingested rulebook text. 34 rules tests; tile conservation verified over full 2-4 player games. |
+| Tactician (heuristic) | Greedy / heuristic action selection | Done | `GreedyPlayer` and four play-style variants; genetic-algorithm-tuned weights (62% vs default on unseen deals); TD(0) reinforcement-learning player (parity with the heuristic). |
+| Tactician (search) | MCTS / minimax with profiler conditioning | Done | Alpha-beta minimax, UCT MCTS, rollout player, and profiler-conditioned MCTS and minimax. Elo round robin: Minimax 1741, MCTS 1738, Rollout 1681, Blocker 1399, Greedy 1361, Random 1079. Conditioning gain is small (+2.7 margin points). |
+| Profiler (rule-based) | Style classification from game features | Done | `BasicProfileAnalyzer`: colour, source, destination, timing, style notes. |
+| Profiler (ML-based) | Sequence modelling and archetype clustering | Done | Transformer / GRU sequence profiler (78.0% held-out on the full game, 68.7% from the first 5 moves, chance 20%) with saliency reasons; logistic-regression classifier (55-61%); k-means clustering evaluated and found not to separate the styles (adjusted Rand index 0.04). Trained on simulated play. |
+| Opponent modelling | Predictive opponent policy | Done | Style-posterior model predicting the next move: top-1 81-98% for opponents in its style library (chance about 18%); about 55% for lookahead opponents outside the library, no better than a fixed heuristic. Used by the conditioned search players. |
+| Game state telemetry | Latency and timing metrics per agent | Done | Per-move decision / click / websocket-wait / total ms; system log over WebSocket; logged to MLflow. |
+| Action trace ledger | Immutable move recording | Done | Append-only SQLite ledger with the board before each move, scores, timings, alternatives and rationale; JSON export. (Immutability is by convention, not enforced by the database.) |
+| Multi-agent orchestration | Independent agents in a shared game room | Done | 2-4 Chromium bots per session; the host starts only once the platform has confirmed every player; verified over consecutive live games with 2-4 players, locally and in Docker. |
+| Visualization and replay | Live monitoring and post-game review | Done | Live monitor, round-grouped move log, winner banner, export, and a Replay view with play / pause / step / jump / speed / jump-to-round controls. |
+| Explainability | Decision explanations tied to search internals | Done | Top-3 alternatives with scores, natural-language rationale and commentary built from engine facts (every claim verified by simulating the move over more than 1,500 positions), inferred opponent styles, per-move rating widget. Human-centred study: instrument and protocol ready; participant ratings still to be collected. |
+| Experiment tracking | MLflow integration | Done | Every finished game logged automatically with its telemetry; evaluation scripts log with `--mlflow`; optional MLflow UI container. |
+
+Also add to the report: rulebook ingestion (retrieval + extraction + validator configuration; 16/16 on the real corpus, about 63% field accuracy on unseen phrasings in the benchmark), the tournament system with Elo and GA tuning, reinforcement learning, external-model integration, and Docker deployment. State the open items plainly: no human participant data for the explanation study, LLM components tested with stubs only, human players joining via the room link not tested live.
