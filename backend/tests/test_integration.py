@@ -46,7 +46,7 @@ class TestSessionLifecycle:
     def test_create_start_stop_lifecycle(self):
         # 1. Create session
         resp = client.post("/api/sessions", json={
-            "room_name": "integration-test-room",
+            "room_name": "integ-test-room",
             "browser_mode": "headless",
             "players": [
                 {"slot": 0, "type": "RandomPlayer", "name": "TestBot"},
@@ -66,7 +66,7 @@ class TestSessionLifecycle:
         # 3. Get session details
         resp = client.get(f"/api/sessions/{session_id}")
         assert resp.status_code == 200
-        assert resp.json()["room_name"] == "integration-test-room"
+        assert resp.json()["room_name"] == "integ-test-room"
 
         # 4. Check history is empty
         resp = client.get(f"/api/history/{session_id}")

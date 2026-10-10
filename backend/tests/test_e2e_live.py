@@ -27,6 +27,8 @@ from app.azul.rules import get_legal_actions
 from app.ml.greedy_player import GreedyPlayer
 from app.models.schemas import BrowserMode, GameStateData
 
+pytestmark = pytest.mark.live
+
 logger = logging.getLogger(__name__)
 
 # Use headless for CI, headed for local debugging

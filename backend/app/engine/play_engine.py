@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 from base64 import b64encode
 from datetime import datetime
@@ -17,7 +18,8 @@ from typing import Any, Callable, Dict, List, Optional
 
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
-from app.engine.action_executor import execute_action
+from app.azul.rules import is_game_over
+from app.engine.action_executor import ExecutionResult, execute_action
 from app.engine.state_parser import (
     parse_game_state_from_event,
     parse_socketio_message,
@@ -34,9 +36,14 @@ from app.models.schemas import (
 
 logger = logging.getLogger(__name__)
 
+_FRAME_LOG = os.environ.get("TILES_DEBUG_FRAMES")
+
 
 class BotBrowser:
     """A single bot's Playwright browser session connected to an Azul room."""
+
+    DEAL_COOLDOWN_S = 4.0
+    JOIN_CONFIRM_TIMEOUT_S = 30.0
 
     def __init__(
         self,
@@ -60,6 +67,13 @@ class BotBrowser:
         self._page: Optional[Page] = None
 
         self.current_state: Optional[GameStateData] = None
+        # Latest state from the platform's WebSocket messages. Authoritative: preferred over
+        # DOM scraping, which can lag animations and mislabel the other players.
+        self.ws_state: Optional[GameStateData] = None
+        self.round = 0
+        self._last_deal_at = float("-inf")
+        # names the platform has told us are in the room (host: every joiner; guest: everyone)
+        self.lobby_players: set = set()
         self.in_lobby = False
         self.game_started = False
         self.game_over = False
@@ -117,29 +131,73 @@ class BotBrowser:
         name_b64 = b64encode(self.player_name.encode()).decode()
         url = f"{self.platform_url}?name={name_b64}"
         logger.info(f"[{self.player_name}] Navigating to {url}")
-        await self._page.goto(url, wait_until="networkidle")
+        await self._open_with_retries(url)
         await self._page.wait_for_timeout(1000)
         logger.info(f"[{self.player_name}] Browser launched")
 
-    async def join_room(self):
-        """Fill room name and click Play to join/create the room."""
+    async def _open_with_retries(self, url: str, attempts: int = 3) -> None:
+        """Load the game page. The site never reaches 'network idle' (ads, analytics), so wait
+        for the DOM plus the room input, and retry transient load failures with backoff."""
+        for attempt in range(1, attempts + 1):
+            try:
+                await self._page.goto(url, wait_until="domcontentloaded", timeout=45_000)
+                await self._page.wait_for_selector("#room", timeout=20_000)
+                try:    # best effort: the site rarely goes fully idle, so do not fail on this
+                    await self._page.wait_for_load_state("networkidle", timeout=8_000)
+                except Exception:
+                    pass
+                return
+            except Exception as e:
+                if attempt == attempts:
+                    raise
+                logger.warning(f"[{self.player_name}] Page load attempt {attempt} failed ({e}); retrying")
+                await asyncio.sleep(2 * attempt)
+
+    async def _wait_in_lobby(self, timeout_s: float) -> bool:
+        """True once the platform confirmed we are in a room (create/join response) or the
+        lobby is visible on the page."""
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_s
+        while True:
+            if self.in_lobby:
+                return True
+            visible = await self._page.evaluate("""() => {
+                const el = document.querySelector('#sharing-link-row');
+                return !!(el && !el.classList.contains('d-none'));
+            }""")
+            if visible:
+                self.in_lobby = True
+                return True
+            if loop.time() >= deadline:
+                return False
+            await asyncio.sleep(0.25)
+
+    async def join_room(self, attempts: int = 3):
+        """Fill the room name and click Play, retrying until the platform confirms the room.
+
+        Raises RuntimeError if it never does, so a session fails loudly instead of starting
+        with fewer players than configured.
+        """
         page = self._page
         if not page:
             raise RuntimeError("Browser not started")
 
-        room_input = await page.wait_for_selector("#room", timeout=5000)
+        room_input = await page.wait_for_selector("#room", timeout=15000)
         await room_input.fill(self.room_name)
         await page.wait_for_timeout(300)
-
         play_btn = await page.wait_for_selector("#start-game", timeout=5000)
         await play_btn.click()
-        await page.wait_for_timeout(2500)
 
-        # Verify lobby state
-        self.in_lobby = await page.evaluate("""() => {
-            const el = document.querySelector('#sharing-link-row');
-            return !!(el && !el.classList.contains('d-none'));
-        }""") or False
+        # Several browsers starting at once can make the confirmation slow, so wait generously
+        # and click again only if the page did not react (the button is still there).
+        for attempt in range(1, attempts + 1):
+            if await self._wait_in_lobby(self.JOIN_CONFIRM_TIMEOUT_S):
+                break
+            logger.warning(f"[{self.player_name}] Join attempt {attempt}/{attempts} not confirmed")
+            if attempt < attempts and await page.is_visible("#start-game"):
+                await (await page.wait_for_selector("#start-game", timeout=5000)).click()
+        else:
+            raise RuntimeError(f"[{self.player_name}] could not join room '{self.room_name}'")
 
         # Store room/player on window for the emit helper
         await page.evaluate(
@@ -149,12 +207,7 @@ class BotBrowser:
             }""",
             [self.room_name, self.player_name],
         )
-
-        if self.in_lobby:
-            logger.info(f"[{self.player_name}] In lobby for room '{self.room_name}' (host={self.is_host})")
-        else:
-            logger.warning(f"[{self.player_name}] May not have joined room")
-            self.in_lobby = True  # optimistic
+        logger.info(f"[{self.player_name}] In lobby for room '{self.room_name}' (host={self.is_host})")
 
     async def start_game(self):
         """Click Start Game button (host only). Waits until button is enabled."""
@@ -178,11 +231,13 @@ class BotBrowser:
 
         logger.error(f"[{self.player_name}] Start button never became enabled")
 
-    async def deal_tiles(self):
-        """Emit dealTiles event. Only the current turn player should call this."""
+    async def deal_tiles(self, wait_s: float = 5.0):
+        """Emit dealTiles and wait (up to ``wait_s``) for the platform to confirm the new round."""
         page = self._page
         if not page:
             return False
+        self._last_deal_at = time.monotonic()
+        self.arm_state_event()
 
         result = await page.evaluate(
             """([room, player]) => {
@@ -204,7 +259,7 @@ class BotBrowser:
 
         if result:
             logger.info(f"[{self.player_name}] Emitted dealTiles via {result}")
-            await page.wait_for_timeout(1500)
+            await self.wait_for_state_update(wait_s, clear=False)
             return True
 
         # Fallback: emit dealTiles via raw WebSocket frame
@@ -238,9 +293,14 @@ class BotBrowser:
 
         return False
 
-    async def wait_for_state_update(self, timeout_s: float = 10) -> bool:
-        """Wait until a new state arrives via WebSocket."""
+    def arm_state_event(self) -> None:
+        """Forget earlier updates; call just before acting so the reply cannot be missed."""
         self._state_event.clear()
+
+    async def wait_for_state_update(self, timeout_s: float = 10, clear: bool = True) -> bool:
+        """Wait until a new state arrives via WebSocket (``clear=False`` keeps an armed event)."""
+        if clear:
+            self._state_event.clear()
         try:
             await asyncio.wait_for(self._state_event.wait(), timeout=timeout_s)
             return True
@@ -277,59 +337,83 @@ class BotBrowser:
             return !!(meInfo && meInfo.classList.contains('current-turn'));
         }""", self.player_name) or False
 
-    async def needs_deal(self) -> bool:
-        """Check if all factories and center are empty (need to deal tiles for new round)."""
+    async def _board_is_empty(self) -> bool:
+        """True if no real tiles are on any factory or in the center right now."""
         if not self._page:
             return False
         return await self._page.evaluate("""() => {
-            // Count actual game tiles (not demo tiles)
-            // After game starts, factory tiles have a factoryid attribute
-            const factoryTiles = document.querySelectorAll('.factory .tile[tilecolor]');
-            const realFactoryTiles = Array.from(factoryTiles).filter(
-                t => t.getAttribute('tilecolor') !== 'dummy'
-            );
-            const centerTiles = document.querySelectorAll('#center-row .tile[tilecolor]');
-            const realCenterTiles = Array.from(centerTiles).filter(
-                t => t.getAttribute('tilecolor') !== 'dummy'
-            );
-            return realFactoryTiles.length === 0 && realCenterTiles.length === 0;
+            const real = (sel) => Array.from(document.querySelectorAll(sel))
+                .filter(t => t.getAttribute('tilecolor') !== 'dummy');
+            return real('.factory .tile[tilecolor]').length === 0
+                && real('#center-row .tile[tilecolor]').length === 0;
         }""") or False
 
-    async def check_game_over(self) -> bool:
-        """Check if the game has ended.
+    async def needs_deal(self, settle_ms: int = 700) -> bool:
+        """True if all factories and the center are empty (a new round must be dealt).
 
-        Checks multiple signals:
-        1. Rematch button rendered with actual height
-        2. Fireworks animation visible
-        3. "wins!" text in the page
-        4. "no more turns remaining" error message
+        The board is briefly empty while tiles animate between rounds, and dealing
+        then makes the platform reject the request, so the empty reading must hold
+        for ``settle_ms`` and no game-over signal may be present.
+        """
+        if self.game_over:
+            return False
+        if time.monotonic() - self._last_deal_at < self.DEAL_COOLDOWN_S:
+            return False                            # the page also auto-deals; avoid duplicate requests
+        ws = self.ws_state
+        if ws is not None and ws.round_in_progress is True:
+            return False
+        if ws is not None and ws.game_over:
+            return False
+        if not await self._board_is_empty():
+            return False                            # also guards against a stale round-over state
+        await asyncio.sleep(settle_ms / 1000)
+        if not await self._board_is_empty():
+            return False
+        return not await self.check_game_over()
+
+    async def _read_game_over_signals(self) -> dict:
+        """Raw page signals. ``strong`` are only shown at a real game end; ``weak`` are
+        text matches that can also appear in transient error messages."""
+        return await self._page.evaluate("""() => {
+            const visible = (el) => !!el && el.offsetHeight > 0 && el.offsetWidth > 0;
+            const text = document.body.innerText;
+            return {
+                strong: visible(document.querySelector('.rematch-button'))
+                     || visible(document.querySelector('.pyro')),
+                weak: text.includes('wins!')
+                     || text.includes('no more turns remaining')
+                     || text.includes('There are no more turns'),
+            };
+        }""") or {"strong": False, "weak": False}
+
+    async def check_game_over(self) -> bool:
+        """Has the game ended?
+
+        Accepted evidence, in order:
+        1. The server said so (``gameOver`` in a takeTurnResponse) - sets ``self.game_over``.
+        2. The rematch button or fireworks are visible.
+        3. A text signal ("wins!", "no more turns remaining") *and* a completed wall row
+           on the board. Text alone is not trusted: error toasts can contain it, and
+           acting on it would end a game in round 1 or 2.
         """
         if self.game_over:
             return True
+        if self.ws_state is not None and self.ws_state.game_over:
+            self.game_over = True
+            return True
         if not self._page:
             return False
-        result = await self._page.evaluate("""() => {
-            // Rematch button rendered
-            const rematch = document.querySelector('.rematch-button');
-            if (rematch && rematch.offsetHeight > 0 && rematch.offsetWidth > 0) return true;
-
-            // Fireworks
-            const pyro = document.querySelector('.pyro');
-            if (pyro && pyro.offsetHeight > 0) return true;
-
-            // Win text
-            const text = document.body.innerText;
-            if (text.includes('wins!')) return true;
-
-            // "no more turns" error
-            if (text.includes('no more turns remaining')) return true;
-            if (text.includes('There are no more turns')) return true;
-
-            return false;
-        }""") or False
-        if result:
+        sig = await self._read_game_over_signals()
+        if sig.get("strong"):
             self.game_over = True
-        return result
+            return True
+        if sig.get("weak"):
+            state = await parse_state_from_dom(self._page)
+            if state is not None and is_game_over(state):
+                self.game_over = True
+                return True
+            logger.warning(f"[{self.player_name}] Game-over text seen but no completed wall row; ignoring")
+        return False
 
     async def get_player_index(self) -> int:
         """Get this bot's player index from the current state or DOM."""
@@ -341,6 +425,8 @@ class BotBrowser:
 
     async def refresh_state_from_dom(self) -> Optional[GameStateData]:
         """Fallback: parse game state from the DOM."""
+        if self.ws_state is not None:
+            return self.ws_state
         if not self._page:
             return None
         state = await parse_state_from_dom(self._page)
@@ -350,15 +436,17 @@ class BotBrowser:
             self.current_state = state
         return state
 
-    async def execute_move(self, action: GameAction) -> bool:
-        """Execute an action on the web UI."""
+    async def execute_move(self, action: GameAction):
+        """Execute an action on the web UI. Returns an ExecutionResult (truthy on success)."""
         if not self._page:
-            return False
+            return ExecutionResult(False)
         player_index = await self.get_player_index()
         return await execute_action(self._page, action, player_index)
 
     async def get_scores(self) -> Dict[str, int]:
-        """Get current scores from DOM."""
+        """Current scores: from the platform's state when available, else the DOM."""
+        if self.ws_state is not None:
+            return {p.name: p.score for p in self.ws_state.players}
         if not self._page:
             return {}
         return await self._page.evaluate("""() => {
@@ -392,11 +480,22 @@ class BotBrowser:
 
     # --- WebSocket interception ---
 
+    def _log_frame(self, payload, direction: str) -> None:
+        """Debug aid: append every frame to $TILES_DEBUG_FRAMES (one JSON line each)."""
+        try:
+            with open(_FRAME_LOG, "a", encoding="utf-8") as f:
+                f.write(json.dumps({"player": self.player_name, "dir": direction,
+                                    "frame": payload if isinstance(payload, str) else repr(payload)}) + "\n")
+        except OSError:
+            pass
+
     def _handle_websocket(self, ws):
         ws.on("framereceived", lambda payload: self._on_ws_frame(payload, "received"))
         ws.on("framesent", lambda payload: self._on_ws_frame(payload, "sent"))
 
     def _on_ws_frame(self, payload: str, direction: str):
+        if _FRAME_LOG:
+            self._log_frame(payload, direction)
         parsed = parse_socketio_message(payload)
         if not parsed:
             return
@@ -409,11 +508,16 @@ class BotBrowser:
         if event_name == "takeTurnResponse":
             state = parse_game_state_from_event(event_data, self.session_id)
             if state:
+                if event_data.get("turnType") == "dealTiles" and event_data.get("success"):
+                    self.round += 1
+                state.round = max(self.round, 1)
+                self.ws_state = state
                 self.current_state = state
                 self.game_started = True
                 if state.game_over:
                     self.game_over = True
-                self._state_event.set()
+                if event_data.get("success"):      # only accepted turns confirm a move/deal
+                    self._state_event.set()
 
         elif event_name == "startGameResponse":
             state = parse_start_game_response(
@@ -424,9 +528,12 @@ class BotBrowser:
                 self.game_started = True
                 self._state_event.set()
 
-        elif event_name == "joinRoomResponse":
+        elif event_name in ("joinRoomResponse", "createRoomResponse"):
             if event_data.get("success"):
                 self.in_lobby = True
+                self.lobby_players.update(event_data.get("players") or [])
+                if event_name == "createRoomResponse":
+                    self.lobby_players.add(self.player_name)
 
 
 class MultiPlayerSession:
@@ -481,46 +588,46 @@ class MultiPlayerSession:
             await bot.join_room()
             await asyncio.sleep(0.5)
 
-    async def wait_for_humans(self, timeout_s: int = 300):
-        """Wait for human players to join (poll lobby player count).
+    @property
+    def expected_players(self) -> int:
+        return len(self.bots) + self.human_count
 
-        The host's page shows the player count. We wait until total players
-        (bots + humans) match the expected count.
-        """
+    async def wait_for_all_players(self, timeout_s: float) -> bool:
+        """Wait until the host has been told the whole expected roster is in the room."""
+        host = self.host
+        if not host:
+            return False
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_s
+        while len(host.lobby_players) < self.expected_players:
+            if loop.time() >= deadline:
+                return False
+            await asyncio.sleep(0.5)
+        return True
+
+    async def wait_for_humans(self, timeout_s: int = 300):
+        """Wait for human players to join (the platform reports each join to the host)."""
         if self.human_count <= 0:
             return
+        logger.info(f"Waiting for {self.human_count} human(s) to join ({self.expected_players} total)...")
+        if await self.wait_for_all_players(timeout_s):
+            logger.info(f"All {self.expected_players} players in lobby")
+        else:
+            logger.warning("Timed out waiting for human players")
 
+    async def start_game(self, join_timeout_s: float = 30):
+        """Host starts the game, but only once every expected player is in the room (the
+        platform enables Start with a single player, so the button state proves nothing)."""
         host = self.host
-        if not host or not host.page:
+        if not host:
             return
-
-        expected_total = len(self.bots) + self.human_count
-        logger.info(f"Waiting for {self.human_count} human(s) to join ({expected_total} total)...")
-
-        start = time.time()
-        while time.time() - start < timeout_s:
-            player_count = await host.page.evaluate("""() => {
-                const players = document.querySelectorAll('.lobby-ribbon-row .player-name, #sharing-link-row .badge');
-                // Fallback: count buddy avatars in the lobby
-                const avatars = document.querySelectorAll('.buddy-avatar');
-                return Math.max(players.length, avatars.length);
-            }""") or len(self.bots)
-
-            if player_count >= expected_total:
-                logger.info(f"All {expected_total} players in lobby")
-                return
-
-            await asyncio.sleep(2)
-
-        logger.warning(f"Timeout waiting for humans, proceeding with {len(self.bots)} bot(s)")
-
-    async def start_game(self):
-        """Host starts the game."""
-        host = self.host
-        if host:
-            await host.start_game()
-            # Wait for all bots to receive the startGameResponse
-            await asyncio.sleep(2)
+        if not await self.wait_for_all_players(join_timeout_s):
+            raise RuntimeError(
+                f"Only {len(host.lobby_players)} of {self.expected_players} players are in the room"
+            )
+        await host.start_game()
+        # Wait for all bots to receive the startGameResponse
+        await asyncio.sleep(2)
 
     async def close_all(self):
         """Close all bot browsers."""

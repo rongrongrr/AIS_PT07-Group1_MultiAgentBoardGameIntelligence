@@ -22,10 +22,23 @@ WALL_COLORS = [
 
 
 def parse_socketio_message(raw: str) -> Optional[tuple]:
-    """Parse a raw Socket.IO message into (event_name, payload).
+    """Parse a raw WebSocket frame from the game platform into (event_name, payload).
 
-    Socket.IO v4 messages are formatted as: 42["eventName", {payload}]
+    Two wire formats are understood:
+    * current platform: a JSON envelope ``{"type": "takeTurnResponse", "payload": {...}}``
+    * legacy Socket.IO v4: ``42["eventName", {payload}]``
     """
+    if not isinstance(raw, str):
+        return None
+    if raw.startswith("{"):
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        if isinstance(data, dict) and isinstance(data.get("type"), str):
+            payload = data.get("payload")
+            return data["type"], payload if isinstance(payload, dict) else {}
+        return None
     if not raw.startswith("42"):
         return None
     try:
@@ -55,9 +68,8 @@ def parse_game_state_from_event(payload: Dict[str, Any], session_id: str = "") -
         }
     }
     """
-    if not payload.get("success"):
-        return None
-
+    # A rejected turn still carries the server's current game, which is exactly what a
+    # client with a stale view needs, so parse it whenever it is present.
     game = payload.get("game")
     if not game:
         return None
@@ -89,13 +101,25 @@ def parse_start_game_response(payload: Dict[str, Any], room_name: str, session_i
 
 
 def _parse_game_object(game: Dict[str, Any], session_id: str) -> GameStateData:
-    """Parse the full game object from takeTurnResponse."""
+    """Parse the full game object from takeTurnResponse.
+
+    Handles the platform's current payload (playerOrder/playerTurnIndex, centerTiles,
+    wall.rows, floorLines.lines, tiles as {"type": colour}) and the older shape
+    (currentPlayer, center, wall.grid).
+    """
     players_dict = game.get("players", {})
     players = []
 
-    # Determine player order from the server data
-    for i, (name, pdata) in enumerate(players_dict.items()):
-        players.append(_parse_player_from_turn(pdata, name, i))
+    # Seat order from the server (playerOrder), falling back to dict order
+    order = [n for n in (game.get("playerOrder") or []) if n in players_dict]
+    order += [n for n in players_dict if n not in order]
+    for i, name in enumerate(order):
+        players.append(_parse_player_from_turn(players_dict[name], name, i))
+
+    current = game.get("currentPlayer") or ""
+    idx = game.get("playerTurnIndex")
+    if not current and isinstance(idx, int) and 0 <= idx < len(game.get("playerOrder") or []):
+        current = game["playerOrder"][idx]
 
     # Parse factories
     factories = []
@@ -109,7 +133,7 @@ def _parse_game_object(game: Dict[str, Any], session_id: str) -> GameStateData:
 
     # Parse center pool
     center = []
-    for tile in game.get("center", []):
+    for tile in game.get("centerTiles") or game.get("center", []):
         if isinstance(tile, str):
             center.append(tile)
         elif isinstance(tile, dict):
@@ -117,16 +141,23 @@ def _parse_game_object(game: Dict[str, Any], session_id: str) -> GameStateData:
             if color:
                 center.append(color)
 
+    round_in_progress = game.get("roundInProgress")
+    game_over = bool(game.get("gameOver", False))
+    if not game_over and round_in_progress is False and game.get("gameStarted", True):
+        # The round just ended: the game is over if anyone completed a wall row.
+        game_over = any(all(row) for p in players for row in p.wall)
+
     return GameStateData(
         timestamp=datetime.utcnow(),
         session_id=session_id,
         room_name=game.get("room", ""),
         round=game.get("round", 1),
-        current_turn=game.get("currentPlayer", ""),
+        current_turn=current,
         factories=factories,
         center_pool=center,
         players=players,
-        game_over=game.get("gameOver", False),
+        game_over=game_over,
+        round_in_progress=round_in_progress,
     )
 
 
@@ -175,6 +206,14 @@ def _parse_player_from_start(pdata: Dict[str, Any], index: int) -> PlayerState:
     )
 
 
+def _cell_color(cell: Dict[str, Any]) -> str:
+    """Colour of a board cell: {"value": {"type": c}}, {"type": c} or {"color": c}."""
+    value = cell.get("value")
+    if isinstance(value, dict) and value.get("type"):
+        return value["type"]
+    return cell.get("type") or cell.get("color") or ""
+
+
 def _parse_pattern_lines(pl_data: Any) -> List[List[Optional[TileColor]]]:
     """Parse pattern lines from server format.
 
@@ -196,8 +235,7 @@ def _parse_pattern_lines(pl_data: Any) -> List[List[Optional[TileColor]]]:
         if isinstance(row, list):
             for cell in row:
                 if isinstance(cell, dict) and cell.get("selected"):
-                    color_str = cell.get("type") or cell.get("color") or ""
-                    color = _safe_tile_color(color_str)
+                    color = _safe_tile_color(_cell_color(cell))
                     row_tiles.append(color)
                 # If not selected, it's an empty slot — don't append
         result[row_idx] = row_tiles
@@ -213,7 +251,7 @@ def _parse_wall(wall_data: Any) -> List[List[bool]]:
     result = [[False] * 5 for _ in range(5)]
 
     if isinstance(wall_data, dict):
-        grid = wall_data.get("grid", [])
+        grid = wall_data.get("rows") or wall_data.get("grid", [])
     elif isinstance(wall_data, list):
         grid = wall_data
     else:
@@ -237,11 +275,15 @@ def _parse_wall(wall_data: Any) -> List[List[bool]]:
 def _parse_floor(floor_data: Any) -> List[TileColor]:
     """Parse floor line from server format."""
     result = []
+    if isinstance(floor_data, dict):
+        floor_data = floor_data.get("lines", [])
     if not isinstance(floor_data, list):
         return result
     for tile in floor_data:
         if isinstance(tile, dict):
-            color_str = tile.get("type") or tile.get("color") or ""
+            if not tile.get("selected", True):
+                continue                      # empty floor slot
+            color_str = _cell_color(tile)
         elif isinstance(tile, str):
             color_str = tile
         else:

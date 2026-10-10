@@ -13,10 +13,13 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session as DBSession
 
+from app.azul.rules import get_legal_actions, is_game_over
 from app.engine.play_engine import BotBrowser, MultiPlayerSession
+from app.ml.archetypes import move_record
 from app.ml.registry import registry
 from app.models.db import Move, Session, get_db, GameState as GameStateModel
 from app.models.schemas import (
+    DestinationType,
     GameAction,
     GameStateData,
     MoveRecord,
@@ -94,6 +97,8 @@ async def start_session(session_id: str, db: DBSession = Depends(get_db)):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    if session_id in _session_tasks or session_id in _active_sessions:
+        raise HTTPException(status_code=400, detail="Session is already running")
     if session.status not in (SessionStatus.CREATED.value, SessionStatus.LOBBY.value):
         raise HTTPException(status_code=400, detail=f"Session is already {session.status}")
 
@@ -108,7 +113,7 @@ async def start_session(session_id: str, db: DBSession = Depends(get_db)):
     bot_models = {}
     for slot in bot_slots:
         model_name = slot["type"]
-        model = registry.get_player(model_name)
+        model = registry.create_player(model_name)  # fresh instance per bot (per-game state)
         if not model:
             available = [p["name"] for p in registry.list_players()]
             raise HTTPException(
@@ -116,6 +121,8 @@ async def start_session(session_id: str, db: DBSession = Depends(get_db)):
                 detail=f"Model '{model_name}' not found. Available: {available}",
             )
         player_name = slot.get("name") or f"Bot_{model_name}_{slot['slot']}"
+        if player_name in bot_models:
+            raise HTTPException(status_code=400, detail=f"Duplicate player name '{player_name}'")
         bot_models[player_name] = model
 
     # Create multi-player session
@@ -162,6 +169,9 @@ async def stop_session(session_id: str, db: DBSession = Depends(get_db)):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    if session.status in (SessionStatus.COMPLETED.value, SessionStatus.ABORTED.value):
+        return {"status": session.status, "session_id": session_id}
+
     task = _session_tasks.pop(session_id, None)
     if task:
         task.cancel()
@@ -191,7 +201,7 @@ async def session_websocket(websocket: WebSocket, session_id: str):
                 if bot.current_state:
                     await websocket.send_json({
                         "type": "state_update",
-                        "data": bot.current_state.dict(),
+                        "data": bot.current_state.model_dump(mode="json"),
                     })
                     break
 
@@ -260,8 +270,6 @@ async def _run_multi_bot_game(
         if not has_tiles:
             logger.info(f"[{host.player_name}] No tiles found, emitting dealTiles")
             await host.deal_tiles()
-            await asyncio.gather(*(bot.wait_for_state_update(timeout_s=8) for bot in mp.bots))
-            await asyncio.sleep(2)
             for bot in mp.bots:
                 await bot.refresh_state_from_dom()
 
@@ -326,8 +334,6 @@ async def _run_multi_bot_game(
                     await syslog("info", bot.player_name, "deal", "Dealing tiles for new round")
                     t0 = time.time()
                     await bot.deal_tiles()
-                    await bot.wait_for_state_update(timeout_s=8)
-                    await asyncio.sleep(1)
                     await bot.refresh_state_from_dom()
                     deal_ms = int((time.time() - t0) * 1000)
                     await syslog("info", bot.player_name, "deal",
@@ -359,14 +365,13 @@ async def _run_multi_bot_game(
                     await syslog("info", bot.player_name, "deal",
                                  "No tiles available, dealing")
                     await bot.deal_tiles()
-                    await bot.wait_for_state_update(timeout_s=8)
                     await bot.refresh_state_from_dom()
                     any_acted = True
                     last_successful_move_time = time.time()
                     continue
 
                 # Save state snapshot
-                _save_state_snapshot(session_id, step_counter, state, db)
+                _save_state_snapshot(session_id, step_counter + 1, state, db)
 
                 # Ask ML model for a decision (with timeout)
                 player_index = await bot.get_player_index()
@@ -388,30 +393,38 @@ async def _run_multi_bot_game(
                                  f"Failed: {e}")
                     continue
 
-                from app.azul.rules import get_legal_actions
-                n_legal = len(get_legal_actions(state, player_index))
+                # Validator gate: never execute a move the rules engine doesn't allow.
+                legal = get_legal_actions(state, player_index)
+                n_legal = len(legal)
+                if action not in legal:
+                    await syslog("error", bot.player_name, "validate",
+                                 f"Rejected illegal action from {model.name}",
+                                 {"action": action.model_dump(), "legal_actions": n_legal})
+                    continue
                 await syslog("info", bot.player_name, "ml_decide",
                              f"Decided in {decision_ms}ms: {action.color.value} from "
                              f"{action.source_type.value}[{action.source_index}] -> "
                              f"{action.destination.value}[{action.destination_row}] "
                              f"({n_legal} legal options)",
                              {"decision_ms": decision_ms, "legal_actions": n_legal,
-                              "action": action.dict()})
+                              "action": action.model_dump()})
 
                 # Execute the move
                 t0 = time.time()
+                bot.arm_state_event()
                 success = await bot.execute_move(action)
                 click_ms = int((time.time() - t0) * 1000)
+                intended_action = action
 
                 if not success:
                     await syslog("error", bot.player_name, "execute",
                                  f"Click failed after {click_ms}ms",
-                                 {"click_ms": click_ms, "action": action.dict()})
+                                 {"click_ms": click_ms, "action": action.model_dump()})
                     continue
 
                 # Wait for state to update (verify the move went through)
                 t0 = time.time()
-                state_changed = await bot.wait_for_state_update(timeout_s=5)
+                state_changed = await bot.wait_for_state_update(timeout_s=5, clear=False)
                 ws_wait_ms = int((time.time() - t0) * 1000)
 
                 if not state_changed:
@@ -421,13 +434,27 @@ async def _run_multi_bot_game(
                                      f"Move had NO effect (state unchanged after {ws_wait_ms}ms). "
                                      f"Rejected by platform?",
                                      {"ws_wait_ms": ws_wait_ms, "click_ms": click_ms,
-                                      "action": action.dict()})
+                                      "action": action.model_dump()})
                         continue
                     await syslog("info", bot.player_name, "verify",
                                  f"No WS update but DOM changed ({ws_wait_ms}ms) — accepting")
                 else:
                     await syslog("info", bot.player_name, "verify",
                                  f"State confirmed via WS in {ws_wait_ms}ms")
+
+                # Record what was actually played if the platform forced a floor fallback
+                fell_back = bool(getattr(success, "fell_back_to_floor", False))
+                if fell_back:
+                    action = GameAction(
+                        source_type=action.source_type,
+                        source_index=action.source_index,
+                        color=action.color,
+                        destination=DestinationType.FLOOR,
+                        destination_row=None,
+                    )
+                    await syslog("warning", bot.player_name, "execute",
+                                 "Platform rejected pattern line; played floor instead",
+                                 {"intended": intended_action.model_dump(), "played": action.model_dump()})
 
                 # Move succeeded
                 total_ms = int((time.time() - turn_start) * 1000)
@@ -442,6 +469,15 @@ async def _run_multi_bot_game(
                     decision_time_ms=decision_ms,
                     timestamp=datetime.utcnow(),
                 )
+                # Let every model observe the move (adaptive players model opponents from it)
+                try:
+                    rec = move_record(state, player_index, action)
+                    for other_bot in mp.bots:
+                        other_model = bot_models[other_bot.player_name]
+                        other_model.observe(rec, other_bot.player_name)
+                except Exception:
+                    logger.exception("observe hook failed")
+
                 # Collect scores and build board snapshot
                 cur_scores = {}
                 cur_round = 1
@@ -471,6 +507,8 @@ async def _run_multi_bot_game(
                     "click_ms": click_ms,
                     "ws_wait_ms": ws_wait_ms,
                     "total_ms": total_ms,
+                    "fell_back_to_floor": fell_back,
+                    "explanation": getattr(model, "last_explanation", None) or None,
                     "legal_actions": n_legal,
                     "round": cur_round,
                     "scores": cur_scores,
@@ -498,8 +536,10 @@ async def _run_multi_bot_game(
                 break
 
             # Check stuck timeout
+            # Humans may think longer than the bot timeout, so only abort on
+            # stalls in bot-only games.
             stuck_duration = time.time() - last_successful_move_time
-            if stuck_duration > move_timeout_sec + stuck_abort_sec:
+            if mp.human_count == 0 and stuck_duration > move_timeout_sec + stuck_abort_sec:
                 abort_reason = (
                     f"No progress for {stuck_duration:.0f}s "
                     f"(limit: {move_timeout_sec}+{stuck_abort_sec}s)"
@@ -517,6 +557,13 @@ async def _run_multi_bot_game(
         for bot in mp.bots:
             s = await bot.get_scores()
             scores.update(s)
+
+        # A game only counts as completed if the board shows a finished wall row.
+        if not abort_reason:
+            final_state = await mp.bots[0].refresh_state_from_dom()
+            if final_state is None or not is_game_over(final_state):
+                abort_reason = "Stopped without any player completing a wall row (game did not finish)"
+                await syslog("error", session_id, "abort", abort_reason)
 
         # Save diagnostic snapshot
         diag = {
@@ -592,15 +639,21 @@ def _update_db_status(session_id: str, status: SessionStatus, db: DBSession,
 
 
 def _save_state_snapshot(session_id: str, step: int, state: GameStateData, db: DBSession):
-    gs = GameStateModel(
-        session_id=session_id,
-        step_id=step,
-        state_json=state.json(),
+    """Store the state that precedes move `step`; re-saving the same step (a retried
+    move) replaces the earlier snapshot rather than failing on the unique constraint."""
+    existing = (
+        db.query(GameStateModel)
+        .filter(GameStateModel.session_id == session_id, GameStateModel.step_id == step)
+        .first()
     )
-    db.add(gs)
+    if existing:
+        existing.state_json = state.model_dump_json()
+    else:
+        db.add(GameStateModel(session_id=session_id, step_id=step, state_json=state.model_dump_json()))
     try:
         db.commit()
     except Exception:
+        logger.exception("Failed to save state snapshot for step %s", step)
         db.rollback()
 
 
@@ -610,13 +663,13 @@ def _save_move_record(session_id: str, record: MoveRecord, db: DBSession, extra:
         step_id=record.step_id,
         player_name=record.player_name,
         system_tag=record.system_tag,
-        action_json=record.action.json(),
+        action_json=record.action.model_dump_json(),
         decision_time_ms=record.decision_time_ms,
     )
     # Store extra data (board snapshot, scores, timing) in action_json alongside the action
     if extra:
         import json as _json
-        action_data = _json.loads(record.action.json())
+        action_data = _json.loads(record.action.model_dump_json())
         action_data["_extra"] = extra
         move.action_json = _json.dumps(action_data)
     db.add(move)
@@ -629,7 +682,7 @@ def _save_move_record(session_id: str, record: MoveRecord, db: DBSession, extra:
 # ---- WebSocket broadcast ----
 
 async def _broadcast_state(session_id: str, state: GameStateData):
-    await _broadcast_state_msg(session_id, {"type": "state_update", "data": state.dict()})
+    await _broadcast_state_msg(session_id, {"type": "state_update", "data": state.model_dump(mode="json")})
 
 
 async def _broadcast_move(session_id: str, record: MoveRecord, extra: dict = None):
@@ -637,7 +690,7 @@ async def _broadcast_move(session_id: str, record: MoveRecord, extra: dict = Non
         "step_id": record.step_id,
         "player_name": record.player_name,
         "system_tag": record.system_tag,
-        "action": record.action.dict(),
+        "action": record.action.model_dump(),
         "decision_time_ms": record.decision_time_ms,
         "timestamp": record.timestamp.isoformat() + "Z",
     }
@@ -653,6 +706,7 @@ async def _broadcast_state_msg(session_id: str, msg: dict):
         try:
             await ws.send_json(msg)
         except Exception:
+            logger.warning("Dropping WebSocket client for %s after send failure", session_id, exc_info=True)
             dead.append(ws)
     for ws in dead:
         conns.remove(ws)

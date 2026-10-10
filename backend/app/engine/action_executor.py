@@ -9,11 +9,28 @@ from app.models.schemas import DestinationType, GameAction, SourceType
 logger = logging.getLogger(__name__)
 
 
-async def execute_action(page, action: GameAction, player_index: int = 0) -> bool:
+class ExecutionResult:
+    """Outcome of execute_action. Truthy when the move was played.
+
+    ``fell_back_to_floor`` is True when the platform rejected the requested
+    pattern line and the tiles were put on the floor instead, so callers can
+    record what was actually played rather than what was intended.
+    """
+
+    def __init__(self, ok: bool, fell_back_to_floor: bool = False):
+        self.ok = ok
+        self.fell_back_to_floor = fell_back_to_floor
+
+    def __bool__(self) -> bool:
+        return self.ok
+
+
+async def execute_action(page, action: GameAction, player_index: int = 0) -> ExecutionResult:
     """Execute a GameAction by emitting Socket.IO chooseTiles + placeTiles.
 
     Returns True only if BOTH steps succeed on the server.
     """
+    fell_back = False
     try:
         # Step 1: chooseTiles
         choose = _build_choose_payload(action)
@@ -21,11 +38,9 @@ async def execute_action(page, action: GameAction, player_index: int = 0) -> boo
         if not result["ok"]:
             logger.error(f"chooseTiles REJECTED: {result['msg']} | "
                          f"{action.color.value} from {action.source_type.value}[{action.source_index}]")
-            return False
+            return ExecutionResult(False)
         logger.info(f"chooseTiles OK: {action.color.value} from "
                      f"{action.source_type.value}[{action.source_index}]")
-
-        await page.wait_for_timeout(300)
 
         # Step 2: placeTiles
         place = _build_place_payload(action)
@@ -38,17 +53,17 @@ async def execute_action(page, action: GameAction, player_index: int = 0) -> boo
             result = await _emit_and_wait(page, floor_payload)
             if not result["ok"]:
                 logger.error(f"placeTiles floor fallback also REJECTED: {result['msg']}")
-                return False
+                return ExecutionResult(False)
+            fell_back = True
             logger.info("placeTiles OK: floor (fallback)")
         else:
             logger.info(f"placeTiles OK: -> {action.destination.value}[{action.destination_row}]")
 
-        await page.wait_for_timeout(800)
-        return True
+        return ExecutionResult(True, fell_back)
 
     except Exception as e:
         logger.error(f"Action execution error: {e}", exc_info=True)
-        return False
+        return ExecutionResult(False)
 
 
 async def _emit_and_wait(page, payload: dict) -> dict:
@@ -78,17 +93,19 @@ async def _emit_and_wait(page, payload: dict) -> dict:
                 // Store the last response globally so it doesn't consume the event
                 let resolved = false;
                 const handler = (resp) => {
+                    // Replies to other requests (the page auto-sends dealTiles, opponents move)
+                    // also arrive as takeTurnResponse; only our own turn's reply counts.
+                    if (resp && resp.turnType && resp.turnType !== payload.turnType) return;
+                    if (resp && resp.player && resp.player !== player) return;
                     if (!resolved) {
                         resolved = true;
                         socket.off('takeTurnResponse', handler);
                         resolve({ok: !!resp.success, msg: resp.message || ''});
                     }
                 };
-                // Use 'on' not 'once' — we manually remove after first call
-                // This allows the platform's own handlers to still fire
-                socket.prependOnceListener
-                    ? socket.prependOnceListener('takeTurnResponse', handler)
-                    : socket.once('takeTurnResponse', handler);
+                // The platform's socket wrapper has on/off/emit but no once(), so register
+                // with on() and remove the handler ourselves; the page's own handlers still fire.
+                socket.on('takeTurnResponse', handler);
 
                 socket.emit('takeTurn', payload);
 

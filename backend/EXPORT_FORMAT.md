@@ -69,7 +69,7 @@ Each move represents one player action (pick tiles from source, place on destina
 | `decision_time_ms` | int | Time the ML model took to decide |
 | `timestamp` | string | ISO timestamp of the move |
 | `round` | int | Which round this move belongs to |
-| `scores` | object | Scores after this move: `{"Alice": 5, "Bob": 3}` |
+| `scores` | object | Scores before this move (captured with the board snapshot): `{"Alice": 5, "Bob": 3}` |
 | `total_ms` | int | Total time for the move (decide + execute + confirm) |
 | `click_ms` | int | Time to execute the move on the platform |
 | `ws_wait_ms` | int | Time waiting for server confirmation |
@@ -140,6 +140,6 @@ Row 4: yellow, red,    black,  white,  blue
 
 2. **Round boundaries**: Use `summary.rounds` to see how many moves per round and scores at each round end.
 
-3. **Scoring analysis**: The `scores` field on each move shows cumulative scores. Compare consecutive moves to see point changes.
+3. **Scoring analysis**: The `scores` field on each move shows cumulative scores as they stood before that move. Compare consecutive moves to see point changes.
 
 4. **ML analysis**: `decision_time_ms` and `legal_actions` show how the ML model performed. The `board` snapshot is the exact input the model received.

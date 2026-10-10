@@ -74,6 +74,8 @@ class GameStateData(BaseModel):
     center_pool: List[str] = Field(default_factory=list)  # includes "firstPlayer"
     players: List[PlayerState] = Field(default_factory=list)
     game_over: bool = False
+    # None when unknown (DOM-parsed states); from the platform's roundInProgress otherwise
+    round_in_progress: Optional[bool] = None
 
 
 class GameAction(BaseModel):
@@ -101,9 +103,9 @@ class MoveRecord(BaseModel):
 # --- API Request/Response Schemas ---
 
 class PlayerSlotConfig(BaseModel):
-    slot: int  # 0-3
+    slot: int = Field(ge=0, le=3)  # 0-3
     type: str  # "human" or a machine player model id
-    name: Optional[str] = None
+    name: Optional[str] = Field(default=None, max_length=16)  # platform limit
 
 
 class ProfilerConfig(BaseModel):
@@ -112,13 +114,13 @@ class ProfilerConfig(BaseModel):
 
 
 class SessionCreate(BaseModel):
-    room_name: str
-    platform_url: str = "https://buddyboardgames.com/azul"
+    room_name: str = Field(min_length=1, max_length=20)  # platform limit
+    platform_url: str = Field(default="https://buddyboardgames.com/azul", pattern=r"^https?://")
     browser_mode: BrowserMode = BrowserMode.HEADLESS
-    players: List[PlayerSlotConfig]
+    players: List[PlayerSlotConfig] = Field(max_length=4)
     profiler: Optional[ProfilerConfig] = None
-    move_timeout_sec: int = 10  # max seconds per move decision + execution
-    stuck_abort_sec: int = 3    # abort session N sec after timeout with no progress
+    move_timeout_sec: int = Field(default=10, ge=1, le=120)  # max seconds per move decision + execution
+    stuck_abort_sec: int = Field(default=3, ge=1, le=120)    # abort session N sec after timeout with no progress
 
 
 class SessionResponse(BaseModel):

@@ -140,7 +140,11 @@ def export_game(session_id: str, db: DBSession = Depends(get_db)):
             "total_moves": len(move_list),
             "total_rounds": len(rounds),
             "rounds": rounds,
-            "final_scores": move_list[-1].get("scores", {}) if move_list else {},
+            # authoritative result recorded when the game ended; the last move's own
+            # `scores` are the scores from *before* that move
+            "final_scores": (json.loads(session.final_scores) if session.final_scores
+                             else (move_list[-1].get("scores", {}) if move_list else {})),
+            "winner": session.winner,
         },
         "moves": move_list,
     }

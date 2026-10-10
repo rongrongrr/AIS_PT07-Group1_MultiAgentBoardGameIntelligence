@@ -34,3 +34,10 @@ backend/azul_findings.json
 
 # Claude
 .claude/
+
+# Office lock files
+~$*
+
+# Coverage
+.coverage
+htmlcov/
