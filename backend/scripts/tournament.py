@@ -24,9 +24,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.azul.game import play_game  # noqa: E402
 from app.ml.greedy_player import GreedyPlayer  # noqa: E402
 from app.ml.random_player import RandomPlayer  # noqa: E402
+from app.ml.minimax_player import MinimaxPlayer  # noqa: E402
 from app.ml.rollout_player import RolloutPlayer  # noqa: E402
 
-PLAYERS = {"GreedyPlayer": GreedyPlayer, "RandomPlayer": RandomPlayer, "RolloutPlayer": RolloutPlayer}
+PLAYERS = {"GreedyPlayer": GreedyPlayer, "RandomPlayer": RandomPlayer, "RolloutPlayer": RolloutPlayer, "MinimaxPlayer": MinimaxPlayer}
 
 
 def wilson(wins: float, n: int, z: float = 1.96):

@@ -6,6 +6,7 @@ from typing import Dict, Optional
 
 from app.ml.base import MachinePlayer, ProfilerAgent
 from app.ml.adaptive_player import AdaptivePlayer, AdaptiveRolloutPlayer
+from app.ml.minimax_player import MinimaxPlayer
 from app.ml.rollout_player import RolloutPlayer
 from app.ml.greedy_player import (
     BlockerPlayer,
@@ -27,7 +28,7 @@ class ModelRegistry:
 
     def _register_defaults(self):
         self.register_player(RandomPlayer())
-        for cls in (GreedyPlayer, ColorCollectorPlayer, RusherPlayer, RecklessPlayer, BlockerPlayer, AdaptivePlayer, RolloutPlayer, AdaptiveRolloutPlayer):
+        for cls in (GreedyPlayer, ColorCollectorPlayer, RusherPlayer, RecklessPlayer, BlockerPlayer, AdaptivePlayer, RolloutPlayer, AdaptiveRolloutPlayer, MinimaxPlayer):
             self.register_player(cls())
 
     def register_player(self, player: MachinePlayer):
