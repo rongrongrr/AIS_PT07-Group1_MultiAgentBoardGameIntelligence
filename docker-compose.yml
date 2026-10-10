@@ -6,8 +6,10 @@ services:
     environment:
       TILES_DB_PATH: /data/tiles.db
       TILES_FORCE_HEADLESS: "1"        # no display in a container, so browsers always run headless
+      TILES_MLFLOW_URI: sqlite:////mlruns/mlflow.db
     volumes:
       - tiles-data:/data               # keeps sessions, moves and profiles between restarts
+      - tiles-mlruns:/mlruns           # MLflow experiment store (every finished game is logged)
     shm_size: "1gb"                    # Chromium needs more shared memory than Docker's 64MB default
     restart: unless-stopped
 
@@ -20,5 +22,19 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Optional experiment-tracking UI:  docker compose --profile tracking up   ->  http://localhost:5000
+  mlflow:
+    profiles: ["tracking"]
+    image: python:3.12-slim
+    command: >
+      sh -c "pip install -q mlflow==3.16.1 &&
+             mlflow server --host 0.0.0.0 --port 5000
+             --backend-store-uri sqlite:////mlruns/mlflow.db --default-artifact-root /mlruns/artifacts"
+    volumes:
+      - tiles-mlruns:/mlruns
+    ports:
+      - "5000:5000"
+
 volumes:
   tiles-data:
+  tiles-mlruns:

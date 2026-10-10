@@ -6,13 +6,16 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     TILES_DB_PATH=/data/tiles.db \
-    TILES_FORCE_HEADLESS=1
+    TILES_FORCE_HEADLESS=1     TILES_MLFLOW_URI=sqlite:////mlruns/mlflow.db
+
+# CPU-only PyTorch (the default PyPI wheel on Linux bundles CUDA and is ~2 GB larger)
+RUN pip install --break-system-packages --index-url https://download.pytorch.org/whl/cpu "torch==2.4.1"
 
 COPY requirements.txt .
 RUN pip install --break-system-packages -r requirements.txt
 
 COPY . .
-RUN mkdir -p /data
+RUN mkdir -p /data /mlruns
 
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \

@@ -41,3 +41,6 @@ backend/azul_findings.json
 # Coverage
 .coverage
 htmlcov/
+
+# Experiment tracking store (MLflow)
+mlruns/
