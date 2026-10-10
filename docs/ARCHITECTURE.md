@@ -1,167 +1,361 @@
-# TILES Architecture
+# TILES architecture
 
-This document maps the codebase to the design in the progress report
-(*TILES: Architecting an Explainable Multi-Agent System for Competitive
-Board Games*). Read it top-down; each section names the modules that
-implement it.
+This document explains how TILES is put together. It follows the path a game
+takes through the system, and names the part of the code responsible for each
+step. All paths are relative to `backend/tiles/` unless they say otherwise.
 
-## 1. Design principles
+If you only want to run TILES, the [README](../README.md) is enough.
 
-1. **The local rules engine is the single source of truth.** The previous
-   iteration used the live website as the game engine, which made round
-   transitions and game-over detection fragile. TILES inverts this: a pure,
-   deterministic engine (`tiles/core/`) owns legality, scoring, and state
-   transitions; the live platform is just an *adapter* that mirrors state in
-   and pushes actions out (`tiles/engine/`; see section 6 for how the live runtime and this engine relate).
-2. **Agents are interfaces, not classes.** Every Decision Stack role sits
-   behind an ABC (`tiles/agents/base.py`) and a registry, so a trained RL
-   Tactician or a transformer Profiler drops in without touching the
-   orchestrator, server, or UI.
-3. **Explainability is data-first.** Tacticians must return a
-   `SearchReport` (candidates, Q-values, visits, priors, principal
-   variation, per-component heuristic breakdowns). Explanations are derived
-   from these artifacts — never invented after the fact.
-4. **Everything is replayable.** Every turn produces a `TurnRecord` with
-   full before/after board snapshots, validation trace, explanation, and
-   timing, persisted append-only in SQLite (`tiles/ledger/`).
+## The big picture
 
-## 2. The core engine (`tiles/core/`)
+```mermaid
+flowchart TB
+    subgraph clients["Clients"]
+        ui["Web app (frontend/)"]
+        cli["tiles command (cli.py)"]
+    end
+    subgraph server["API server (server/)"]
+        routers["Routers"]
+        sm["Session manager"]
+        em["Experiment manager (experiments/)"]
+    end
+    subgraph games["Running games"]
+        sim["Local games and tournaments (sim/)"]
+        live["Live session (engine/)"]
+    end
+    subgraph stack["Decision Stack"]
+        pipeline["Turn pipeline (orchestration/)"]
+        agents["Validator, Tactician, Profiler, Explainer (agents/)"]
+    end
+    core["Rules engine (core/)"]
+    ledger[("Ledger: SQLite (ledger/)")]
+    site["buddyboardgames.com"]
 
-- `state.py` — `GameState` / `PlayerBoard`. Optimized for MCTS cloning:
-  walls are 25-bit integers, tile pools are 5-int count vectors. A semantic
-  JSON view (`to_dict`) serves the ledger, Explainer, and frontend — the
-  dual-representation strategy from the report (bitboard-style for search,
-  JSON for humans).
-- `actions.py` — `Action` with a stable 300-slot `action_id` space
-  (10 sources × 5 colors × 6 destinations), matching the report's action
-  space analysis and giving RL consumers a fixed action mask.
-- `rules.py` — legality as named predicates (`wall_slot_open`,
-  `line_color_matches`, …) returning machine-readable `RuleViolation`s;
-  adjacency scoring; wall-tiling round resolution; floor penalties with the
-  zero floor; end-game bonuses; `step()` as the single transition function.
-- `simulator.py` — the stochastic part (bag draws, lid refill, factory
-  dealing) kept separate so search can determinize it and the live adapter
-  can skip it.
-- `encode.py` — flat float observation vector for neural consumers.
-
-Invariant tested end-to-end: the 100 physical tiles are conserved through
-every transition of full random games (`tests/test_rules.py`).
-
-## 3. The Decision Stack (`tiles/agents/`)
-
-```
-            ┌────────────────────────────────────────────────┐
-            │              TurnPipeline (orchestration)       │
-            │                                                │
- sense ──► profile ──► decide ──► validate ──► execute ──► observe ──► explain
-            │Profiler│   │Tactician│  │Validator│ (rules.step)  │Profiler│  │Explainer│
-            │        │   ▲         │      │ reject + trace     │
-            │        └───┘ opponent│      └──────► retry ──────┘
-            │            policy    │              (≤2, then greedy fallback)
-            └────────────────────────────────────────────────┘
+    ui --> routers
+    routers --> sm
+    routers --> em
+    cli --> sim
+    cli --> live
+    sm --> sim
+    sm --> live
+    em --> sim
+    sim --> pipeline
+    live --> pipeline
+    pipeline --> agents
+    agents --> core
+    live <--> site
+    sim --> ledger
+    live --> ledger
+    em --> ledger
+    routers --> ledger
 ```
 
-### Validator (`validator.py` + `orchestration/turn_graph.py`)
-The deterministic authority. Wraps `core.rules.check_action`; every check
-is recorded in an audit trail. The orchestrator gives it coordination
-authority: a rejected proposal is bounced back to the Tactician once with
-the violated predicate attached, then falls back to the best heuristic
-legal move — the self-correcting loop from the report, with zero
-possibility of an illegal move reaching the board. The pipeline nodes map
-1:1 onto the report's LangGraph design; the implementation is a
-framework-free deterministic graph (same node/edge semantics, no LLM in
-the routing path, trivially portable to LangGraph if required).
+A game is started either from the web app, through the API server, or directly
+from the `tiles` command. Either way it is run by one of two game runners: a
+local one that simulates the whole game, or a live one that plays on the
+website. Both hand each turn to the same turn pipeline, which runs the four
+agents, and both write the result to the same database.
 
-### Tacticians (`tacticians/`)
-- `random`, `greedy` — report baselines. Greedy uses a weighted,
-  *decomposed* heuristic (`heuristics.py`): immediate placement points,
-  line progress, floor penalty, first-player token value, end-game bonus
-  potential, and **denial** (taking tiles opponents visibly need). The
-  decomposition doubles as XAI evidence.
-- `minimax` — paranoid depth-limited alpha-beta within the current round
-  (drafting is deterministic between redeals), the third report baseline.
-- `mcts` — PUCT search: priors from a heuristic softmax, determinized
-  redeals at round boundaries, epsilon-greedy rollouts, `tanh`-normalized
-  leaf evaluation.
-- `mcts_profiled` — the same search with the report's core idea: at
-  opponent decision nodes the prior is blended 70/30 with the **Profiler's
-  predicted move distribution**, so search effort concentrates on futures
-  the *actual* opponent is likely to create.
+## Design principles
 
-### Profiler (`profiler/`)
-- `features.py` — per-move features and per-player trait accumulation
-  (color bias, center/floor rates, completion rate, denial, risk, tempo).
-- `archetypes.py` — 5 named archetypes (aggressive_blocker,
-  cautious_optimizer, set_collector, greedy_scorer, risk_taker) via
-  similarity to trait signatures, plus a pure-Python k-means for offline
-  archetype discovery. (Deliverable: 3–5 archetypes.)
-- `predictor.py` — opponent modeling: each opponent is a softmax policy
-  over the shared heuristic components with per-player weights learned
-  online (multiplicative-weights updates). Cold start is handled by a
-  population prior blended out as evidence accumulates — the Bayesian
-  prior→posterior transition from the report. (Deliverable: next-move
-  prediction accuracy, benchmarked by `tiles predict-eval` against uniform
-  and static-greedy baselines.)
+1. **The local rules engine is the source of truth.** TILES never asks the
+   website whether a move is legal. A deterministic engine (`core/`) owns
+   legality, scoring and state transitions. In live play the website deals
+   the tiles and keeps the official score, but every move is validated
+   locally before it is sent.
+2. **Agents are interfaces.** Each role sits behind a small contract
+   (`agents/base.py`) and a registry, so a new Tactician or Profiler can be
+   added without touching the pipeline, the server or the web app.
+3. **Explanations come from evidence.** A Tactician must return a search
+   report alongside its move: the candidates it compared, their scores, and
+   the line of play it expected. The Explainer builds its text from that
+   report. It does not invent a justification afterwards.
+4. **Everything can be replayed.** Each turn produces a record with the board
+   before and after, the validation result, the explanation and timings.
+   Moves and rounds are only ever inserted into the database, never edited.
 
-### Explainer (`explainer/`)
-- `templates.py` — deterministic rationale: primary driver (largest
-  weighted heuristic component), margin vs. runner-up, search evidence
-  (simulations, principal variation), profiler evidence (archetype), and
-  concept tags (COMPLETES_LINE, BLOCKS_OPPONENT, FLOOR_SACRIFICE, …).
-- `llm.py` — optional Claude-refined commentary; silently falls back to
-  the template. The LLM is *never* in the decision path.
+## The rules engine (`core/`)
 
-## 4. Rule ingestion (`tiles/rulebook/`)
+| File | What it does |
+|---|---|
+| `state.py` | The board. Built to be copied cheaply during search: each wall is a 25-bit integer and tile pools are five-number colour counts. `to_dict()` gives the readable JSON form used by the database, the Explainer and the web app. |
+| `actions.py` | A move, with a stable numeric ID in a fixed space of 300 (10 sources × 5 colours × 6 destinations). |
+| `rules.py` | Legality as named checks (`wall_slot_open`, `line_color_matches`, `line_has_space`, and so on), scoring, end-of-round wall tiling, floor penalties, end-game bonuses, and `step()`, the single function that advances the game. |
+| `simulator.py` | The random part: drawing from the bag, refilling it, dealing factories. Kept separate so search can re-deal on its own and live play can skip it. |
+| `encode.py` | Flattens the board into a numeric vector for the reinforcement-learning environment. |
 
-The RAG-to-Logic pipeline, sized to this project: `rulebook.md` (English
-rules) → TF-IDF chunk retrieval (`ingest.py`) → structured `RuleSpec`s
-mapping sentences to engine predicates and parameters (`extract.py`,
-deterministic extractor + optional LLM extractor) → `verify.py`, which
-checks every spec **against the engine as ground truth** and reports an
-accuracy score (`tiles verify-rules`). This keeps generative components
-out of the real-time path while still demonstrating rulebook
-understanding — and gives the report its extraction-accuracy benchmark.
+When a move is illegal, the engine says which named check failed. That is what
+the Validator reports.
 
-## 5. Persistence & telemetry
+## The Decision Stack (`agents/` and `orchestration/`)
 
-- `ledger/store.py` — append-only SQLite (WAL): sessions, moves
-  (full `TurnRecord` JSON), rounds, profiles. Powers replay, export,
-  profiling datasets, and future RL training data.
-- `telemetry/` — MLflow when installed, JSONL otherwise; used by the
-  ablation study.
-- `sim/` — `match.py` (local games through the TurnPipeline),
-  `tournament.py` (round-robin + Elo), `ablation.py` (greedy vs mcts vs
-  mcts_profiled against a fixed blocker opponent — isolates the Profiler's
-  win-rate contribution), `prediction_eval.py` (opponent-model accuracy).
+The turn pipeline (`orchestration/turn_graph.py`) runs the agents in a fixed
+order. It is plain Python with no agent framework and no language model in the
+decision path.
 
-## 6. Interfaces and how the two engines fit together
+```mermaid
+flowchart LR
+    sense["Sense<br/>copy the board,<br/>list legal moves"] --> profile["Profile<br/>fetch opponent profiles<br/>and predictions"]
+    profile --> decide["Decide<br/>Tactician picks a move"]
+    decide --> validate{"Validate<br/>is it legal?"}
+    validate -- "yes" --> execute["Execute<br/>apply the move"]
+    validate -- "no, first try" --> decide
+    validate -- "no, second try" --> fallback["Fall back<br/>to the best<br/>heuristic move"]
+    fallback --> execute
+    execute --> observe["Observe<br/>Profiler learns<br/>from the move"]
+    observe --> explain["Explain<br/>rationale and<br/>concept tags"]
+    explain --> record["Record<br/>the turn"]
+```
 
-TILES has two rules engines on purpose, joined by a bridge:
+The pipeline exposes this in two halves so live play can put the website in the
+middle: `propose()` covers sense to validate, and `conclude()` covers observe
+to record. `run_turn()` does both, with the move applied in between, for local
+games.
 
-- `tiles/azul/` + `tiles/engine/` + `tiles/routers/` + `tiles/main.py` — the **live runtime**. FastAPI
-  (`main.py`, `routers/`) runs one Playwright Chromium bot per player against buddyboardgames.com. The site is
-  authoritative for dealing and scores: the engine reads its WebSocket state (JSON `{type, payload}` frames;
-  the DOM parser is only a fallback), picks a move, and sends the two-step `chooseTiles`/`placeTiles`
-  protocol. Everything the UI shows (monitor, replay, explanations, profiles, ratings) is served from here.
-  `tiles/ml/` holds the Machine Players that work directly on `GameStateData` (heuristics, minimax, UCT MCTS,
-  rollout, TD, sequence profiler, opponent model, Elo, GA tuning).
-- `tiles/core/` + `tiles/agents/` + `tiles/orchestration/` + `tiles/sim/` + `tiles/rl/` — the **Decision Stack**
-  described above on the fast bit-packed engine: PUCT MCTS with profiler priors, minimax, the opponent-move
-  predictor, template/LLM explainer, ledger, turn pipeline, tournaments, ablation study and the PettingZoo env.
-- `tiles/bridge.py` converts `GameStateData`/`GameAction` to and from `core.GameState`/`Action`, and wraps a core
-  Tactician as a live `MachinePlayer` (`TilesMinimax`, `TilesMCTS`, `TilesProfiledMCTS`). `tests/test_bridge.py`
-  replays random full 2-4 player games through both engines and asserts identical legal moves every turn and
-  identical scores after every round and at game end, so the engines cannot drift apart unnoticed.
-- `tiles/rulebook/` and `tiles/rules_ingest/` are two independent rule-ingestion pipelines (see the README).
-- `frontend/` — React + TypeScript + Zustand: session config, live monitor, round-grouped move log, replay with
-  playback controls, profile analysis, explanation rating widget.
-- `tiles/rl/azul_env.py` — PettingZoo AEC environment with action masks.
+### Validator (`agents/validator.py`)
 
-## 7. Extending TILES
+A thin layer over the rules engine. It lists the legal moves for the current
+board, checks each proposed move, and keeps an audit trail of every check. If
+the Tactician proposes an illegal move, the pipeline asks it once more; if the
+second proposal is also illegal, the pipeline takes the top-ranked heuristic
+move instead. An illegal move cannot reach the board.
 
-| To add… | Implement | Register in |
+### Tacticians (`agents/tacticians/`)
+
+| Name | Approach |
+|---|---|
+| `random` | Uniform choice among the legal moves. |
+| `greedy` | Scores each move one step ahead with a weighted heuristic (`heuristics.py`). The components are immediate points, line progress, near-completion, floor penalty, first-player token, end-game bonus potential, and denial (taking tiles an opponent visibly needs). The per-component breakdown is reused as evidence by the Explainer. |
+| `minimax` | Depth-limited alpha-beta search within the current round, treating all opponents as playing against it. Only the most promising moves are explored below the root. |
+| `mcts` | Monte Carlo tree search in the PUCT style. Move priors come from the heuristic, the tiles are re-dealt on each visit when a search path crosses into a new round, and positions are valued by short randomised playouts followed by the heuristic evaluation. |
+| `mcts_profiled` | The same search with one change: at an opponent's turn, the prior is a 70/30 blend of the Profiler's predicted move distribution for that opponent and the heuristic. Search effort goes to the futures this particular opponent is likely to create. Without a Profiler attached it behaves like `mcts`. |
+
+### Profiler (`agents/profiler/`)
+
+| File | What it does |
+|---|---|
+| `features.py` | Turns each observed move into features and accumulates per-player traits: colour bias, how often they take from the centre, how often tiles land on the floor, how often they complete lines, denial, risk, bonus focus, and tempo. |
+| `archetypes.py` | Five named play styles (`aggressive_blocker`, `cautious_optimizer`, `set_collector`, `greedy_scorer`, `risk_taker`). A player is assigned the style whose signature their traits are closest to, with a confidence. Also contains a small k-means implementation used by the archetype-discovery experiment. |
+| `predictor.py` | Predicts an opponent's next move. Each opponent is modelled as weighing the same heuristic components differently, and those weights are adjusted whenever a prediction misses. Early in a game the prediction is blended with a neutral one and that blend fades as moves accumulate. |
+| `basic.py` | The Profiler the app uses, combining the three above. |
+| `analysis.py` | Replays a recorded game through a Profiler after the fact. This powers the Profiles view and `tiles analyze`. |
+
+### Explainer (`agents/explainer/`)
+
+| Name | Approach |
+|---|---|
+| `template` | Deterministic. Names the main driver of the decision (the largest weighted heuristic component), the margin over the runner-up, the search evidence and the opponent's profile, and attaches concept tags: `COMPLETES_LINE`, `BLOCKS_OPPONENT`, `BONUS_SETUP`, `FLOOR_SACRIFICE`, `TAKES_FIRST_PLAYER`, `FORCED`, `ENDGAME`. |
+| `llm` | Produces the template explanation first, then asks Claude to rewrite it in two sentences. If the API key, the package or the call is unavailable, the template text is used unchanged. |
+
+The Explainer runs after the move has been chosen and applied. It never
+influences the decision.
+
+## Running a game
+
+### Local games (`sim/match.py`)
+
+`MatchRunner` deals a new game, then loops: run one turn through the pipeline,
+save the turn record, announce the move and the new board, and, when a round
+ends, save the round result and deal the next round. At the end it saves each
+player's final profile and the result. `sim/` also contains the round-robin
+tournament with Elo ratings, the ablation study and the Profiler's
+prediction-accuracy evaluation, all built on the same runner.
+
+### Live games (`engine/`)
+
+| File | What it does |
+|---|---|
+| `protocol.py` | Everything known about the site's message format: frame parsing, message types, payload builders, and how a room join link is built. |
+| `browser_seat.py` | One Chromium browser for one bot. It joins the room, listens to the page's WebSocket, and sends moves through it. |
+| `state_translator.py` | Converts the site's game object into the local engine's board and back, and infers which move another player made by comparing two successive boards. |
+| `dom_snapshot.py` | Reads the board from the page itself. Used only as a fallback when the WebSocket state is not available. |
+| `live_session.py` | The game loop that ties these together. |
+
+```mermaid
+sequenceDiagram
+    participant S as LiveSession
+    participant B as BrowserSeat (one per bot)
+    participant W as buddyboardgames.com
+    participant P as Turn pipeline
+    participant L as Ledger
+
+    S->>B: launch Chromium and open the game page
+    B->>W: joinRoom, then createRoom if the room is new
+    Note over S,W: Other bots join. Human seats join from their own browsers using the room link.
+    B->>W: startGame, once every configured seat is in the lobby
+    W-->>B: opening deal (takeTurnResponse with the full game)
+    loop until the game is over
+        S->>S: translate the freshest site state into a local board
+        opt the previous mover was not a bot
+            S->>S: infer their move from the board change
+            S->>P: Profiler observes it
+        end
+        alt it is a bot's turn
+            S->>P: propose (sense, profile, decide, validate)
+            P-->>S: validated move
+            S->>B: emit the move
+            B->>W: takeTurn chooseTiles, then takeTurn placeTiles
+            W-->>B: takeTurnResponse with the updated game
+            S->>P: conclude (observe, explain, build the record)
+            S->>L: save the turn
+        else it is a person's turn
+            S->>B: wait for the next state update
+        end
+        opt the table is empty and the site has not dealt
+            B->>W: takeTurn dealTiles
+        end
+    end
+    S->>L: save final profiles and scores
+```
+
+A few behaviours worth knowing:
+
+- The first bot in the seat list is the host. It creates the room and starts
+  the game.
+- A human seat has no browser on the TILES side. The person opens the room
+  link, types a name and clicks Play. The host waits up to five minutes for
+  the lobby to fill, then starts regardless.
+- If the room name is already in use, the session retries with a new name and
+  reports it.
+- If the site rejects where a bot wanted to place its tiles, the bot places
+  them on the floor instead, and the turn record notes that this happened.
+- A person's moves are inferred and fed to the Profiler, but only bots' turns
+  are written to the move log.
+
+## Persistence (`ledger/`)
+
+One SQLite database, opened in write-ahead mode. By default it is `db/tiles.db`
+relative to wherever the server or command was started; `--db` overrides it.
+
+| Table | Contents |
+|---|---|
+| `sessions` | One row per game: mode (local or live), configuration, status, timestamps, final result. |
+| `moves` | One row per turn, holding the complete turn record as JSON. |
+| `rounds` | One row per completed round: wall tilings, floor penalties, scores, bonuses. |
+| `profiles` | Each player's final profile, saved when the game ends. |
+| `experiments` | One row per experiment run: kind, settings, status, progress, result. |
+
+Moves and rounds are insert-only. Session and experiment rows are updated as
+their status changes, and a session or experiment can be deleted as a whole.
+
+`telemetry/` is separate from the ledger. It gives the ablation study somewhere
+to log runs: MLflow if it is installed, otherwise a local `experiments.jsonl`
+file, or nowhere.
+
+## Experiments (`experiments/`)
+
+`registry.py` lists the eight experiment kinds, each defined in its own file
+under `kinds/` with a parameter schema. `runner.py` validates the parameters,
+runs the experiment on a background thread (or directly, from the command
+line), saves progress and the final result to the ledger, and streams updates
+to the web app. Every experiment returns the same shape of result: a summary,
+metrics, tables and chart series. The web app generates each experiment's form
+from its parameter schema, so a new experiment needs no frontend work.
+
+What each experiment measures is described in
+[EVALUATION.md](EVALUATION.md).
+
+## Rule extraction (`rulebook/`)
+
+This shows that the rules can be read out of the English rulebook, without
+putting a language model anywhere near real-time play.
+
+```mermaid
+flowchart LR
+    book["rulebook.md<br/>the rules in English"] --> index["Index<br/>split into passages,<br/>rank with TF-IDF"]
+    index --> extract["Extract<br/>turn passages into<br/>structured rules"]
+    extract --> verify["Verify<br/>check each rule against<br/>the rules engine"]
+    verify --> report["Report<br/>accuracy and per-rule status"]
+```
+
+`ingest.py` builds the searchable index, `extract.py` produces structured rules
+(with a deterministic extractor and an optional Claude-based one), and
+`verify.py` checks every extracted rule against `core/`, either by comparing
+constants or by probing the engine's behaviour. The extracted rules are checked
+against the engine; they are never fed back into it. This is what the Rulebook
+view, `tiles verify-rules` and the `rule_extraction` experiment show.
+
+## The API server and web app
+
+`server/app.py` builds the FastAPI application. `server/sessions.py` holds the
+session manager, which keeps running games in memory, starts each one on its
+own worker thread, and fans events out to WebSocket subscribers. The routers in
+`server/routers/` are thin: they validate input and call the session manager,
+the experiment manager or the ledger. If a built web app is present, the server
+also serves it.
+
+Because running games are held in memory, a server restart loses them. Recorded
+history is unaffected.
+
+The web app (`frontend/`) is a React and TypeScript single-page app with no
+other runtime dependencies. It reads state over REST and follows live games and
+experiments over WebSockets, with polling every few seconds as a backstop. Endpoint details are in [API.md](API.md).
+
+## Reinforcement-learning environment (`rl/`)
+
+`rl/azul_env.py` wraps the rules engine as a PettingZoo environment with a
+300-entry action mask, so standard multi-agent RL libraries can train on it.
+Rewards are the score change when a round is resolved, plus a win or loss bonus
+at the end. Nothing in the app uses it; it is there for future training work.
+
+## The second implementation
+
+The package contains two independent implementations that grew on separate
+branches and were merged. Everything above describes the first, which is what
+`tiles serve` runs. The second is still present and still tested.
+
+```mermaid
+flowchart LR
+    subgraph served["What tiles serve runs"]
+        s_api["server/"] --> s_stack["orchestration/ and agents/"]
+        s_live["engine/live_session.py"] --> s_stack
+        s_stack --> s_core["core/"]
+        s_api --> s_ledger["ledger/"]
+    end
+    subgraph second["Second implementation"]
+        m_api["main.py and routers/"] --> m_ml["ml/ player library"]
+        m_live["engine/play_engine.py"] --> m_ml
+        scripts["backend/scripts/"] --> m_ml
+        m_ml --> m_azul["azul/ rules engine"]
+        m_api --> m_db["models/"]
+    end
+    m_ml -- "bridge.py" --> s_stack
+```
+
+| Concern | What `tiles serve` runs | Second implementation |
 |---|---|---|
-| a new Tactician (e.g. RL policy) | `Tactician.decide()` returning a `SearchReport` | `agents/tacticians/__init__.py` |
-| a new Profiler (e.g. transformer) | `Profiler.observe/profile/predict` | `agents/profiler/__init__.py` |
-| a new Explainer | `Explainer.explain` | `agents/explainer/__init__.py` |
-| a new game | a new `core/`-equivalent + translator | session config `mode` |
+| Rules engine | `core/` | `azul/` |
+| Players | five Tacticians in `agents/tacticians/` | a registry of players in `ml/`, including rollout, minimax, MCTS, adaptive and TD-learning players, plus externally hosted models |
+| Profiling | `agents/profiler/` | `ml/opponent_model.py`, `ml/archetypes.py`, `ml/sequence_profiler.py`, `ml/analyzers.py` |
+| Explanations | `agents/explainer/` | `explain/` |
+| Database | `ledger/` | `models/` (SQLAlchemy) |
+| API | `server/` | `main.py`, `routers/`, with `auth.py` and `validation.py` |
+| Live play | `engine/live_session.py`, `browser_seat.py`, `protocol.py`, `state_translator.py`, `dom_snapshot.py` | `engine/play_engine.py`, `state_parser.py`, `action_executor.py`, `human_tracker.py` |
+| Rule ingestion | `rulebook/` | `rules_ingest/`, reading `docs/rules/azul_rules.md` |
+| Experiment tracking | `telemetry/` | `tracking.py` |
+
+Things to know about the second implementation:
+
+- It is started with `uvicorn tiles.main:app`, which is what
+  `backend/Dockerfile` does. Nothing else in the repository launches it, and
+  the web app in `frontend/` does not work against it.
+- The scripts in `backend/scripts/` and the trained files in `backend/models/`
+  belong to it. The measured results in [EVALUATION.md](EVALUATION.md) were
+  produced with those scripts.
+- `bridge.py` connects the two in one direction. It converts boards and moves
+  between the two rules engines and wraps three of the Tacticians above as
+  players in the second implementation's registry (`TilesMinimax`,
+  `TilesMCTS`, `TilesProfiledMCTS`). `tests/test_bridge.py` plays full games
+  through both engines and checks they agree on legal moves and scores.
+- The two databases both have tables named `sessions` and `moves` with
+  different columns. They use different files by default; do not point them
+  at the same one.
+
+## Extending TILES
+
+| To add | Write | Register it in |
+|---|---|---|
+| A Tactician | A class with `decide()` that returns a move and a search report | `agents/tacticians/__init__.py`, and describe it in `agents/catalog.py` so the web app can show it |
+| A Profiler | A class with `observe()`, `profile()` and `predict()` | `agents/profiler/__init__.py` and `agents/catalog.py` |
+| An Explainer | A class with `explain()` | `agents/explainer/__init__.py` and `agents/catalog.py` |
+| An experiment | A file in `experiments/kinds/` with a parameter schema and a `run()` | `experiments/registry.py` |

@@ -1,14 +1,65 @@
-# TILES: Evaluation
+# TILES evaluation
+
+This document has two parts.
+
+- **Part 1** describes the eight experiments built into the app. You can run
+  them yourself from the Experiments view or with the `tiles` command.
+- **Part 2** records results the team has already measured with the standalone
+  scripts in `backend/scripts/`.
+
+## Part 1: Built-in experiments
+
+Run an experiment from the **Experiments** view in the web app, or from the
+terminal:
+
+```bash
+tiles experiment list
+tiles experiment run profiler_ablation --param games=20 --param simulations=300
+tiles experiment run tournament --param games_per_pair=6 --output elo.json
+```
+
+Each run is saved in the database with its settings, progress and result, so
+it appears in the Experiments view however it was started. A result always has
+the same shape: a short summary, headline metrics, tables and charts. Unknown
+settings are rejected, and `tiles experiment list` prints the settings each
+experiment accepts.
+
+| Experiment | What it measures | Settings (default) |
+|---|---|---|
+| `profiler_ablation` | Win rate, score margin and decision time of `greedy`, `mcts` and `mcts_profiled` against a fixed opponent that plays to block, with seats alternating. Reports how much profiling adds to the tree search. | `games` (6), `simulations` (100), `seed` (0), `tracker` (`null`; also `jsonl`, `mlflow`, `auto`) |
+| `prediction_accuracy` | How often the Profiler's top prediction, and its top three, contain the opponent's actual next move, against a fixed-heuristic baseline and a uniform one, split into early, middle and late game. | `games` (10), `seed` (0) |
+| `archetype_discovery` | Whether clustering, and the Profiler's own classifier, can recover five differently weighted play styles from their games. Reports cluster purity and a confusion table. | `games_per_preset` (3), `seed` (0), `k` (5) |
+| `tournament` | An Elo ladder and a head-to-head win matrix between Tacticians, in two-player games with seats alternating. | `games_per_pair` (2), `simulations` (100), `seed` (0), `entrants` (`random,greedy,minimax,mcts,mcts_profiled`) |
+| `search_budget_sweep` | Win rate, margin and decision time of `mcts` against `greedy` as the number of simulations grows. | `budgets` (`25,50,100,200`), `games_per_budget` (4), `seed` (0) |
+| `rule_extraction` | How many rules extracted from the rulebook text match the rules engine. | `extractor` (`deterministic`; also `llm`) |
+| `latency_profile` | Median, 90th-percentile and maximum time for each pipeline step (decide, validate, explain, total) per Tactician. It reads games already in the database, so play some first. | `tactician` (blank for all) |
+| `xai_coverage` | The share of recorded moves that have an explanation, how often each concept tag appears, and whether the stated main reason matches the evidence. It also reads games already in the database. | `tactician` (reserved, currently ignored) |
+
+Four commands give a quicker, terminal-only version that prints its result
+instead of saving it to the database: `tiles ablate`, `tiles tournament`,
+`tiles predict-eval` and `tiles verify-rules`.
+
+## Part 2: Recorded results
+
+The results below were produced with the scripts in `backend/scripts/`. Those
+scripts use the second implementation described in
+[ARCHITECTURE.md](ARCHITECTURE.md): its rules engine (`backend/tiles/azul/`)
+and its player library (`backend/tiles/ml/`). Player names such as
+`GreedyPlayer`, `RolloutPlayer`, `MinimaxPlayer` and `MCTSPlayer` come from
+that library and are not the Tacticians you pick in the web app. Section 18
+compares the two directly.
+
+Run the scripts from the `backend/` folder with the backend environment active.
 
 All results come from the simulation engine (`backend/tiles/azul/game.py`), are seeded, and can be regenerated with the commands shown. Numbers are from the runs recorded here; re-running with the same seed and code gives the same output.
 
 **Scope of these results.** They describe bots playing bots in simulation. They do not measure play against humans or on the live platform, and the archetype classifier has never been tested on human games.
 
-## 1. Simulation validity
+### 1. Simulation validity
 
 `backend/tests/test_game_engine.py` checks the engine's invariants: factories are dealt correctly, the first-player token counts towards the floor and its holder starts the next round, the same seed gives the same game, and **all 100 tiles are accounted for after every move** in full 2-, 3- and 4-player games.
 
-## 2. Heuristic player vs random baseline
+### 2. Heuristic player vs random baseline
 
 `python scripts/tournament.py --games 100 --seed 1`
 
@@ -20,7 +71,7 @@ All results come from the simulation engine (`backend/tiles/azul/game.py`), are 
 
 An earlier version of the player had a tile-counting bug (factory picks were counted as 0 tiles); it is fixed and covered by regression tests.
 
-## 3. Identifying play-style archetypes
+### 3. Identifying play-style archetypes
 
 Five styles are generated by weighting the same heuristic differently: balanced (`GreedyPlayer`), `ColorCollectorPlayer`, `RusherPlayer`, `RecklessPlayer`, `BlockerPlayer`. Each game yields one 10-feature behaviour vector per player (colour concentration, centre share, floor share, mean row, overflow rate, block rate, first-player-token rate, pick size, small-row share, repeat-colour rate), extracted from the same move format the live ledger uses.
 
@@ -43,7 +94,7 @@ Held-out confusion (rows = true style, columns = predicted):
 
 Reading it: Reckless and Blocker are recognised well; the balanced baseline and Rusher are frequently confused with each other. Unsupervised clustering does **not** recover the styles from one game's worth of moves, which is why identification uses a supervised classifier whose per-feature contributions double as the explanation shown in the UI.
 
-## 4. Does adapting to the opponent help?
+### 4. Does adapting to the opponent help?
 
 `AdaptivePlayer` observes opponent moves, and once it has seen 6 of them classifies the opponent and switches to the weights that did best against that style. The best-response table was learned on deals from seed 21 (`scripts/best_response.py --games 100 --seed 21`, 200 games per cell):
 
@@ -75,7 +126,7 @@ Findings and caveats:
 - Against Greedy the adaptive player does not realise the 0.62 that always playing Blocker would give. Likely causes (not isolated): the first 6 opponent moves are played as Balanced, and the classifier confuses Greedy with other styles.
 - The opponents are the same five bot styles the classifier was trained on, so this is an in-distribution test.
 
-## 5. Lookahead player (`RolloutPlayer`)
+### 5. Lookahead player (`RolloutPlayer`)
 
 `GreedyPlayer` only reasons about the current move. `RolloutPlayer` shortlists the heuristic's best moves, then simulates the rest of the round for each (everyone moving by the heuristic, with some randomness), applies wall tiling and floor penalties, and values the result as *my score + board potential - 0.4 x opponents' score + potential*. Within a round every tile is visible, so the simulation is exact apart from the opponent's choices.
 
@@ -100,7 +151,7 @@ Decision time is about 0.1-0.3 s; live moves averaged 200-440 ms including the r
 
 The default is 0.4: it keeps the win rate against Greedy and scores about twice as much in mirror matches. The sample is small (16 games per cell), so treat the exact optimum loosely. Other value-function and search-size variants (more rollouts, less exploration noise, larger bonus or line-progress weights) were all within noise of the default, so it sits on a plateau. Two-player mirror matches remain low-scoring and high-variance (live: 10-56 points); 3- and 4-player games produce 30-70 per player.
 
-## 6. Opponent modelling inside the search: no measurable benefit
+### 6. Opponent modelling inside the search: no measurable benefit
 
 `AdaptiveRolloutPlayer` simulates each opponent as the archetype the profiler infers (when the classifier's confidence is at least 0.5 and at least 10 opponent moves have been seen), instead of assuming a balanced opponent. `python scripts/evaluate_lookahead.py --games 25 --seed 66` (50 games per row), margin = my score minus the opponent's:
 
@@ -115,16 +166,16 @@ The default is 0.4: it keeps the win rate against Greedy and scores about twice 
 
 Without the confidence gate (30 games per row, seed 55) the mean gain was -1.0, with the largest loss against the Greedy opponent, which the classifier often mislabels. **Conclusion: with a 55%-accurate classifier, plugging inferred archetypes into the search does not help.** `RolloutPlayer` is the recommended default; `AdaptiveRolloutPlayer` is kept as the profile-conditioned variant for future work (a more accurate or human-trained profiler might change this).
 
-## 7. Live platform verification
+### 7. Live platform verification
 
-The same engine was run on buddyboardgames.com through the production path (API -> browsers -> platform) in headless mode. Recorded games are in [`docs/evidence/`](evidence/): each JSON contains every move, board state, scores, timings and the model's top alternatives.
+The same engine was run on buddyboardgames.com through the second implementation's live path (API -> browsers -> platform) in headless mode.
 
-| Evidence file | Players | Result |
+| Game | Players | Result |
 |---|---|---|
-| `live_game_2p_rollout_vs_greedy.json` | RolloutPlayer vs GreedyPlayer | completed, 5 rounds, 52 moves, 44-30 |
-| `live_game_2p_greedy_vs_blocker.json` | GreedyPlayer vs BlockerPlayer | completed, 5 rounds, 52 moves, 36-50 |
-| `live_game_4p_mixed.json` | Rollout, Greedy, Blocker, Rollout | completed, 5 rounds, 83 moves, 66/51/58/69 |
-| `live_game_4p_core_tacticians.json` | TilesMCTS, TilesProfiledMCTS, Minimax, Greedy (after the stage-2 merge) | completed, 67/44/58/59, TilesMCTS wins |
+| 2 players | RolloutPlayer vs GreedyPlayer | completed, 5 rounds, 52 moves, 44-30 |
+| 2 players | GreedyPlayer vs BlockerPlayer | completed, 5 rounds, 52 moves, 36-50 |
+| 4 players | Rollout, Greedy, Blocker, Rollout | completed, 5 rounds, 83 moves, 66/51/58/69 |
+| 4 players | TilesMCTS, TilesProfiledMCTS, Minimax, Greedy | completed, 67/44/58/59, TilesMCTS wins |
 
 After the final fixes, 7 consecutive live games (3 four-player, 4 two-player) completed with no errors, no warnings and no floor fallbacks, at roughly 300-440 ms per move. Final scores in the ledger were checked against the platform's own final message (they match).
 
@@ -138,11 +189,11 @@ Running live exposed defects that no offline test could, all now fixed and cover
 6. **Page load timed out** waiting for "network idle", which this site never reaches; loading is now retried.
 7. **Live state never reached the browser UI** (a timestamp that could not be serialised killed the WebSocket); fixed.
 
-**Human slot (outside client).** A session with one bot and one `human` slot was run live in Docker four times (`backend/scripts/live_human_join_check.py`). The "human" is a separate Chromium browser that joins the room by name and plays random legal moves, so this tests the host waiting for an outside player, starting once it has joined, alternating turns with it, and ledger recording; it does **not** test a real person's clicking or timing. All four games completed. Because TILES does not control the human, its moves are inferred from the board by matching legal moves against what appeared (including the last move of a round or the game, where the platform already shows the scored board): in the last run 28 of the outside client's 29 moves were recorded, with no inference failures logged (the first run, before the round-end rule was added, recorded 24 of 27; a later run with `TilesMCTS` as the bot recorded 25 of 26). The recorded game is `docs/evidence/live_game_2p_bot_vs_outside_client.json`. The profilers then analyse the human's moves like any other player's. A random-play stand-in was labelled ColorCollectorPlayer by the archetype classifier, which is a reminder that archetype labels on unseen play are hypotheses (section 3).
+**Human slot (outside client).** A session with one bot and one `human` slot was run live in Docker four times (`backend/scripts/live_human_join_check.py`). The "human" is a separate Chromium browser that joins the room by name and plays random legal moves, so this tests the host waiting for an outside player, starting once it has joined, alternating turns with it, and ledger recording; it does **not** test a real person's clicking or timing. All four games completed. Because TILES does not control the human, its moves are inferred from the board by matching legal moves against what appeared (including the last move of a round or the game, where the platform already shows the scored board): in the last run 28 of the outside client's 29 moves were recorded, with no inference failures logged (the first run, before the round-end rule was added, recorded 24 of 27; a later run with `TilesMCTS` as the bot recorded 25 of 26). The profilers then analyse the human's moves like any other player's. A random-play stand-in was labelled ColorCollectorPlayer by the archetype classifier, which is a reminder that archetype labels on unseen play are hypotheses (section 3).
 
-Before fix 5, four consecutive four-player attempts aborted. The platform is third-party and changed once already; its message format is an external dependency (see README, limitations).
+Before fix 5, four consecutive four-player attempts aborted. The platform is third-party and changed once already; its message format is an external dependency (see *Good to know* in the README).
 
-## 8. Search players: minimax and MCTS
+### 8. Search players: minimax and MCTS
 
 `MinimaxPlayer` is a depth-limited alpha-beta search over the exact within-round game tree (beam of the 5 best moves per ply plus the best floor dump, greedy playouts at the depth limit). `MCTSPlayer` is UCT over the same tree with greedy playouts. Both value a position as *my score + board potential - w x opponents' score + potential*.
 
@@ -178,7 +229,7 @@ Depth 2 was clearly weaker (0.57 against Rollout); depth 4 with a narrower beam 
 
 Minimax and MCTS are statistically indistinguishable; both clearly beat the one-ply heuristics. Live, in Docker, Minimax-vs-Minimax finished 48-51 (a realistic game) and Minimax won a 4-player game 84-48-55-38.
 
-## 9. Profiler conditioning of the search
+### 9. Profiler conditioning of the search
 
 `ConditionedMCTSPlayer` and `ConditionedMinimaxPlayer` keep an opponent model per opponent (section 10) and, once it is confident (>= 6 observed moves, posterior >= 0.5), simulate / order that opponent's replies with the inferred style instead of the generic heuristic. `python scripts/evaluate_mcts.py --games 8 --seed 41`, margin against each opponent style (32 games per row):
 
@@ -193,7 +244,7 @@ Minimax and MCTS are statistically indistinguishable; both clearly beat the one-
 
 The mean gain is small and the per-row samples are small, so this is a weak positive effect, not a proven one (win rates were equal or lower for conditioned MCTS against three of five styles). The conditioned Minimax player is implemented and unit-tested; its strength against plain Minimax has not been measured.
 
-## 10. Opponent model: next-move prediction
+### 10. Opponent model: next-move prediction
 
 `OpponentModel` keeps a likelihood for each of 8 play styles from the moves observed so far and predicts the next move as the posterior-weighted mixture of the styles' softmax move distributions. `python scripts/evaluate_opponent_model.py --games 12 --seed 5` (about 240 predicted moves per row, after a 6-move warm-up; the model predicts each move before seeing it):
 
@@ -209,7 +260,7 @@ The mean gain is small and the per-row samples are small, so this is a weak posi
 
 For opponents that play like one of its styles the model predicts the exact next move 81-98% of the time (chance is about 18%) and beats a fixed heuristic when the opponent is not the balanced style. **For lookahead players, which are not in its library, it is no better than the fixed heuristic.** Human opponents are untested.
 
-## 11. Sequence-model profiler
+### 11. Sequence-model profiler
 
 A Transformer encoder (2 layers, 4 heads, width 48) or a GRU reads a player's move sequence (18 features per move) and predicts the style archetype. Training used random prefix truncation. `python scripts/train_sequence_profiler.py --games 1500 --seed 7` (2100 training, 450 validation, 450 held-out player-games; chance 20%):
 
@@ -219,9 +270,9 @@ A Transformer encoder (2 layers, 4 heads, width 48) or a GRU reads a player's mo
 | **Transformer** | **68.7%** | 70.0% | 73.8% | **78.0%** |
 | GRU | 65.1% | 72.0% | 74.7% | 77.6% |
 
-The sequence models beat the aggregate-feature classifier by about 17 points and can identify a style from the first 5 moves almost as well as the feature classifier does from a whole game. Unsupervised k-means clustering (section 3) did not separate the styles, so supervised models are used. Reasons for a label come from input-gradient saliency (which per-move features drove it). Trained on simulated bot play only; labels on human games are hypotheses. Both analyzers are available in the UI (`ArchetypeProfileAnalyzer`, `SequenceProfileAnalyzer`).
+The sequence models beat the aggregate-feature classifier by about 17 points and can identify a style from the first 5 moves almost as well as the feature classifier does from a whole game. Unsupervised k-means clustering (section 3) did not separate the styles, so supervised models are used. Reasons for a label come from input-gradient saliency (which per-move features drove it). Trained on simulated bot play only; labels on human games are hypotheses. Both are registered as analyzers in `backend/tiles/ml/analyzers.py` (`ArchetypeProfileAnalyzer`, `SequenceProfileAnalyzer`).
 
-## 12. Reinforcement learning (TD(0))
+### 12. Reinforcement learning (TD(0))
 
 `TDPlayer` learns a linear value function over after-states by TD(0) self-play (12 features: score margin, pending line points, floor cost, board structure, ...; reward = change in score margin plus the final result). `python scripts/train_td.py --games 800 --seed 3 --eval-games 60`:
 
@@ -232,7 +283,7 @@ The sequence models beat the aggregate-feature classifier by about 17 points and
 
 Learning from zero knowledge, with no hand-written move scoring, the player reaches roughly parity with the hand-tuned heuristic but does not surpass it. Learned weights (positive = good for the mover): wall tiles +0.31, floor cost +0.29, pending line points +0.27, score margin +0.16, colour / column / row structure +0.10 / +0.08 / +0.07, line progress -0.14 (it prefers completing lines to partly filling many). The mean absolute TD error settled at about 0.05 after the first 100 games. A one-step linear value function is the limit here; combining the learned value with search is the obvious next step and was not done.
 
-## 13. Genetic-algorithm weight tuning
+### 13. Genetic-algorithm weight tuning
 
 `python scripts/tune_weights.py --generations 8 --population 16 --seed 5 --validate 60` evolves the nine heuristic weights (fitness = margin against a pool of Greedy, Blocker and Rusher players on shared deals). Best fitness rose from about 13 to 15-16 over 8 generations and the population mean from 5.5 to 10. The tuned weights (saved to `backend/models/ga_weights.json`) were then evaluated on deals the GA never saw (120 games):
 
@@ -244,9 +295,9 @@ Learning from zero knowledge, with no hand-written move scoring, the player reac
 
 A modest gain: it beats the default weights and Rusher but not Blocker, and the tuned weights lower the end-game bonus term and raise the wall-completion term. The search players of section 8 are far stronger than any retuned one-ply heuristic.
 
-## 14. Rule extraction (rulebook ingestion)
+### 14. Rule extraction (rulebook ingestion)
 
-Pipeline: chunk the rulebook, rank passages per rule with TF-IDF, parse them into a structured rule set (16 fields: tile counts, factory counts per player count, pattern-line sizes, floor penalties, bonuses, wall layout, end trigger, token rules, scoring rules), verify against the engine, and build a `RulesConfig` that drives the validator and simulator. `python scripts/rule_extraction_benchmark.py --count 100 --seed 1`.
+Pipeline: chunk the rulebook, rank passages per rule with TF-IDF, parse them into a structured rule set (16 fields: tile counts, factory counts per player count, pattern-line sizes, floor penalties, bonuses, wall layout, end trigger, token rules, scoring rules), verify against the engine, and build a `RulesConfig` that the `azul` rules engine can play from. `python scripts/rule_extraction_benchmark.py --count 100 --seed 1`.
 
 * **Real corpus** (`docs/rules/azul_rules.md`): 16/16 fields match the engine and the wall layout rebuilds the standard wall. The extracted config plays games **identical** to the built-in rules (same seed, same scores), and a modified rulebook (different floor penalties and factory count) changes the game accordingly.
 * **Generated rulebooks** (randomised parameter values, so memorising the standard numbers cannot help; distractor sentences with unrelated numbers; 100 rulebooks per group, exact match per field):
@@ -259,17 +310,17 @@ Pipeline: chunk the rulebook, rank passages per rule with TF-IDF, parse them int
 
 The honest generalisation estimate is the **fresh first-run figure: about 63% field accuracy, with no rulebook fully correct**. Error analysis (more passages ranked, query synonyms, per-field keyword gates, ordinal and signed-number forms) raised it, but the post-analysis numbers are not independent. Remaining weak fields on the fresh phrasings: floor penalties (64%), row bonus (62%), scoring in both directions (75%). A pluggable `LLMExtractor` that reads the same retrieved passages and returns JSON is wired and unit-tested with a stub; it has **not been benchmarked** (no API key in the development environment), and the rule-based extractor is what the numbers above describe.
 
-## 15. Explainability
+### 15. Explainability
 
-* **Rationales** (`tiles/explain`): each move gets a natural-language rationale and a one-line commentary built from engine-derived facts (tiles taken, line completion and the points it is worth, overflow and floor cost, first-player token, tiles passed to opponents, denial, margin over the next-best option, inferred opponent styles). In live Docker games 51 of 51 moves carried a rationale; they appear in the Game Monitor, the Replay and the export. An optional `LLMExplainer` rewrites the text from the facts only (stub-tested, not run live).
+* **Rationales** (`tiles/explain`): each move gets a natural-language rationale and a one-line commentary built from engine-derived facts (tiles taken, line completion and the points it is worth, overflow and floor cost, first-player token, tiles passed to opponents, denial, margin over the next-best option, inferred opponent styles). In live Docker games 51 of 51 moves carried a rationale; they are stored with each move in that implementation's database. An optional `LLMExplainer` rewrites the text from the facts only (stub-tested, not run live).
 * **Faithfulness** (`tests/test_explainer.py`): over more than 1,500 simulated positions every claim is re-derived by *simulating the move in the game engine* (tiles removed, line completed, floor spill, token, and the exact points awarded when the engine scores the round). All claims matched.
-* **Human-centred evaluation:** the instrument is built (1-5 ratings of understandable / useful / trustworthy per explained move, comment, per-model and overall statistics with 95% CIs, a text-vs-scores-only control condition at `?explain=scores`; see [HUMAN_EVALUATION_PROTOCOL.md](HUMAN_EVALUATION_PROTOCOL.md)). **No participant ratings have been collected**; this study has to be run by the team.
+* **Human-centred evaluation:** the instrument is built into the second API (1-5 ratings of understandable / useful / trustworthy per explained move, a comment, and per-model and overall statistics with 95% CIs, through `/api/feedback` and `scripts/analyze_feedback.py`). **No participant ratings have been collected**; this study has to be run by the team.
 
-## 16. Experiment tracking (MLflow)
+### 16. Experiment tracking (MLflow)
 
-Every finished live game is logged to MLflow automatically (configuration, final scores, winning margin, per-model decision latency, per-move decision / click / websocket-wait / total ms, floor-fallback count, the full move ledger as an artifact), and the evaluation scripts log with `--mlflow` (tournaments, Elo, GA tuning, RL training). The store is a SQLite database (`mlruns/mlflow.db`; MLflow 3 no longer supports its plain file store). Tracking is optional and can never fail a game. View it with `docker compose --profile tracking up` (http://localhost:5000) or `mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`. Verified in Docker: a finished game appeared as a run with its telemetry.
+Every live game finished through the second API is logged to MLflow automatically (configuration, final scores, winning margin, per-model decision latency, per-move decision / click / websocket-wait / total ms, floor-fallback count, the full move ledger as an artifact), and the evaluation scripts log with `--mlflow` (tournaments, Elo, GA tuning, RL training). The store is a SQLite database (`mlruns/mlflow.db`; MLflow 3 no longer supports its plain file store). Tracking is optional and can never fail a game. View it with `mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`. Verified in Docker: a finished game appeared as a run with its telemetry.
 
-## 17. Not evaluated
+### 17. Not evaluated
 
 - Play against human opponents, and archetype / sequence-model labels on human games.
 - The human-centred study of explanation quality (instrument ready, no data).
@@ -278,9 +329,9 @@ Every finished live game is logged to MLflow automatically (configuration, final
 - Strength of the conditioned Minimax player against plain Minimax.
 - Headed (visible-window) mode and long-running stability beyond the live games listed in section 7.
 
-## 18. Stage-2 Decision Stack vs the original search players
+### 18. The app's Tacticians vs the second implementation's search players
 
-The teammate's branch brought its own search players (`tiles/agents/tacticians`: PUCT MCTS, optionally biased by a learned next-move predictor, and a paranoid minimax) running on the bit-packed core engine. They play live through `tiles/bridge.py` (`TilesMCTS`, `TilesProfiledMCTS`, `TilesMinimax`) and were compared with the original `MinimaxPlayer` and `MCTSPlayer` in the same simulation, same deals, both seats (`scripts/elo_tournament.py`). Before comparing, the two rules engines were checked against each other: `tests/test_bridge.py` plays random 2-4 player games through both and finds identical legal moves on every turn and identical scores after every round and at the end.
+The app's Tacticians (`tiles/agents/tacticians`: PUCT MCTS, optionally biased by a learned next-move predictor, and a paranoid minimax) run on the `core` rules engine. Through `tiles/bridge.py` they are available to the scripts as `TilesMCTS`, `TilesProfiledMCTS` and `TilesMinimax`, and were compared with the second implementation's own `MinimaxPlayer` and `MCTSPlayer` ("the original" players below) in the same simulation, same deals, both seats (`scripts/elo_tournament.py`). Before comparing, the two rules engines were checked against each other: `tests/test_bridge.py` plays random 2-4 player games through both and finds identical legal moves on every turn and identical scores after every round and at the end.
 
 **Six players, 6 deals per pair (12 games per pair, 180 games):**
 
@@ -306,8 +357,8 @@ Elo: TilesMCTS 1603, TilesProfiledMCTS 1586, MinimaxPlayer 1409, MCTSPlayer 1402
 
 Findings, with their limits:
 
-* **The stage-2 PUCT MCTS is the strongest player in the repository.** It beats the original Minimax 81% and the original MCTS 75% over 40 games each (a 95% interval on 40 games is roughly +/-15 points, so both margins are clearly above 50%). It is therefore the default player in the UI. The first, smaller run (12 games per pair) showed the same ordering with a 67% lead, which on its own was within noise; the larger run is what settles it. Mean scores are about equal (51 vs 52), so it wins more games rather than scoring more points.
+* **The app's PUCT MCTS is the strongest player in the repository.** It beats the original Minimax 81% and the original MCTS 75% over 40 games each (a 95% interval on 40 games is roughly +/-15 points, so both margins are clearly above 50%). The first, smaller run (12 games per pair) showed the same ordering with a 67% lead, which on its own was within noise; the larger run is what settles it. Mean scores are about equal (51 vs 52), so it wins more games rather than scoring more points.
 * **Profiler priors do not help it.** TilesProfiledMCTS against TilesMCTS is 51-49 over 40 games, i.e. no measurable effect, consistent with the small effect found for the original conditioned search (section 9). The opponents in this test are fixed-algorithm bots, which the predictor can only partly model; whether it helps against humans is untested.
-* **The stage-2 minimax is the weakest search player** (Elo 1359, 17% against the original Minimax); the original alpha-beta stays in the product as `MinimaxPlayer`.
+* **The app's minimax is the weakest search player** (Elo 1359, 17% against the original Minimax).
 * Decision time in live games: about 0.6 s per move for the profiled MCTS (max 1.2 s), about 0.04 s for TilesMinimax, against a 10 s move limit.
 * One live game in Docker, `TilesProfiledMCTS` vs `TilesMinimax`, completed without errors (51-13, 50 moves).
