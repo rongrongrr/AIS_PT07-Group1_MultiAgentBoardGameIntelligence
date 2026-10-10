@@ -85,7 +85,7 @@ class _Node:
         self.priors: List[float] = []
         self.edge_n: List[int] = []
         self.edge_w: List[float] = []
-        self.children: List[Optional["_Node"]] = []
+        self.children: List[Optional[_Node]] = []
         self.visits = 0
 
 

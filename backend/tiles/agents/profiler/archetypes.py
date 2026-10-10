@@ -204,7 +204,7 @@ class KMeans:
         k: int,
         seed: int = 0,
         iters: int = 100,
-    ) -> "KMeans":
+    ) -> KMeans:
         if not vectors or k <= 0:
             raise ValueError("need at least one vector and k >= 1")
         k = min(k, len(vectors))

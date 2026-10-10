@@ -12,7 +12,6 @@ from typing import Dict, List, Tuple
 
 from tiles.core import (
     FLOOR_PENALTIES,
-    NUM_COLORS,
     Action,
     GameState,
     end_game_bonuses,

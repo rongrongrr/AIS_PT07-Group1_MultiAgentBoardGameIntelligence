@@ -286,16 +286,13 @@ def cmd_verify_rules(_args: argparse.Namespace) -> int:
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
+    import os
+
     import uvicorn
 
-    from tiles.server.app import create_app
-
-    uvicorn.run(
-        create_app(db_path=args.db),
-        host=args.host,
-        port=args.port,
-        log_level="info",
-    )
+    if args.db:
+        os.environ["TILES_DB_PATH"] = args.db  # read by tiles.models.db at import time
+    uvicorn.run("tiles.main:app", host=args.host, port=args.port, log_level="info")
     return 0
 
 
@@ -375,7 +372,7 @@ def main(argv=None) -> int:
     p = sub.add_parser("serve", help="start the API server")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8000)
-    p.add_argument("--db", default="db/tiles.db")
+    p.add_argument("--db", default=None, help="SQLite path (default: $TILES_DB_PATH or db/tiles.db)")
     p.set_defaults(func=cmd_serve)
 
     args = parser.parse_args(argv)
