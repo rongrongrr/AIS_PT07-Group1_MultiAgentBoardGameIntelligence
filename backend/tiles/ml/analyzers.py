@@ -6,10 +6,9 @@ via the analyzer_registry.
 
 from __future__ import annotations
 
-import json
 import logging
 from abc import ABC, abstractmethod
-from collections import Counter, defaultdict
+from collections import Counter
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)

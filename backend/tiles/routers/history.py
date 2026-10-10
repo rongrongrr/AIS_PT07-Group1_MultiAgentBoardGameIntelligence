@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session as DBSession
 
 from tiles.models.db import GameState, Move, Session, get_db
-from tiles.models.schemas import GameAction, GameHistoryResponse, MoveResponse
+from tiles.models.schemas import GameAction
 
 router = APIRouter()
 

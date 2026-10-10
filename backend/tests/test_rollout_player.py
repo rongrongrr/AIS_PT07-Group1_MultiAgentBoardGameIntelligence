@@ -4,11 +4,11 @@ import asyncio
 
 import pytest
 
-from tiles.azul.game import apply_action, new_game, play_game
+from tiles.azul.game import new_game, play_game
 from tiles.azul.rules import get_legal_actions
 from tiles.ml.adaptive_player import AdaptiveRolloutPlayer
 from tiles.ml.archetypes import Prediction
-from tiles.ml.greedy_player import ARCHETYPES, DEFAULT_WEIGHTS, GreedyPlayer
+from tiles.ml.greedy_player import ARCHETYPES, GreedyPlayer
 from tiles.ml.random_player import RandomPlayer
 from tiles.ml.registry import registry
 from tiles.ml.rollout_player import RolloutPlayer, potential

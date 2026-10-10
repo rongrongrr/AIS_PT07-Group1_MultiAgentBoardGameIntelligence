@@ -4,7 +4,7 @@ from tiles.agents.base import DecisionContext
 from tiles.agents.explainer import make_explainer
 from tiles.agents.explainer.llm import LLMExplainer
 from tiles.agents.tacticians.greedy import GreedyTactician
-from tiles.core import Action, FLOOR, legal_actions, new_game
+from tiles.core import FLOOR, legal_actions, new_game
 
 
 def make_ctx(seed: int = 3):

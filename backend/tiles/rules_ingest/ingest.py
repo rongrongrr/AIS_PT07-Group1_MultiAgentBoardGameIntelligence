@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from tiles.azul.config import DEFAULT_RULES, RulesConfig
+from tiles.azul.config import RulesConfig
 from tiles.rules_ingest.extract import PatternExtractor
 from tiles.rules_ingest.schema import RuleSet, compare, ground_truth, to_config, wall_matches_standard
 

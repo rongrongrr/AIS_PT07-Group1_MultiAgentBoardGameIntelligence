@@ -39,8 +39,8 @@ VALUE_SCALE = 20.0          # leaf values are divided by this so UCB1's constant
 class Node:
     action: Optional[GameAction]
     mover: int                              # who plays at THIS node (the player to move)
-    parent: Optional["Node"] = None
-    children: List["Node"] = field(default_factory=list)
+    parent: Optional[Node] = None
+    children: List[Node] = field(default_factory=list)
     untried: Optional[List[GameAction]] = None
     visits: int = 0
     total: float = 0.0                      # sum of leaf values from the root player's perspective

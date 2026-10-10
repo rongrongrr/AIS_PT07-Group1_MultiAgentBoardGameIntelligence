@@ -1,13 +1,11 @@
 """MLflow tracking: runs are recorded with the right content, and failures never propagate."""
 
-import asyncio
 import json
 
 import pytest
 
 from tiles import tracking
-from tiles.models.db import Move, Session
-from tests.test_orchestration import make_session, run_game, setup
+from tests.test_orchestration import run_game, setup
 
 mlflow = pytest.importorskip("mlflow")
 

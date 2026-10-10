@@ -138,7 +138,7 @@ class CoreTacticianPlayer(MachinePlayer):
     def name(self) -> str:
         return self._name
 
-    def clone(self) -> "CoreTacticianPlayer":
+    def clone(self) -> CoreTacticianPlayer:
         return type(self)(seed=self.seed)
 
     # -- opponent observation (profiler priors) -------------------------------------

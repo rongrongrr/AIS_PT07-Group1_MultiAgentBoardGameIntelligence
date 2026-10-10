@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from tiles.azul.game import GameSim, apply_action, floor_size, round_over, score_round
+from tiles.azul.game import GameSim, apply_action, round_over, score_round
 from tiles.azul.rules import get_legal_actions, wall_column_for_color
 from tiles.ml.greedy_player import DEFAULT_WEIGHTS, GreedyPlayer, Weights, _score_action
 from tiles.models.schemas import GameAction, GameStateData, PlayerState, TileColor

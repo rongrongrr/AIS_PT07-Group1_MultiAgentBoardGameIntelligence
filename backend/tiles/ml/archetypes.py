@@ -198,7 +198,7 @@ class ArchetypeModel:
     # --- training ---
     @classmethod
     def fit(cls, X: np.ndarray, k: int, seed: int = 0, labels: Optional[Sequence[str]] = None,
-            y: Optional[Sequence[str]] = None) -> "ArchetypeModel":
+            y: Optional[Sequence[str]] = None) -> ArchetypeModel:
         """Fit k-means. If ground-truth labels ``y`` are given, each cluster is named by its
         majority label (used for simulated data where the generating archetype is known)."""
         from sklearn.cluster import KMeans
@@ -262,7 +262,7 @@ class ArchetypeClassifier:
         self.classes = list(classes)
 
     @classmethod
-    def fit(cls, X: np.ndarray, y: Sequence[str], C: float = 1.0) -> "ArchetypeClassifier":
+    def fit(cls, X: np.ndarray, y: Sequence[str], C: float = 1.0) -> ArchetypeClassifier:
         from sklearn.linear_model import LogisticRegression
 
         mean, std = X.mean(axis=0), X.std(axis=0)
@@ -304,7 +304,7 @@ class ArchetypeClassifier:
         }, indent=2))
 
     @classmethod
-    def load(cls, path: Path) -> "ArchetypeClassifier":
+    def load(cls, path: Path) -> ArchetypeClassifier:
         d = json.loads(Path(path).read_text())
         if d["feature_names"] != FEATURE_NAMES:
             raise ValueError("Archetype model was trained with different features; retrain it")

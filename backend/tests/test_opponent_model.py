@@ -2,9 +2,8 @@
 
 import asyncio
 
-import pytest
 
-from tiles.azul.game import apply_action, new_game, play_game
+from tiles.azul.game import new_game, play_game
 from tiles.azul.rules import get_legal_actions
 from tiles.ml.greedy_player import ARCHETYPES, BlockerPlayer, GreedyPlayer, RecklessPlayer
 from tiles.ml.opponent_model import STYLE_LIBRARY, OpponentModel, move_distribution
@@ -49,7 +48,7 @@ def test_blocker_is_identified_and_reset_clears_evidence():
     observe_game(BlockerPlayer(), GreedyPlayer(), 4, m)
     assert m.likely_style()[0] == "BlockerPlayer"
     m.reset()
-    assert m.observed == 0 and len(set(round(v, 6) for v in m.posterior().values())) == 1
+    assert m.observed == 0 and len({round(v, 6) for v in m.posterior().values()}) == 1
 
 
 def test_predicts_next_move_better_than_chance():
@@ -69,7 +68,7 @@ def test_predicts_next_move_better_than_chance():
 def test_unobserved_action_does_not_zero_a_style():
     m = OpponentModel()
     sim = new_game(["A", "B"], seed=2)
-    other = [a for a in get_legal_actions(sim.state, 0)][-1]
+    other = list(get_legal_actions(sim.state, 0))[-1]
     m.observe(sim.state, 0, other)
     assert all(v > -50 for v in m.log_lik.values())
     assert set(m.styles) == set(STYLE_LIBRARY)

@@ -1,4 +1,4 @@
-"""Execute Azul game actions via Socket.IO emits through the browser."""
+"""Execute Azul game actions (chooseTiles + placeTiles) by emitting them on the page's own game socket."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ class ExecutionResult:
 
 
 async def execute_action(page, action: GameAction, player_index: int = 0) -> ExecutionResult:
-    """Execute a GameAction by emitting Socket.IO chooseTiles + placeTiles.
+    """Execute a GameAction by emitting chooseTiles + placeTiles on the page's game socket.
 
     Returns True only if BOTH steps succeed on the server.
     """

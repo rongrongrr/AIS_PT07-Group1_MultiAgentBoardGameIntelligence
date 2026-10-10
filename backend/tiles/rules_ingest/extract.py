@@ -435,10 +435,10 @@ class LLMExtractor:
             if name == "factories_by_players" and isinstance(v, dict):
                 v = {int(a): int(b) for a, b in v.items()}
             setattr(rs, name, v)
-        return rs, {t: n for t, n in seen.items()}
+        return rs, dict(seen)
 
 
-def anthropic_complete(model: str = "claude-haiku-4-5", max_tokens: int = 1024) -> Callable[[str, str], str]:
+def anthropic_complete(model: str = "claude-haiku-5-5", max_tokens: int = 1024) -> Callable[[str, str], str]:
     """Build a ``complete`` function backed by the Anthropic API (needs ANTHROPIC_API_KEY)."""
     import anthropic
 

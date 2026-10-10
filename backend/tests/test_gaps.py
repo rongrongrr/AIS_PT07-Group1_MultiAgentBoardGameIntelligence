@@ -2,11 +2,9 @@
 
 import asyncio
 import json
-import random
 import sys
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 from tiles.azul import game as G

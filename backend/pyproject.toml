@@ -4,25 +4,33 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tiles"
-version = "0.2.0"
-description = "TILES: Transparent Intelligence for Learning, Exploration, and Simulation — an explainable multi-agent system for Azul"
+version = "0.3.0"
+description = "TILES: Transparent Intelligence for Learning, Exploration, and Simulation - an explainable multi-agent system for Azul"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
     "pydantic>=2.5",
+    "sqlalchemy>=2.0",
+    "numpy>=1.26",
+    "scikit-learn>=1.3",
+    "playwright>=1.40",          # live play on buddyboardgames.com (then: playwright install chromium)
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
-live = ["playwright>=1.40"]        # live play on buddyboardgames.com
-telemetry = ["mlflow>=2.10"]       # experiment tracking for ablations
-llm = ["anthropic>=0.40"]          # LLM-refined explanations & rule extraction
-rl = ["pettingzoo>=1.24.3", "gymnasium>=0.29", "numpy>=1.26"]
-dev = ["pytest>=8", "httpx>=0.27"]
+ml = ["torch>=2.1"]                                  # Transformer / GRU sequence profiler
+telemetry = ["mlflow-skinny>=3.0"]                   # experiment tracking
+llm = ["anthropic>=0.40"]                            # LLM-refined explanations and rule extraction
+rl = ["pettingzoo>=1.24.3", "gymnasium>=0.29"]       # PettingZoo environment
+dev = ["pytest>=8", "pytest-asyncio", "pytest-cov"]
 
 [project.scripts]
 tiles = "tiles.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["tiles*"]
+
+[tool.setuptools.package-data]
+tiles = ["rulebook/rulebook.md"]

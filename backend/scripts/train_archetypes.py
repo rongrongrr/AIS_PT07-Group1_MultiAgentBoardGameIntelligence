@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import random
 import sys
 from collections import Counter
@@ -24,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tiles.azul.game import play_game  # noqa: E402
 from tiles.ml.archetypes import (  # noqa: E402
-    DEFAULT_MODEL_PATH, FEATURE_NAMES, ArchetypeClassifier, ArchetypeModel, extract_features, move_record,
+    DEFAULT_MODEL_PATH, ArchetypeClassifier, ArchetypeModel, extract_features, move_record,
 )  # noqa: E402
 from tiles.ml.greedy_player import (  # noqa: E402
     BlockerPlayer, ColorCollectorPlayer, GreedyPlayer, RecklessPlayer, RusherPlayer,
@@ -40,7 +39,7 @@ def snapshot(sim, idx, action) -> dict:
 async def simulate(n_games: int, seed: int):
     rng = random.Random(seed)
     games = []
-    for g in range(n_games):
+    for _ in range(n_games):
         a, b = rng.choice(CLASSES), rng.choice(CLASSES)
         names = [f"p0_{a.__name__}", f"p1_{b.__name__}"]
         log = []

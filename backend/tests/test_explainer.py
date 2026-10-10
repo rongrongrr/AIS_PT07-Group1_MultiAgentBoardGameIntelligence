@@ -3,7 +3,6 @@
 import asyncio
 import random
 
-import pytest
 
 from tiles.azul.game import apply_action, floor_size, new_game, play_game, score_round
 from tiles.azul.rules import calculate_floor_penalty, get_legal_actions

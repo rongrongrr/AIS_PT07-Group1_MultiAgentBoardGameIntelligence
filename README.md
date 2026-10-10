@@ -104,7 +104,7 @@ python scripts/best_response.py / evaluate_adaptive.py / evaluate_lookahead.py  
 ```bash
 cd backend
 python -m pytest                                  # offline tests (live test excluded); coverage report below
-python -m pytest --cov=tiles --cov-report=term    # fails below 80% (currently ~95%)
+python -m pytest --cov=tiles --cov-report=term    # fails below 80% (currently ~96%)
 python -m pytest -m live -s                       # live game on buddyboardgames.com (network + Chromium)
 cd ../frontend && npm test && npx tsc -b          # UI tests (Vitest + Testing Library) and type-check
 ```

@@ -1,4 +1,4 @@
-"""Action executor, DOM/Socket.IO parsing, and BotBrowser/MultiPlayerSession with stub pages."""
+"""Action executor, DOM / WebSocket-message parsing, and BotBrowser/MultiPlayerSession with stub pages."""
 
 import asyncio
 import base64

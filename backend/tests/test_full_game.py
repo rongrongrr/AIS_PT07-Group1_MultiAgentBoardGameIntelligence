@@ -9,20 +9,15 @@ It validates that:
 4. Game terminates (a player completes a wall row)
 """
 
-import asyncio
 import copy
 import random
 import pytest
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from tiles.azul.rules import (
-    WALL_PATTERN,
-    can_place_on_pattern_line,
     calculate_end_game_bonuses,
     calculate_floor_penalty,
-    count_tiles_of_color,
     get_legal_actions,
-    is_game_over,
     pattern_line_space,
     score_tile_placement,
     wall_column_for_color,

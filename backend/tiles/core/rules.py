@@ -17,7 +17,6 @@ from typing import List, Optional
 from .actions import CENTER, FLOOR, Action
 from .state import (
     FIRST_PLAYER,
-    FLOOR_CAPACITY,
     NUM_COLORS,
     PHASE_DRAFTING,
     PHASE_GAME_OVER,

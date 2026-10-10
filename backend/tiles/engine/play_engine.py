@@ -13,8 +13,7 @@ import logging
 import os
 import time
 from base64 import b64encode
-from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
@@ -30,8 +29,6 @@ from tiles.models.schemas import (
     BrowserMode,
     GameAction,
     GameStateData,
-    MoveRecord,
-    SessionStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -96,7 +93,7 @@ class BotBrowser:
         self._page = await self._context.new_page()
         self._page.on("websocket", self._handle_websocket)
 
-        # Inject script to capture the Socket.IO socket reference onto window.__socket
+        # Inject script to capture the page's game socket onto window.__socket
         # This runs before any page JS, intercepting io.connect() calls.
         await self._page.add_init_script("""
             (function() {

@@ -150,7 +150,7 @@ class SequenceProfiler:
         opt = torch.optim.AdamW(self.net.parameters(), lr=lr, weight_decay=1e-2)
         history = {"loss": [], "val_acc": []}
         n = len(seqs)
-        for ep in range(epochs):
+        for _ in range(epochs):
             self.net.train()
             order = list(range(n))
             rng.shuffle(order)
@@ -222,7 +222,7 @@ class SequenceProfiler:
                     "state": self.net.state_dict(), "features": MOVE_FEATURES, "meta": meta or {}}, path)
 
     @classmethod
-    def load(cls, path: Path) -> "SequenceProfiler":
+    def load(cls, path: Path) -> SequenceProfiler:
         torch, _ = _torch()
         blob = torch.load(path, map_location="cpu", weights_only=False)
         if blob["features"] != MOVE_FEATURES:

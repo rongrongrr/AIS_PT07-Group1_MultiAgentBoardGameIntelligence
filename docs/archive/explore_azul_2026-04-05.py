@@ -1,4 +1,6 @@
-"""
+"""HISTORICAL (2026-04-05): first DOM exploration of the platform. Its Socket.IO findings are outdated: the site now sends JSON {type, payload} over a plain WebSocket (see docs/EVALUATION.md section 7).
+
+
 Azul Board Game DOM Explorer
 =============================
 Explores https://buddyboardgames.com/azul to map out DOM selectors

@@ -5,7 +5,6 @@ The actual Playwright game execution requires a live connection to buddyboardgam
 so we test the API layer and verify the engine components are wired correctly.
 """
 
-import asyncio
 import os
 import pytest
 
@@ -16,7 +15,6 @@ from fastapi.testclient import TestClient
 from tiles.main import app
 from tiles.models.db import Base, engine, init_db
 from tiles.ml.random_player import RandomPlayer
-from tiles.ml.greedy_player import GreedyPlayer
 from tiles.ml.registry import registry
 from tiles.azul.rules import get_legal_actions
 from tiles.engine.state_parser import parse_game_state_from_event

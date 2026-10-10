@@ -69,7 +69,7 @@ class GameSim:
     finished: bool = False
     rules: RulesConfig = DEFAULT_RULES
 
-    def copy(self) -> "GameSim":
+    def copy(self) -> GameSim:
         c = GameSim(
             state=self.state.model_copy(deep=True),
             bag=list(self.bag),

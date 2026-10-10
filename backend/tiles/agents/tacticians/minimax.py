@@ -19,7 +19,7 @@ runner-up scores are fail-soft bounds — fine for candidate ordering.
 from __future__ import annotations
 
 import time
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from tiles.agents.base import (
     CandidateMove,

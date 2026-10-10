@@ -1,4 +1,4 @@
-"""Parse Azul game state from Socket.IO events or DOM scraping."""
+"""Parse Azul game state from the platform's WebSocket messages (JSON ``{type, payload}``) or DOM scraping."""
 
 from __future__ import annotations
 
@@ -330,7 +330,7 @@ def _safe_tile_color(color_str: str) -> Optional[TileColor]:
 async def parse_state_from_dom(page) -> Optional[GameStateData]:
     """Fallback: Parse game state directly from the DOM using Playwright page.
 
-    This is less reliable than intercepting Socket.IO events but serves as a
+    This is less reliable than reading the platform's WebSocket state but serves as a
     fallback if event interception fails.
     """
     try:

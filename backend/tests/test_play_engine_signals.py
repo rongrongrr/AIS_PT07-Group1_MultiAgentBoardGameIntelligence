@@ -2,7 +2,6 @@
 
 import asyncio
 
-import pytest
 
 import tiles.engine.play_engine as pe
 from tiles.models.schemas import GameStateData, PlayerState

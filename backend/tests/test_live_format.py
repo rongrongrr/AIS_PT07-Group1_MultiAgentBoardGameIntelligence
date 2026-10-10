@@ -4,7 +4,6 @@ import asyncio
 import json
 from pathlib import Path
 
-import pytest
 
 from tiles.azul.rules import is_game_over
 from tiles.engine import play_engine as pe

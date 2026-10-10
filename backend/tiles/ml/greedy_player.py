@@ -15,12 +15,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Optional
 
 from tiles.azul.rules import (
-    WALL_PATTERN,
     calculate_floor_penalty,
-    can_place_on_pattern_line,
     count_tiles_of_color,
     get_legal_actions,
     get_pattern_line_color,

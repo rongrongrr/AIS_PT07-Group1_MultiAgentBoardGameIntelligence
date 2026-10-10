@@ -20,7 +20,7 @@ from typing import List, Optional, Tuple
 from tiles.azul.game import GameSim, apply_action, round_over, score_round
 from tiles.azul.rules import get_legal_actions
 from tiles.ml.greedy_player import DEFAULT_WEIGHTS, GreedyPlayer, Weights, _score_action
-from tiles.ml.rollout_player import DEFAULT_VALUE, ValueWeights, _sim_from_state, potential
+from tiles.ml.rollout_player import ValueWeights, _sim_from_state, potential
 from tiles.models.schemas import GameAction, GameStateData
 
 logger = logging.getLogger(__name__)

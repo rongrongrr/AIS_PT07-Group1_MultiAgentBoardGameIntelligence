@@ -1,6 +1,5 @@
 """Tests for Azul rules engine."""
 
-import pytest
 
 from tiles.azul.rules import (
     WALL_PATTERN,
@@ -8,7 +7,6 @@ from tiles.azul.rules import (
     calculate_floor_penalty,
     can_place_on_pattern_line,
     get_legal_actions,
-    is_color_on_wall,
     is_game_over,
     pattern_line_space,
     score_tile_placement,

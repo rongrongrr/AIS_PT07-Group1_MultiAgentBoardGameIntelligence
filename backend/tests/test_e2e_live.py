@@ -21,11 +21,9 @@ import time
 
 import pytest
 
-from tiles.engine.play_engine import BotBrowser, MultiPlayerSession
-from tiles.engine.state_parser import parse_state_from_dom
-from tiles.azul.rules import get_legal_actions
+from tiles.engine.play_engine import MultiPlayerSession
 from tiles.ml.greedy_player import GreedyPlayer
-from tiles.models.schemas import BrowserMode, GameStateData
+from tiles.models.schemas import BrowserMode
 
 pytestmark = pytest.mark.live
 
@@ -153,7 +151,7 @@ async def run_one_game(game_number: int) -> dict:
                     consecutive_failures += 1
                     if consecutive_failures > 5:
                         results["error"] = f"Too many consecutive failures: {e}"
-                        raise RuntimeError(results["error"])
+                        raise RuntimeError(results["error"]) from e
                     continue
 
                 # Execute

@@ -1,6 +1,5 @@
-"""Tests for the Socket.IO state parser."""
+"""Tests for the WebSocket-message state parser (including the legacy Socket.IO framing it still accepts)."""
 
-import pytest
 
 from tiles.engine.state_parser import (
     parse_game_state_from_event,

@@ -85,7 +85,7 @@ class RulebookIndex:
     # -- construction ---------------------------------------------------
 
     @classmethod
-    def build(cls, path: Path | str = DEFAULT_RULEBOOK_PATH) -> "RulebookIndex":
+    def build(cls, path: Path | str = DEFAULT_RULEBOOK_PATH) -> RulebookIndex:
         markdown = Path(path).read_text(encoding="utf-8")
         chunks: List[Chunk] = []
         for section_id, body in _split_sections(markdown):

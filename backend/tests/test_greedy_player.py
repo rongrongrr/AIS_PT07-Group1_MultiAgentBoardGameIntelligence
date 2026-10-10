@@ -141,22 +141,8 @@ class TestScoringLogic:
         assert score_complete > score_partial
 
     def test_overflow_penalty_reduces_score(self):
-        """Overflow to floor should reduce score. Compare placing 2 tiles on row 3
-        (partial fill, no overflow) vs placing 4 tiles on row 3 (partial fill, 1 overflow)."""
+        """Spilling tiles onto the floor must score lower than the same pick placed on a pattern line."""
         p = make_player()
-
-        # 2 red tiles into row 3 (capacity 4), no overflow
-        state_no_overflow = make_state(
-            factories=[[TileColor.RED, TileColor.RED, TileColor.BLUE, TileColor.BLUE]],
-            players=[p],
-        )
-        action_no_overflow = GameAction(
-            source_type=SourceType.FACTORY,
-            source_index=0,
-            color=TileColor.RED,
-            destination=DestinationType.PATTERN_LINE,
-            destination_row=3,
-        )
 
         # 4 red tiles into row 2 (capacity 3), 1 overflows to floor
         state_overflow = make_state(
@@ -171,12 +157,7 @@ class TestScoringLogic:
             destination_row=2,
         )
 
-        score_no = _score_action(state_no_overflow, p, action_no_overflow)
         score_over = _score_action(state_overflow, p, action_overflow)
-        # Both complete their rows (2/4 partial vs 3/3 complete),
-        # but the overflow should cause a penalty
-        # Actually: row2 completes (3/3) getting wall bonus, row3 partial (2/4) no bonus
-        # Compare same row instead: floor action always scores lower than pattern line
         floor_action = GameAction(
             source_type=SourceType.FACTORY,
             source_index=0,

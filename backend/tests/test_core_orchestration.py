@@ -3,7 +3,7 @@
 from tiles.agents.base import Decision, DecisionContext, Tactician
 from tiles.agents.tacticians.greedy import GreedyTactician
 from tiles.agents.validator import Validator
-from tiles.core import Action, CENTER, FLOOR, new_game
+from tiles.core import Action, FLOOR, new_game
 from tiles.orchestration import TurnPipeline
 from tiles.sim.match import MatchConfig, MatchRunner
 
@@ -46,7 +46,7 @@ def test_full_local_match_produces_contract_shaped_records():
     assert result.winner_name in ("Greta", "Randy")
 
     for record in result.records:
-        assert REQUIRED_RECORD_KEYS <= set(record)
+        assert set(record) >= REQUIRED_RECORD_KEYS
         assert record["validation"]["ok"] is True
         assert record["validation"]["attempts"] == 1
         assert record["timing"]["total_ms"] >= record["timing"]["decide_ms"]

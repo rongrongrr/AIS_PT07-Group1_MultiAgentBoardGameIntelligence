@@ -136,7 +136,7 @@ class PlayerBoard:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "PlayerBoard":
+    def from_dict(cls, d: dict) -> PlayerBoard:
         board = cls(name=d.get("name", "player"), score=d.get("score", 0))
         for r, row in enumerate(d.get("wall", [])):
             for c, filled in enumerate(row):
@@ -150,7 +150,7 @@ class PlayerBoard:
         board.floor = [color_from_name(t) for t in d.get("floor_line", [])]
         return board
 
-    def clone(self) -> "PlayerBoard":
+    def clone(self) -> PlayerBoard:
         return PlayerBoard(
             name=self.name,
             wall=self.wall,
@@ -263,7 +263,7 @@ class GameState:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "GameState":
+    def from_dict(cls, d: dict) -> GameState:
         def collapse(tiles: List[str]) -> List[int]:
             counts = [0] * NUM_COLORS
             for t in tiles:
@@ -286,7 +286,7 @@ class GameState:
         )
         return state
 
-    def clone(self) -> "GameState":
+    def clone(self) -> GameState:
         return GameState(
             num_players=self.num_players,
             factories=[f[:] for f in self.factories],

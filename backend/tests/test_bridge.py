@@ -2,7 +2,6 @@
 plus the bridge that lets core Tacticians play through the live ``MachinePlayer`` interface."""
 
 import asyncio
-import copy
 import random
 
 import pytest

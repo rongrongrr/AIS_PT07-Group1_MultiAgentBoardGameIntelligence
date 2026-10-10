@@ -32,7 +32,7 @@ class RemotePlayer(MachinePlayer):
     def name(self) -> str:
         return self._name
 
-    def clone(self) -> "RemotePlayer":
+    def clone(self) -> RemotePlayer:
         return RemotePlayer(self._name, self.url, self.timeout, self._client)
 
     async def decide(self, game_state: GameStateData, player_index: int) -> GameAction:

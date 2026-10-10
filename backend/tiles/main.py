@@ -61,7 +61,7 @@ app.include_router(tournament.router, prefix="/api/tournament", tags=["tournamen
 @app.middleware("http")
 async def require_api_key(request: Request, call_next):
     """Optional shared-secret auth: when TILES_API_KEY is set every /api call (except health) needs
-    the key in the ``X-API-Key`` header. WebSockets are checked separately (see ``ws_guard``)."""
+    the key in the ``X-API-Key`` header. WebSockets are checked in ``routers.sessions.session_websocket``."""
     path = request.url.path
     if path.startswith("/api/") and path != "/api/health" and not api_key_ok(request.headers.get("x-api-key")):
         return JSONResponse({"detail": "Missing or invalid API key"}, status_code=401)
@@ -73,18 +73,29 @@ def health():
     return {"status": "ok", "service": "tiles"}
 
 
-# Optional single-process mode: serve the built React UI (``npm run build`` -> frontend/dist) from the
-# API itself. Docker Compose uses nginx for this instead; this is for ``tiles serve`` without Docker.
-_ui_dist = os.environ.get("TILES_UI_DIST")
-if _ui_dist and os.path.isdir(_ui_dist):
+def mount_ui(application: FastAPI, dist: str) -> None:
+    """Serve a built React UI (``npm run build`` -> frontend/dist) from the API itself.
+
+    Single-process mode for ``tiles serve`` without Docker (set ``TILES_UI_DIST``); Docker Compose uses
+    nginx for this. Unknown ``/api`` paths still return a JSON 404 rather than the UI page.
+    """
+    from fastapi import HTTPException
     from fastapi.responses import FileResponse
     from fastapi.staticfiles import StaticFiles
 
-    app.mount("/assets", StaticFiles(directory=os.path.join(_ui_dist, "assets")), name="assets")
+    root = os.path.abspath(dist)
+    application.mount("/assets", StaticFiles(directory=os.path.join(root, "assets")), name="assets")
 
-    @app.get("/{path:path}", include_in_schema=False)
+    @application.get("/{path:path}", include_in_schema=False)
     def spa(path: str):
-        candidate = os.path.join(_ui_dist, path)
-        if path and os.path.isfile(candidate) and os.path.abspath(candidate).startswith(os.path.abspath(_ui_dist)):
+        if path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        candidate = os.path.abspath(os.path.join(root, path))
+        if path and candidate.startswith(root) and os.path.isfile(candidate):
             return FileResponse(candidate)
-        return FileResponse(os.path.join(_ui_dist, "index.html"))
+        return FileResponse(os.path.join(root, "index.html"))
+
+
+_ui_dist = os.environ.get("TILES_UI_DIST")
+if _ui_dist and os.path.isdir(_ui_dist):
+    mount_ui(app, _ui_dist)

@@ -61,9 +61,7 @@ def can_place_on_pattern_line(player: PlayerState, row: int, color: TileColor) -
     existing_color = get_pattern_line_color(player, row)
     if existing_color is not None and existing_color != color:
         return False
-    if pattern_line_space(player, row) == 0:
-        return False
-    return True
+    return pattern_line_space(player, row) != 0
 
 
 def get_factory_tiles(state: GameStateData, factory_index: int) -> List[TileColor]:

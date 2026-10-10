@@ -25,9 +25,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from duel import duel  # noqa: E402
 
-from tiles.azul.game import apply_action, finish_game, new_game, round_over, step_round_boundary  # noqa: E402
+from tiles.azul.game import apply_action, new_game, round_over, step_round_boundary  # noqa: E402
 from tiles.ml.greedy_player import GreedyPlayer  # noqa: E402
-from tiles.ml.td_player import DEFAULT_TD_PATH, FEATURES, TDPlayer, td_update  # noqa: E402
+from tiles.ml.td_player import FEATURES, TDPlayer, td_update  # noqa: E402
 
 REWARD_SCALE = 50.0
 

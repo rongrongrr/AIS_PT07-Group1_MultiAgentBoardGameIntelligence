@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from tiles.azul.game import apply_action, new_game, round_over, step_round_boundary
 from tiles.engine.action_executor import ExecutionResult

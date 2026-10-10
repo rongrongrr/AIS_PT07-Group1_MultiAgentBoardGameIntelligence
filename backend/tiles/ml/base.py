@@ -16,7 +16,7 @@ class MachinePlayer(ABC):
         """Given the current game state and player index, return the action to take."""
         ...
 
-    def clone(self) -> "MachinePlayer":
+    def clone(self) -> MachinePlayer:
         """A fresh instance for one game (per-game state must not be shared between sessions)."""
         return type(self)()
 
@@ -26,7 +26,7 @@ class MachinePlayer(ABC):
         ``record`` is a ledger-format move dict (see tiles.ml.archetypes.move_record).
         Stateless players ignore it; adaptive players use it to model opponents.
         """
-        return None
+        return
 
     @property
     @abstractmethod

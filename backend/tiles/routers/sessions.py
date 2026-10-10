@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 from sqlalchemy.orm import Session as DBSession
 
 from tiles.azul.rules import get_legal_actions, is_game_over
-from tiles.engine.play_engine import BotBrowser, MultiPlayerSession
+from tiles.engine.play_engine import MultiPlayerSession
 from tiles import tracking
 from tiles.explain.explainer import Explainer
 from tiles.ml.archetypes import move_record

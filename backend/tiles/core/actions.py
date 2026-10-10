@@ -16,7 +16,6 @@ and ``dest_slot`` is the pattern row (0..4) or 5 for the floor.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from .state import COLOR_NAMES, color_from_name
 
@@ -48,7 +47,7 @@ class Action:
         return source_slot * 30 + self.color * 6 + dest_slot
 
     @classmethod
-    def from_action_id(cls, action_id: int) -> "Action":
+    def from_action_id(cls, action_id: int) -> Action:
         source_slot, rest = divmod(action_id, 30)
         color, dest_slot = divmod(rest, 6)
         return cls(
@@ -67,7 +66,7 @@ class Action:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Action":
+    def from_dict(cls, d: dict) -> Action:
         return cls(
             source_index=(
                 CENTER

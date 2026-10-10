@@ -35,7 +35,6 @@ from tiles.agents.base import (
 from tiles.agents.tacticians.heuristics import rank_actions
 from tiles.agents.validator import Validator
 from tiles.core import (
-    Action,
     GameState,
     MoveResult,
     RoundResult,
@@ -137,7 +136,7 @@ class TurnPipeline:
         attempts = 0
         decision: Optional[Decision] = None
         last_validation = None
-        for attempt in range(self.max_decide_attempts):
+        for _ in range(self.max_decide_attempts):
             t0 = time.perf_counter()
             candidate = self._decide(ctx, tactician)
             decide_ms += (time.perf_counter() - t0) * 1000
