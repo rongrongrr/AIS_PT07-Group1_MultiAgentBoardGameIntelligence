@@ -66,8 +66,9 @@ class TestGreedyPlayerDecision:
         )
         action = await player.decide(state, 0)
         # Should pick red and target row 1 to complete it
-        if action.color == TileColor.RED and action.destination == DestinationType.PATTERN_LINE:
-            assert action.destination_row == 1  # complete the nearly-full row
+        assert action.color == TileColor.RED
+        assert action.destination == DestinationType.PATTERN_LINE
+        assert action.destination_row == 1
 
     @pytest.mark.asyncio
     async def test_avoids_floor_when_possible(self, player):
@@ -185,3 +186,16 @@ class TestScoringLogic:
         score_floor = _score_action(state_overflow, p, floor_action)
         # Placing on pattern line (even with overflow) should beat sending everything to floor
         assert score_over > score_floor
+
+
+class TestFactoryTileCounting:
+    def test_factory_pick_counts_all_matching_tiles(self):
+        from app.ml.greedy_player import _count_source_tiles
+        state = make_state(
+            factories=[[TileColor.RED, TileColor.RED, TileColor.RED, TileColor.BLUE]]
+        )
+        action = GameAction(
+            source_type=SourceType.FACTORY, source_index=0, color=TileColor.RED,
+            destination=DestinationType.FLOOR,
+        )
+        assert _count_source_tiles(state, action) == 3

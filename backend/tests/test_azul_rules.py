@@ -328,3 +328,25 @@ class TestGameOver:
         p2 = make_player(index=1, name="P2", wall=wall2)
         state = make_state(players=[p1, p2])
         assert is_game_over(state) is True
+
+
+# --- Regression tests ---
+
+class TestTileCounting:
+    def test_counts_enum_tiles_in_factory(self):
+        from app.azul.rules import count_tiles_of_color
+        tiles = [TileColor.RED] * 3 + [TileColor.BLUE]
+        assert count_tiles_of_color(tiles, TileColor.RED) == 3
+
+    def test_counts_string_tiles_in_center(self):
+        from app.azul.rules import count_tiles_of_color
+        assert count_tiles_of_color(["red", "red", "firstPlayer"], TileColor.RED) == 2
+
+
+class TestLegalActionOrderIsDeterministic:
+    def test_action_order_is_stable_and_in_color_order(self):
+        state = make_state(factories=[[TileColor.WHITE, TileColor.BLUE, TileColor.RED, TileColor.BLACK]])
+        colors = [a.color for a in get_legal_actions(state, 0)]
+        # first-seen order must follow TileColor declaration order
+        seen = list(dict.fromkeys(colors))
+        assert seen == [c for c in TileColor.all_colors() if c in seen]

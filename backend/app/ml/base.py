@@ -16,6 +16,14 @@ class MachinePlayer(ABC):
         """Given the current game state and player index, return the action to take."""
         ...
 
+    def observe(self, record: dict, observer_name: str) -> None:
+        """Called after every move in the game (including this player's own).
+
+        ``record`` is a ledger-format move dict (see app.ml.archetypes.move_record).
+        Stateless players ignore it; adaptive players use it to model opponents.
+        """
+        return None
+
     @property
     @abstractmethod
     def name(self) -> str:

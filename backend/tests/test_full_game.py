@@ -252,7 +252,7 @@ async def play_full_game(
             all_moves.append({
                 "round": round_num,
                 "player": player_names[current_player_idx],
-                "action": action.dict(),
+                "action": action.model_dump(),
             })
 
             current_player_idx = (current_player_idx + 1) % len(player_names)

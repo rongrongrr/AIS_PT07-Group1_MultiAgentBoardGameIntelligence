@@ -5,7 +5,15 @@ from __future__ import annotations
 from typing import Dict, Optional
 
 from app.ml.base import MachinePlayer, ProfilerAgent
-from app.ml.greedy_player import GreedyPlayer
+from app.ml.adaptive_player import AdaptivePlayer, AdaptiveRolloutPlayer
+from app.ml.rollout_player import RolloutPlayer
+from app.ml.greedy_player import (
+    BlockerPlayer,
+    ColorCollectorPlayer,
+    GreedyPlayer,
+    RecklessPlayer,
+    RusherPlayer,
+)
 from app.ml.random_player import RandomPlayer
 
 
@@ -19,7 +27,8 @@ class ModelRegistry:
 
     def _register_defaults(self):
         self.register_player(RandomPlayer())
-        self.register_player(GreedyPlayer())
+        for cls in (GreedyPlayer, ColorCollectorPlayer, RusherPlayer, RecklessPlayer, BlockerPlayer, AdaptivePlayer, RolloutPlayer, AdaptiveRolloutPlayer):
+            self.register_player(cls())
 
     def register_player(self, player: MachinePlayer):
         self._players[player.name] = player
@@ -29,6 +38,11 @@ class ModelRegistry:
 
     def get_player(self, name: str) -> Optional[MachinePlayer]:
         return self._players.get(name)
+
+    def create_player(self, name: str) -> Optional[MachinePlayer]:
+        """A fresh instance of a registered player (so per-game state is not shared)."""
+        proto = self._players.get(name)
+        return type(proto)() if proto is not None else None
 
     def get_profiler(self, name: str) -> Optional[ProfilerAgent]:
         return self._profilers.get(name)

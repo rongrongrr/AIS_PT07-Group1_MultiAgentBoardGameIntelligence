@@ -142,6 +142,52 @@ class BasicProfileAnalyzer(ProfileAnalyzer):
         }
 
 
+class ArchetypeProfileAnalyzer(ProfileAnalyzer):
+    """BasicProfileAnalyzer statistics plus an archetype label from a trained classifier.
+
+    The classifier is trained on simulated self-play between style-weighted bots
+    (scripts/train_archetypes.py) and applied here to ledger games. Treat the
+    label as a hypothesis: it is per-game, trained on bot styles, and held-out
+    accuracy is stored in models/archetype_classifier.json (meta).
+    """
+
+    def __init__(self, model):
+        self._basic = BasicProfileAnalyzer()
+        self._model = model
+
+    @property
+    def name(self) -> str:
+        return "ArchetypeProfileAnalyzer"
+
+    @property
+    def description(self) -> str:
+        return "Basic statistics plus a learned play-style archetype with feature-level reasons."
+
+    def analyze(self, player_name: str, moves: List[dict]) -> dict:
+        from app.ml.archetypes import extract_features
+
+        profile = self._basic.analyze(player_name, moves)
+        if "total_moves" not in profile:
+            return profile
+        feats = extract_features(moves, player_name)
+        if feats is None:
+            profile["archetype"] = None
+            profile["summary"] += " Archetype: not enough moves with board snapshots to classify."
+            return profile
+        pred = self._model.predict(feats)
+        profile.update({
+            "archetype": pred.archetype,
+            "archetype_confidence": pred.confidence,
+            "archetype_scores": pred.scores,
+            "archetype_reasons": pred.standout_features,
+        })
+        reasons = "; ".join(r["meaning"] for r in pred.standout_features) or "no single dominant trait"
+        profile["summary"] += (
+            f" Archetype: {pred.archetype} ({pred.confidence:.0%} confidence) because {reasons}."
+        )
+        return profile
+
+
 class AnalyzerRegistry:
     """Registry for pluggable profile analyzers."""
 
@@ -151,6 +197,13 @@ class AnalyzerRegistry:
 
     def _register_defaults(self):
         self.register(BasicProfileAnalyzer())
+        try:
+            from app.ml.archetypes import DEFAULT_MODEL_PATH, ArchetypeClassifier
+
+            if DEFAULT_MODEL_PATH.exists():
+                self.register(ArchetypeProfileAnalyzer(ArchetypeClassifier.load(DEFAULT_MODEL_PATH)))
+        except Exception:  # missing numpy/model or feature mismatch: keep the basic analyzer only
+            logger.exception("Archetype analyzer unavailable")
 
     def register(self, analyzer: ProfileAnalyzer):
         self._analyzers[analyzer.name] = analyzer

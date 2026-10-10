@@ -86,7 +86,9 @@ def get_center_tile_colors(state: GameStateData) -> List[TileColor]:
 
 def count_tiles_of_color(tiles: List, color: TileColor) -> int:
     """Count how many tiles of a specific color are in a list."""
-    return sum(1 for t in tiles if str(t) == str(color.value))
+    # Tiles may be TileColor members or plain strings; str(TileColor.RED) is
+    # "TileColor.RED", so compare on .value explicitly.
+    return sum(1 for t in tiles if getattr(t, "value", t) == color.value)
 
 
 def get_legal_actions(state: GameStateData, player_index: int) -> List[GameAction]:
@@ -115,11 +117,17 @@ def get_legal_actions(state: GameStateData, player_index: int) -> List[GameActio
                     colors_in_factory.add(TileColor(str(tile)))
                 except ValueError:
                     pass
-        for color in colors_in_factory:
-            sources.append((SourceType.FACTORY, i, color))
+        # Iterate in fixed TileColor order so action order is reproducible
+        # (set iteration order varies with PYTHONHASHSEED).
+        for color in TileColor.all_colors():
+            if color in colors_in_factory:
+                sources.append((SourceType.FACTORY, i, color))
 
     # Center pool
-    for color in get_center_tile_colors(state):
+    center_colors = set(get_center_tile_colors(state))
+    for color in TileColor.all_colors():
+        if color not in center_colors:
+            continue
         sources.append((SourceType.CENTER, None, color))
 
     # For each source+color, enumerate valid destinations
