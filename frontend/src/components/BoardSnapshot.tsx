@@ -90,7 +90,7 @@ export default function BoardSnapshot({ board, action, activePlayer, heading = '
               }`}
             >
               {f.length === 0 ? (
-                <span className="text-[9px] text-gray-600">empty</span>
+                <span className="text-[10px] text-gray-300">empty</span>
               ) : (
                 f.map((t, ti) => (
                   <Tile
@@ -139,7 +139,7 @@ export default function BoardSnapshot({ board, action, activePlayer, heading = '
                   {p.name}
                 </span>
                 {isActive && (
-                  <span className="text-[10px] px-1.5 py-0.5 bg-teal-700 text-teal-200 rounded-full">
+                  <span className="text-[10px] px-1.5 py-0.5 bg-teal-900 text-teal-300 rounded-full">
                     making this move
                   </span>
                 )}
@@ -150,7 +150,7 @@ export default function BoardSnapshot({ board, action, activePlayer, heading = '
             <div className="flex gap-6 justify-center">
               {/* Pattern Lines (pyramid — right-aligned, filled from right) */}
               <div className="space-y-1">
-                <div className="text-[10px] text-gray-500 text-center mb-1">Pattern Lines</div>
+                <div className="text-[10px] text-gray-400 text-center mb-1">Pattern Lines</div>
                 {p.pattern_lines.map((row, ri) => {
                   const isTargetRow = isActive && dstRow === ri;
                   const capacity = ri + 1;
@@ -182,7 +182,7 @@ export default function BoardSnapshot({ board, action, activePlayer, heading = '
 
               {/* Wall (5x5 grid) */}
               <div className="space-y-1">
-                <div className="text-[10px] text-gray-500 text-center mb-1">Wall</div>
+                <div className="text-[10px] text-gray-400 text-center mb-1">Wall</div>
                 {WALL_PATTERN.map((wallRow, ri) => (
                   <div key={ri} className="flex gap-0.5">
                     {wallRow.map((wc, ci) => (
@@ -208,7 +208,7 @@ export default function BoardSnapshot({ board, action, activePlayer, heading = '
                   ) : (
                     <div className={`${TS} rounded bg-gray-900 border border-gray-700`} />
                   )}
-                  <div className="text-[9px] text-red-400/70 mt-0.5">{penalty}</div>
+                  <div className="text-[9px] text-red-400 mt-0.5">{penalty}</div>
                 </div>
               ))}
             </div>

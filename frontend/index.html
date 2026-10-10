@@ -4,7 +4,17 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>TILES</title>
+    <script>
+      // Set the theme before the first paint so there is no dark flash for light-mode users.
+      (function () {
+        try {
+          var p = localStorage.getItem("tiles_theme") || "system";
+          var light = p === "light" || (p === "system" && window.matchMedia("(prefers-color-scheme: light)").matches);
+          document.documentElement.setAttribute("data-theme", light ? "light" : "dark");
+        } catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

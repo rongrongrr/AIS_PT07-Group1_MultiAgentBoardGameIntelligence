@@ -65,7 +65,7 @@ export default function FeedbackWidget({ sessionId, stepId, alreadyRated = false
               aria-label={`${s.label}: ${n}`}
               aria-pressed={scores[s.key] === n}
               onClick={() => setScores({ ...scores, [s.key]: n })}
-              className={`w-6 h-6 rounded ${scores[s.key] === n ? 'bg-teal-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}
+              className={`w-6 h-6 rounded ${scores[s.key] === n ? 'bg-teal-700 text-white' : 'bg-gray-700 hover:bg-gray-600 text-gray-100'}`}
             >{n}</button>
           ))}
         </div>

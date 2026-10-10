@@ -137,7 +137,7 @@ export function FactoryDisplay({ tiles }: { tiles: string[]; index: number }) {
   return (
     <div className="bg-gray-800 rounded-lg p-2 border border-gray-700 inline-flex flex-wrap gap-1 w-16 h-16 items-center justify-center">
       {tiles.length === 0 ? (
-        <span className="text-xs text-gray-600">Empty</span>
+        <span className="text-xs text-gray-500">Empty</span>
       ) : (
         tiles.map((color, i) => (
           <TileCell key={i} color={color} size="sm" />

@@ -30,7 +30,7 @@ export default function ProfilerInsights({ sessionId, uptoStep, refreshKey, poll
     <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 space-y-2" data-testid="profiler-insights">
       <div className="text-[10px] text-gray-500">{title}</div>
       {error && <div className="text-xs text-red-400">{error}</div>}
-      {!error && insights.length === 0 && <div className="text-xs text-gray-600">Waiting for moves...</div>}
+      {!error && insights.length === 0 && <div className="text-xs text-gray-500">Waiting for moves...</div>}
       {insights.map((p) => (
         <div key={p.player_name} className="text-xs text-gray-300">
           <span className="font-semibold text-teal-300">{p.player_name}</span>

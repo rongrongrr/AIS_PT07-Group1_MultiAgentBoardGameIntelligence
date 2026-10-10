@@ -224,7 +224,7 @@ export default function SessionConfig({ onCreated }: { onCreated?: (id: string) 
               onClick={() => setBrowserMode('headless')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
                 browserMode === 'headless'
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-teal-700 text-white'
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
               }`}
             >
@@ -234,7 +234,7 @@ export default function SessionConfig({ onCreated }: { onCreated?: (id: string) 
               onClick={() => setBrowserMode('headed')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
                 browserMode === 'headed'
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-teal-700 text-white'
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
               }`}
             >
@@ -330,7 +330,7 @@ export default function SessionConfig({ onCreated }: { onCreated?: (id: string) 
                   maxLength={16}
                   className="flex-1 bg-gray-800 text-gray-100 rounded-lg px-3 py-2 text-sm border border-gray-700 focus:border-teal-500 focus:outline-none"
                 />
-                <span className="text-xs text-gray-600 w-20 text-right hidden sm:block">
+                <span className="text-xs text-gray-500 w-20 text-right hidden sm:block">
                   {slot.type === 'human' ? 'manual join' : 'auto-play'}
                 </span>
                 <button
@@ -361,7 +361,7 @@ export default function SessionConfig({ onCreated }: { onCreated?: (id: string) 
         <button
           onClick={createSession}
           disabled={creating || problems.length > 0}
-          className="w-full py-3 bg-teal-600 hover:bg-teal-500 rounded-lg font-semibold transition disabled:opacity-50"
+          className="w-full py-3 bg-teal-700 hover:bg-teal-600 rounded-lg font-semibold transition disabled:opacity-50"
         >
           {creating
             ? 'Creating...'

@@ -118,7 +118,7 @@ export default function ProfileAnalyzer({ sessionId, session }: {
         <button
           onClick={runAnalysis}
           disabled={selectedPlayers.size === 0 || loading !== null}
-          className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-lg text-sm font-medium transition disabled:opacity-50"
+          className="px-4 py-2 bg-teal-700 hover:bg-teal-600 rounded-lg text-sm font-medium transition disabled:opacity-50"
         >
           {loading ? `Analyzing ${loading}...` : 'Analyze'}
         </button>
@@ -222,11 +222,11 @@ export default function ProfileAnalyzer({ sessionId, session }: {
           <div>
             <div className="text-xs text-gray-500 mb-1">Source Split</div>
             <div className="flex h-4 rounded-full overflow-hidden">
-              <div className="bg-teal-600 flex items-center justify-center text-[9px] text-white"
+              <div className="bg-teal-700 flex items-center justify-center text-[9px] text-white"
                    style={{ width: `${profile.source_split.factory}%` }}>
                 {profile.source_split.factory > 15 && `Factory ${profile.source_split.factory}%`}
               </div>
-              <div className="bg-yellow-600 flex items-center justify-center text-[9px] text-white"
+              <div className="bg-yellow-700 flex items-center justify-center text-[9px] text-white"
                    style={{ width: `${profile.source_split.center}%` }}>
                 {profile.source_split.center > 15 && `Center ${profile.source_split.center}%`}
               </div>
@@ -254,7 +254,7 @@ export default function ProfileAnalyzer({ sessionId, session }: {
             </div>
           )}
 
-          <div className="text-[10px] text-gray-600">
+          <div className="text-[10px] text-gray-500">
             Analyzed by {profile.analyzer}
           </div>
         </div>

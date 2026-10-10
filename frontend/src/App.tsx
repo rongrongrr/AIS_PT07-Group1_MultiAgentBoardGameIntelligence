@@ -7,6 +7,7 @@ import Replay from './components/Replay';
 import Leaderboard from './components/Leaderboard';
 import { PatternsContext } from './components/BoardSnapshot';
 import { useFlag, usePref } from './lib/prefs';
+import { useTheme, type ThemePref } from './lib/theme';
 import { useGameStore } from './stores/gameStore';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -34,6 +35,7 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [patterns, setPatterns] = useFlag('tiles_patterns', false);
+  const [theme, setTheme] = useTheme();
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = usePref('tiles_status_filter', 'all');
   const resizing = useRef(false);
@@ -132,10 +134,19 @@ export default function App() {
             >
               Player profiles
             </button>
-            <span className="text-xs text-gray-600 ml-2 whitespace-nowrap">{selected.room_name}</span>
+            <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">{selected.room_name}</span>
           </>
         )}
-        <label className="ml-auto flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap cursor-pointer"
+        <label className="ml-auto flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap">
+          Theme
+          <select value={theme} onChange={(e) => setTheme(e.target.value as ThemePref)} aria-label="Colour theme"
+                  className="bg-gray-800 text-xs rounded px-1.5 py-1 border border-gray-700">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+        <label className="ml-3 flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap cursor-pointer"
                title="Adds a letter to every tile (B, Y, R, G, W) so colours are not the only cue">
           <input type="checkbox" checked={patterns} onChange={(e) => setPatterns(e.target.checked)} className="accent-teal-500" />
           Tile letters
@@ -177,7 +188,7 @@ export default function App() {
 
               <div className="flex-1 overflow-y-auto">
                 {shown.length === 0 ? (
-                  <div className="px-3 py-4 text-xs text-gray-600 text-center">
+                  <div className="px-3 py-4 text-xs text-gray-500 text-center">
                     {sessions.length === 0 ? 'No sessions yet. Create one to get started.' : 'No sessions match the search or filter.'}
                   </div>
                 ) : (
@@ -229,7 +240,7 @@ export default function App() {
                               ))}
                           </div>
                         )}
-                        <div className="text-[10px] text-gray-600 mt-0.5 truncate">
+                        <div className="text-[10px] text-gray-500 mt-0.5 truncate">
                           {players.join(', ')}
                         </div>
                       </button>

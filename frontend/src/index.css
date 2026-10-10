@@ -8,6 +8,12 @@
   --color-white-tile: #ffffff;
 }
 
+:root {
+  color-scheme: dark;
+  /* Muted text must stay readable on the dark surfaces (Tailwind's default 500 is only about 3.7:1). */
+  --color-gray-500: #8b95a7;
+}
+
 body {
   margin: 0;
   background: #1a1a2e;
@@ -31,4 +37,51 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .tile-pulse { animation: none; }
+}
+
+
+/*
+ * Light theme. The UI is written with Tailwind's gray scale for surfaces and text, so the whole
+ * theme is a remap of CSS variables: the grays are inverted, accent colours used as text get darker
+ * shades (readable on light surfaces) and the tinted banner backgrounds become pale. Mid-tone
+ * button colours (600-800 with white text) are left alone.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --color-gray-950: #f8fafc;
+  --color-gray-900: #f1f5f9;
+  --color-gray-800: #e2e8f0;
+  --color-gray-700: #cbd5e1;
+  --color-gray-600: #64748b;
+  --color-gray-500: #4b5b70;
+  --color-gray-400: #475569;
+  --color-gray-300: #334155;
+  --color-gray-200: #1e293b;
+  --color-gray-100: #0f172a;
+  --color-gray-50: #020617;
+
+  --color-teal-200: #134e4a;  --color-teal-300: #134e4a;  --color-teal-400: #115e59;  --color-teal-900: #ccfbf1;
+  --color-red-200: #991b1b;   --color-red-300: #b91c1c;   --color-red-400: #b91c1c;   --color-red-900: #fee2e2;
+  --color-yellow-200: #713f12; --color-yellow-300: #854d0e; --color-yellow-400: #854d0e; --color-yellow-900: #fef9c3;
+  --color-green-200: #14532d; --color-green-300: #166534; --color-green-400: #166534; --color-green-900: #dcfce7;
+  --color-blue-200: #1e3a8a;  --color-blue-300: #1d4ed8;  --color-blue-400: #1d4ed8;  --color-blue-900: #dbeafe;
+}
+
+:root[data-theme="light"] body {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+/* White tiles would vanish on a light board, so give them an edge. */
+:root[data-theme="light"] .bg-white {
+  box-shadow: inset 0 0 0 1px #94a3b8;
+}
+
+/* Buttons and badges with a saturated background keep white text in the light theme (their text colour is
+   otherwise inherited from the inverted gray scale). */
+:root[data-theme="light"] :is([class*="bg-teal-6"], [class*="bg-teal-7"], [class*="bg-teal-8"],
+    [class*="bg-red-6"], [class*="bg-red-7"], [class*="bg-red-8"], [class*="bg-green-6"], [class*="bg-green-7"],
+    [class*="bg-yellow-6"], [class*="bg-blue-6"], [class*="bg-blue-7"]) {
+  color: #fff;
 }

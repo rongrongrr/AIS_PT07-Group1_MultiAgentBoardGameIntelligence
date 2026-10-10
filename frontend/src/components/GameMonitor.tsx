@@ -42,7 +42,7 @@ function MoveRow({ m: move, isLast, playerIdx, sessionId }: { m: MoveResponse; i
         className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-800/30 transition"
         onClick={() => setExpanded(!expanded)}
       >
-        <span className="text-[10px] text-gray-600 w-5 text-right font-mono">{m.step_id}</span>
+        <span className="text-[10px] text-gray-500 w-5 text-right font-mono">{m.step_id}</span>
         <span className={`text-gray-500 text-[10px] transition-transform ${expanded ? 'rotate-90' : ''}`}>&#9654;</span>
         <span className={`font-medium text-xs w-16 truncate ${pColor}`}>{m.player_name}</span>
 
@@ -70,7 +70,7 @@ function MoveRow({ m: move, isLast, playerIdx, sessionId }: { m: MoveResponse; i
 
         {m.total_ms != null && (
           <span className={`text-[10px] px-1 rounded ${
-            m.total_ms > 5000 ? 'text-red-400' : m.total_ms > 2000 ? 'text-yellow-400' : 'text-gray-600'
+            m.total_ms > 5000 ? 'text-red-400' : m.total_ms > 2000 ? 'text-yellow-400' : 'text-gray-500'
           }`}>{m.total_ms}ms</span>
         )}
       </div>
@@ -99,7 +99,7 @@ function MoveRow({ m: move, isLast, playerIdx, sessionId }: { m: MoveResponse; i
                 </marker></defs>
                 <line x1="0" y1="10" x2="52" y2="10" stroke="currentColor" strokeWidth="2" markerEnd="url(#ah)"/>
               </svg>
-              <div className="text-[10px] text-gray-600">{m.player_name}</div>
+              <div className="text-[10px] text-gray-500">{m.player_name}</div>
             </div>
 
             {/* Destination */}
@@ -216,7 +216,7 @@ function MoveRow({ m: move, isLast, playerIdx, sessionId }: { m: MoveResponse; i
           {m.board ? (
             <BoardSnapshot board={m.board} action={m.action} activePlayer={m.player_name} />
           ) : (
-            <div className="bg-gray-800/30 rounded-lg p-3 text-center text-xs text-gray-600">
+            <div className="bg-gray-800/30 rounded-lg p-3 text-center text-xs text-gray-500">
               Board snapshot not available for this move (only available during live play)
             </div>
           )}
@@ -512,14 +512,14 @@ export default function GameMonitor({ sessionId, session: externalSession }: {
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
           <span className={`text-xs px-2 py-0.5 rounded-full ${
-            status === 'playing' ? 'bg-green-700 text-green-200'
-              : status === 'completed' ? 'bg-blue-700 text-blue-200'
-              : status === 'aborted' ? 'bg-red-700 text-red-200'
+            status === 'playing' ? 'bg-green-900 text-green-300'
+              : status === 'completed' ? 'bg-blue-900 text-blue-300'
+              : status === 'aborted' ? 'bg-red-900 text-red-300'
               : 'bg-gray-700 text-gray-300'
           }`}>{status}</span>
           <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}
                 title={isConnected ? 'WS connected' : 'Disconnected'} />
-          <span className="text-xs text-gray-600">
+          <span className="text-xs text-gray-500">
             {moves.length} moves | {sysLogs.length} logs
           </span>
           {status === 'playing' && (
@@ -626,7 +626,7 @@ export default function GameMonitor({ sessionId, session: externalSession }: {
         <div ref={moveLogRef}
              className="max-h-[500px] overflow-y-auto space-y-0">
           {moves.length === 0 ? (
-            <div className="bg-gray-900 border border-gray-800 rounded-lg text-gray-600 text-sm p-4 text-center">
+            <div className="bg-gray-900 border border-gray-800 rounded-lg text-gray-500 text-sm p-4 text-center">
               No moves recorded yet.
             </div>
           ) : (
@@ -672,14 +672,14 @@ export default function GameMonitor({ sessionId, session: externalSession }: {
           <div ref={sysLogRef}
                className="bg-gray-950 border border-gray-800 rounded-lg max-h-48 overflow-y-auto font-mono text-xs">
             {filteredLogs.length === 0 ? (
-              <div className="text-gray-700 p-3 text-center">No system logs yet.</div>
+              <div className="text-gray-500 p-3 text-center">No system logs yet.</div>
             ) : (
               filteredLogs.map((log, i) => (
                 <div key={i} className={`px-3 py-0.5 border-b border-gray-900/50 ${LOG_LEVEL_COLORS[log.level] || 'text-gray-400'}`}>
-                  <span className="text-gray-600">{log.ts.split('T')[1]?.slice(0, 12) || ''}</span>
+                  <span className="text-gray-500">{log.ts.split('T')[1]?.slice(0, 12) || ''}</span>
                   {' '}
                   <span className={`${
-                    log.level === 'error' ? 'text-red-500' : log.level === 'warning' ? 'text-yellow-500' : 'text-gray-600'
+                    log.level === 'error' ? 'text-red-500' : log.level === 'warning' ? 'text-yellow-500' : 'text-gray-500'
                   }`}>
                     [{log.level.toUpperCase().padEnd(5)}]
                   </span>

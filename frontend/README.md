@@ -21,4 +21,6 @@ npm run build      # type-check (tsc -b) and production build into dist/
 
 Also: quick-start presets and inline validation when creating a session, searchable / filterable session list, an optional **Tile letters** mode (B, Y, R, G, W on every tile) for colour-blind players, reduced-motion support, keyboard focus rings, and `?` help on technical terms.
 
+**Theme:** System (follows the operating system, live), Light or Dark from the top bar; the choice is stored in `localStorage` and applied before first paint. The light theme is a remap of the CSS variables in `src/index.css` (inverted gray scale, darker accent text colours); both themes were checked with a WCAG contrast scan of the running UI (`docs/evidence/ux_light_*.png`, `ux_dark_*.png`), which also fixed several low-contrast muted texts in the original dark theme.
+
 If the backend sets `TILES_API_KEY`, the UI asks for the key once and stores it in `localStorage`.

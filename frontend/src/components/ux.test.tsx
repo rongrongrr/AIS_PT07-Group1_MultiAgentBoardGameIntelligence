@@ -176,5 +176,9 @@ describe('App shell', () => {
     fireEvent.click(screen.getByLabelText(/Tile letters/));
     expect(localStorage.getItem('tiles_patterns')).toBe('1');
     expect(screen.getAllByRole('tab').length).toBeGreaterThanOrEqual(2);
+
+    fireEvent.change(screen.getByLabelText('Colour theme'), { target: { value: 'light' } });
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    expect(localStorage.getItem('tiles_theme')).toBe('light');
   });
 });
