@@ -5,16 +5,15 @@ case study on **Azul**. TILES fields a decision stack of four specialized
 agents — a **Validator**, a **Tactician**, a **Profiler**, and an
 **Explainer** — that plays Azul locally (fast simulation) or live on
 [buddyboardgames.com](https://buddyboardgames.com/azul) via browser
-automation, records every move in an immutable ledger, explains every
-decision it makes, and ships the experiments the project report needs.
+automation, records every move in an immutable ledger, and explains every
+decision it makes.
 
 *AIS PT07 Capstone Group 1 — Master of Technology in Artificial Intelligent
-Systems, ISS, National University of Singapore. Progress report:
-[`docs/report/consolidated-first-report.pdf`](docs/report/consolidated-first-report.pdf).*
+Systems, ISS, National University of Singapore.*
 
-## Capabilities (report → code)
+## Capabilities
 
-| Report capability | Where it lives | Try it |
+| Capability | Where it lives | Try it |
 |---|---|---|
 | End-to-end autonomous gameplay on a **live website** (real browser, real platform, real opponents; Playwright driving the site's WebSocket protocol) | `backend/tiles/engine/` | Sessions → mode *live*, or `tiles live --room …` |
 | Deterministic & **auditable decision pipeline** (validate → execute → persist with full state; replay anytime) | `tiles/orchestration/`, `tiles/ledger/` | Monitor → Replay → export JSON |
@@ -32,10 +31,7 @@ Systems, ISS, National University of Singapore. Progress report:
 ./start.sh                 # backend :8000 + frontend :5173 (creates venv, node_modules, Playwright/Chromium)
 ```
 
-Then open <http://localhost:5173>. A guided tour is in
-[`docs/DEMO.md`](docs/DEMO.md).
-
-**Deliverables.** The final technical report is [`docs/FINAL_REPORT.md`](docs/FINAL_REPORT.md) (PDF in `docs/report/`, measured results in `docs/report/results/`); the presentation flow, architecture views and demonstration run-of-show are in [`docs/PRESENTATION.md`](docs/PRESENTATION.md); the team workload distribution is in [`docs/TEAM_WORKLOAD.md`](docs/TEAM_WORKLOAD.md).
+Then open <http://localhost:5173>.
 
 Manual setup:
 
@@ -78,8 +74,7 @@ Set `ANTHROPIC_API_KEY` to enable the LLM explainer / LLM rule extractor.
 
 Each experiment is a registered job (`tiles/experiments/kinds/`) with a
 parameter schema, live progress, and a uniform result (summary, metrics,
-tables, charts); results persist in the ledger. Details, report mapping
-and how to read each one: [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md).
+tables, charts); results persist in the ledger.
 
 | Kind | Question it answers |
 |---|---|
@@ -106,17 +101,12 @@ tiles live --room tiles-demo --player Athena=mcts_profiled --player You=human --
 ```
 
 Or create a session with mode **live** in the UI. Each bot gets its own
-Chromium seat; a `human` seat shows a share link with the room pre-filled
-(the human enters a name and clicks *Play*; the host bot starts the game
-once everyone is in the lobby). The site is
-the dealer, the local engine is the referee: every move is validated
-locally before it is emitted, opponents' moves are inferred from the
-site's authoritative state for profiling, and the whole game lands in
-the ledger like a local one. All site specifics are isolated in
-`tiles/engine/protocol.py` (frame format, events, join links),
-`browser_seat.py` and `dom_snapshot.py`; the protocol was re-verified
-against the live site in October 2026 (it moved from Socket.IO to a
-plain WebSocket with `{type, payload}` frames).
+Chromium seat; a `human` seat shows a share link with the room pre-filled.
+The site is the dealer, the local engine is the referee: every move is
+validated locally before it is emitted, opponents' moves are inferred from
+the site's authoritative state for profiling, and the whole game lands in
+the ledger like a local one. Site specifics are isolated in
+`tiles/engine/protocol.py`, `browser_seat.py` and `dom_snapshot.py`.
 
 ## Repository layout
 
@@ -141,28 +131,18 @@ backend/tiles/
 ├── server/          # FastAPI app factory, session manager, stats, routers/
 └── cli.py           # play · live · analyze · tournament · ablate · experiment · serve
 frontend/            # React + TypeScript: eight views, inline-SVG charts
-docs/                # FINAL_REPORT.md, PRESENTATION.md, TEAM_WORKLOAD.md, ARCHITECTURE.md, API.md, EXPERIMENTS.md, DEMO.md, STAGE2_PLAN.md, report/
 ```
 
 ## Tests
 
 ```bash
-cd backend && .venv/bin/python -m pytest        # ~110 tests, < 1 minute
+cd backend && .venv/bin/python -m pytest        # ~540 tests
 cd frontend && npm run build                     # type-check + bundle
 ```
 
 Covers rules legality/scoring/transitions (with a 100-tile conservation
 invariant over full games), tactician correctness and strength, profiler
-learning and prediction accuracy, the orchestration reject-loop, ledger
-round-trips, rulebook extraction accuracy, the live-state translator, the
-**full live-play loop against a fake site** (joining, opening deal, turns,
-round transitions, human seats, stop), every experiment kind, the API
-routers and WebSocket streams, and the PettingZoo API.
-
-## Documentation
-
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — the system design and how it maps to the report.
-- [docs/API.md](docs/API.md) — the REST/WebSocket contract between backend and frontend.
-- [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) — every experiment, its parameters and how to read it.
-- [docs/DEMO.md](docs/DEMO.md) — a scripted 15-minute demonstration.
-- [docs/STAGE2_PLAN.md](docs/STAGE2_PLAN.md) — remaining work and the final-report outline.
+learning and prediction, the orchestration reject-loop, ledger round-trips,
+live play against a fake site, the ML stack (MCTS/rollout/TD, Elo,
+archetypes, sequence profiler), rule ingestion, every experiment kind, the
+API routers and WebSocket streams, and the PettingZoo API.
