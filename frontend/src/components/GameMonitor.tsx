@@ -284,7 +284,7 @@ function MoveRow({ m, isLast, playerIdx }: { m: MoveResponse; isLast: boolean; p
           <span className="text-[11px] text-gray-300 bg-gray-800/80 px-1.5 rounded">{dest}</span>
         </div>
 
-        {/* Scores after this move */}
+        {/* Scores before this move */}
         {m.scores && Object.keys(m.scores).length > 0 && (
           <div className="flex gap-1.5 text-[10px]">
             {Object.entries(m.scores).map(([name, score]) => (
@@ -391,10 +391,36 @@ function MoveRow({ m, isLast, playerIdx }: { m: MoveResponse; isLast: boolean; p
             </div>
           )}
 
-          {/* Scores after this move */}
+          {/* Why this move: the model's top-scoring options */}
+          {m.explanation && (
+            <div className="bg-gray-800/50 rounded p-2 space-y-1">
+              <div className="text-[10px] text-gray-500">
+                Why this move ({m.explanation.model}, {m.explanation.n_legal} legal options)
+              </div>
+              {m.explanation.adaptation && (
+                <div className="text-[11px] text-yellow-300">
+                  Adaptation: {m.explanation.adaptation.reason} (playing as {m.explanation.adaptation.playing_as})
+                </div>
+              )}
+              {m.explanation.top_alternatives.map((alt, i) => (
+                <div key={i} className={`text-[11px] flex gap-2 ${i === 0 ? 'text-teal-300' : 'text-gray-400'}`}>
+                  <span className="w-10 text-right font-mono">{alt.score.toFixed(1)}</span>
+                  <span>
+                    {alt.action.color} from {alt.action.source_type === 'factory'
+                      ? `factory ${(alt.action.source_index ?? 0) + 1}` : 'center'}
+                    {' → '}
+                    {alt.action.destination === 'floor' ? 'floor' : `row ${(alt.action.destination_row ?? 0) + 1}`}
+                    {i === 0 ? ' (chosen)' : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Scores before this move */}
           {m.scores && Object.keys(m.scores).length > 0 && (
             <div className="bg-gray-800/50 rounded p-2">
-              <div className="text-[10px] text-gray-500 mb-1">Scores after this move</div>
+              <div className="text-[10px] text-gray-500 mb-1">Scores before this move</div>
               <div className="flex gap-4">
                 {Object.entries(m.scores).map(([name, score]) => (
                   <div key={name} className="text-xs">

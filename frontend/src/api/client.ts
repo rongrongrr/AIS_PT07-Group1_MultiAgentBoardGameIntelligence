@@ -64,6 +64,13 @@ export interface MoveResponse {
   ws_wait_ms?: number;
   total_ms?: number;
   legal_actions?: number;
+  explanation?: {
+    model: string;
+    chosen_score: number;
+    n_legal: number;
+    top_alternatives: { action: GameAction; score: number }[];
+    adaptation?: { reason: string; playing_as: string; target_archetype?: string };
+  } | null;
   round?: number;
   scores?: Record<string, number>;
   board?: {

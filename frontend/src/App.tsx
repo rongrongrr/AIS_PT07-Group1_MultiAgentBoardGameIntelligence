@@ -129,7 +129,7 @@ export default function App() {
                 ) : (
                   sessions.map((s) => {
                     const players = s.player_config.map((p) => {
-                      const label = p.type === 'human' ? 'H' : p.type === 'GreedyPlayer' ? 'G' : 'R';
+                      const label = p.type === 'human' ? 'H' : p.type.charAt(0);
                       return `${label}:${p.name || p.type}`;
                     });
                     const duration = formatDuration(s.created_at, s.completed_at);

@@ -22,6 +22,10 @@ interface ProfileResult {
   timing: { avg_total_ms: number; avg_decide_ms: number };
   score_trajectory: number[];
   analyzer: string;
+  archetype?: string | null;
+  archetype_confidence?: number;
+  archetype_scores?: Record<string, number>;
+  archetype_reasons?: { feature: string; value: number; z: number; meaning: string }[];
 }
 
 export default function ProfileAnalyzer({ sessionId, session }: {
@@ -130,6 +134,43 @@ export default function ProfileAnalyzer({ sessionId, session }: {
 
           {/* Summary */}
           <p className="text-sm text-gray-300 leading-relaxed">{profile.summary}</p>
+
+          {/* Learned archetype with reasons */}
+          {profile.archetype && (
+            <div className="bg-gray-800 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-500">Archetype</span>
+                <span className="text-sm font-semibold text-yellow-300">
+                  {profile.archetype.replace('Player', '')}
+                  <span className="text-xs text-gray-400 font-normal ml-2">
+                    {Math.round((profile.archetype_confidence ?? 0) * 100)}% confidence
+                  </span>
+                </span>
+              </div>
+              {profile.archetype_reasons && profile.archetype_reasons.length > 0 && (
+                <ul className="text-xs text-gray-300 list-disc list-inside">
+                  {profile.archetype_reasons.map((r) => (
+                    <li key={r.feature}>{r.meaning} ({r.feature} = {r.value}, z = {r.z})</li>
+                  ))}
+                </ul>
+              )}
+              {profile.archetype_scores && (
+                <div className="space-y-1">
+                  {Object.entries(profile.archetype_scores)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([label, p]) => (
+                      <div key={label} className="flex items-center gap-2 text-[10px] text-gray-400">
+                        <span className="w-28 truncate">{label.replace('Player', '')}</span>
+                        <div className="flex-1 h-1.5 bg-gray-700 rounded">
+                          <div className="h-1.5 bg-teal-500 rounded" style={{ width: `${Math.round(p * 100)}%` }} />
+                        </div>
+                        <span className="w-8 text-right">{Math.round(p * 100)}%</span>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Stats grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
