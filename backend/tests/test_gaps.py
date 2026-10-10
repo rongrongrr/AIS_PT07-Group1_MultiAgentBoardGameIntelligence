@@ -9,15 +9,15 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from app.azul import game as G
-from app.azul import rules as R
-from app.azul import scoring
-from app.ml import adaptive_player as AP
-from app.ml.analyzers import ArchetypeProfileAnalyzer, BasicProfileAnalyzer, analyzer_registry
-from app.ml.archetypes import (
+from tiles.azul import game as G
+from tiles.azul import rules as R
+from tiles.azul import scoring
+from tiles.ml import adaptive_player as AP
+from tiles.ml.analyzers import ArchetypeProfileAnalyzer, BasicProfileAnalyzer, analyzer_registry
+from tiles.ml.archetypes import (
     FEATURE_NAMES, ArchetypeClassifier, ArchetypeModel, extract_features,
 )
-from app.models.schemas import (
+from tiles.models.schemas import (
     DestinationType, GameAction, GameStateData, PlayerState, SourceType, TileColor,
 )
 
@@ -95,7 +95,7 @@ def test_floor_overflow_goes_to_lid_and_bag_refills_from_lid():
 
 
 def test_max_rounds_cutoff_still_returns_scores():
-    from app.ml.random_player import RandomPlayer
+    from tiles.ml.random_player import RandomPlayer
     ps = [RandomPlayer(seed=1), RandomPlayer(seed=2)]
     res = asyncio.run(G.play_game([p.decide for p in ps], ["A", "B"], seed=3, max_rounds=1))
     assert res["rounds"] <= 2 and set(res["scores"]) == {"A", "B"}
@@ -184,7 +184,7 @@ def test_archetype_analyzer_edge_cases(corpus):
 
 
 def test_registry_survives_a_bad_model_file(monkeypatch, tmp_path):
-    from app.ml import analyzers, archetypes
+    from tiles.ml import analyzers, archetypes
     bad = tmp_path / "bad.json"
     bad.write_text("{not json")
     monkeypatch.setattr(archetypes, "DEFAULT_MODEL_PATH", bad)

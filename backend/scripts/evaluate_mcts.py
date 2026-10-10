@@ -15,13 +15,13 @@ import time
 
 from duel import duel
 
-from app.azul.game import play_game
-from app.ml.greedy_player import (
+from tiles.azul.game import play_game
+from tiles.ml.greedy_player import (
     BlockerPlayer, ColorCollectorPlayer, GreedyPlayer, RecklessPlayer, RusherPlayer,
 )
-from app.ml.mcts_player import ConditionedMCTSPlayer, MCTSPlayer
-from app.ml.minimax_player import MinimaxPlayer
-from app.ml.rollout_player import RolloutPlayer
+from tiles.ml.mcts_player import ConditionedMCTSPlayer, MCTSPlayer
+from tiles.ml.minimax_player import MinimaxPlayer
+from tiles.ml.rollout_player import RolloutPlayer
 
 STYLES = [GreedyPlayer, ColorCollectorPlayer, RusherPlayer, RecklessPlayer, BlockerPlayer]
 

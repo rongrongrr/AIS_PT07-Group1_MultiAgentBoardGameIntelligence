@@ -4,15 +4,15 @@ import asyncio
 
 import pytest
 
-from app.azul.game import new_game, play_game
-from app.azul.rules import get_legal_actions
-from app.ml.archetypes import move_record, state_from_record
-from app.ml.elo import EloRatings, round_robin
-from app.ml.greedy_player import BlockerPlayer, DEFAULT_WEIGHTS, GreedyPlayer, Weights
-from app.ml.mcts_player import ConditionedMCTSPlayer, MCTSPlayer
-from app.ml.random_player import RandomPlayer
-from app.ml.registry import registry
-from app.ml.tuning import BOUNDS, GENES, clip, evaluate, evolve, to_genome, to_weights
+from tiles.azul.game import new_game, play_game
+from tiles.azul.rules import get_legal_actions
+from tiles.ml.archetypes import move_record, state_from_record
+from tiles.ml.elo import EloRatings, round_robin
+from tiles.ml.greedy_player import BlockerPlayer, DEFAULT_WEIGHTS, GreedyPlayer, Weights
+from tiles.ml.mcts_player import ConditionedMCTSPlayer, MCTSPlayer
+from tiles.ml.random_player import RandomPlayer
+from tiles.ml.registry import registry
+from tiles.ml.tuning import BOUNDS, GENES, clip, evaluate, evolve, to_genome, to_weights
 
 
 def run(c):
@@ -139,7 +139,7 @@ def test_evolve_returns_valid_weights_and_history():
 
 
 def test_conditioned_minimax_infers_style_and_orders_replies_by_it():
-    from app.ml.minimax_player import ConditionedMinimaxPlayer
+    from tiles.ml.minimax_player import ConditionedMinimaxPlayer
 
     me = ConditionedMinimaxPlayer(depth=2, min_observed=4)
     players = [me, BlockerPlayer()]

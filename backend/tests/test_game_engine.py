@@ -1,17 +1,17 @@
-"""Tests for app.azul.game (state transitions and full-game simulation)."""
+"""Tests for tiles.azul.game (state transitions and full-game simulation)."""
 
 import asyncio
 import random
 
 import pytest
 
-from app.azul.game import (
+from tiles.azul.game import (
     FIRST_PLAYER, apply_action, floor_size, new_game, play_game, round_over, step_round_boundary,
 )
-from app.azul.rules import get_legal_actions
-from app.ml.greedy_player import GreedyPlayer
-from app.ml.random_player import RandomPlayer
-from app.models.schemas import DestinationType, GameAction, SourceType, TileColor
+from tiles.azul.rules import get_legal_actions
+from tiles.ml.greedy_player import GreedyPlayer
+from tiles.ml.random_player import RandomPlayer
+from tiles.models.schemas import DestinationType, GameAction, SourceType, TileColor
 
 
 def tile_total(sim) -> int:

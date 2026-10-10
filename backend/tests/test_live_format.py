@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from app.azul.rules import is_game_over
-from app.engine import play_engine as pe
-from app.engine.state_parser import parse_game_state_from_event, parse_socketio_message
-from app.models.schemas import TileColor
+from tiles.azul.rules import is_game_over
+from tiles.engine import play_engine as pe
+from tiles.engine.state_parser import parse_game_state_from_event, parse_socketio_message
+from tiles.models.schemas import TileColor
 
 FRAMES = json.loads((Path(__file__).parent / "fixtures" / "live_frames.json").read_text())["frames"]
 FIRST_DEAL, MID, ROUND_END, NEXT_DEAL, REJECTED_DEAL, FINAL = FRAMES

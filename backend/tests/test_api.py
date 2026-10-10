@@ -7,8 +7,8 @@ from fastapi.testclient import TestClient
 # Use a test database
 os.environ["TILES_DB_PATH"] = "/tmp/tiles_test.db"
 
-from app.main import app
-from app.models.db import Base, engine, init_db
+from tiles.main import app
+from tiles.models.db import Base, engine, init_db
 
 
 @pytest.fixture(autouse=True)
@@ -136,7 +136,7 @@ class TestHistory:
         sid = create_resp.json()["id"]
 
         # Insert a move with board data directly into DB
-        from app.models.db import Move, SessionLocal
+        from tiles.models.db import Move, SessionLocal
         db = SessionLocal()
         move = Move(
             session_id=sid, step_id=1, player_name="Alice",
@@ -188,7 +188,7 @@ class TestHistory:
             "players": [{"slot": 0, "type": "GreedyPlayer", "name": "A"}],
         })
         sid = create_resp.json()["id"]
-        from app.models.db import Move, SessionLocal
+        from tiles.models.db import Move, SessionLocal
         db = SessionLocal()
         for i in range(5):
             db.add(Move(
@@ -222,7 +222,7 @@ class TestHistory:
         })
         sid = create_resp.json()["id"]
 
-        from app.models.db import Move, SessionLocal
+        from tiles.models.db import Move, SessionLocal
         db = SessionLocal()
         for i in range(3):
             db.add(Move(

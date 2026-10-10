@@ -6,16 +6,16 @@ from pathlib import Path
 
 import pytest
 
-from app.azul.config import DEFAULT_RULES, RulesConfig
-from app.azul.game import new_game, play_game
-from app.azul.rules import calculate_end_game_bonuses, calculate_floor_penalty
-from app.ml.greedy_player import GreedyPlayer
-from app.rules_ingest import extract as X
-from app.rules_ingest.benchmark import make_variant, random_truth, run_benchmark
-from app.rules_ingest.extract import LLMExtractor, PatternExtractor
-from app.rules_ingest.ingest import ingest_file, ingest_text
-from app.rules_ingest.retriever import Retriever, chunk, split_sentences
-from app.rules_ingest.schema import (
+from tiles.azul.config import DEFAULT_RULES, RulesConfig
+from tiles.azul.game import new_game, play_game
+from tiles.azul.rules import calculate_end_game_bonuses, calculate_floor_penalty
+from tiles.ml.greedy_player import GreedyPlayer
+from tiles.rules_ingest import extract as X
+from tiles.rules_ingest.benchmark import make_variant, random_truth, run_benchmark
+from tiles.rules_ingest.extract import LLMExtractor, PatternExtractor
+from tiles.rules_ingest.ingest import ingest_file, ingest_text
+from tiles.rules_ingest.retriever import Retriever, chunk, split_sentences
+from tiles.rules_ingest.schema import (
     FIELDS, RuleSet, compare, ground_truth, to_config, wall_matches_standard,
 )
 

@@ -15,12 +15,12 @@ import time
 
 from duel import duel
 
-from app.azul.game import play_game
-from app.ml.adaptive_player import AdaptiveRolloutPlayer
-from app.ml.greedy_player import (
+from tiles.azul.game import play_game
+from tiles.ml.adaptive_player import AdaptiveRolloutPlayer
+from tiles.ml.greedy_player import (
     BlockerPlayer, ColorCollectorPlayer, GreedyPlayer, RecklessPlayer, RusherPlayer,
 )
-from app.ml.rollout_player import RolloutPlayer
+from tiles.ml.rollout_player import RolloutPlayer
 
 OPPONENTS = [GreedyPlayer, ColorCollectorPlayer, RusherPlayer, RecklessPlayer, BlockerPlayer]
 

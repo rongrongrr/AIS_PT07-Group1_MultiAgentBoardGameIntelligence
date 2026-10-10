@@ -4,12 +4,12 @@ import asyncio
 
 import pytest
 
-from app.azul.game import new_game, play_game
-from app.azul.rules import get_legal_actions
-from app.ml.greedy_player import GreedyPlayer
-from app.ml.minimax_player import MinimaxPlayer
-from app.ml.registry import registry
-from app.ml.rollout_player import ValueWeights
+from tiles.azul.game import new_game, play_game
+from tiles.azul.rules import get_legal_actions
+from tiles.ml.greedy_player import GreedyPlayer
+from tiles.ml.minimax_player import MinimaxPlayer
+from tiles.ml.registry import registry
+from tiles.ml.rollout_player import ValueWeights
 
 
 def run(c):

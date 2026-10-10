@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.azul.rules import (
+from tiles.azul.rules import (
     WALL_PATTERN,
     calculate_end_game_bonuses,
     calculate_floor_penalty,
@@ -14,7 +14,7 @@ from app.azul.rules import (
     score_tile_placement,
     wall_column_for_color,
 )
-from app.models.schemas import (
+from tiles.models.schemas import (
     DestinationType,
     GameStateData,
     PlayerState,
@@ -334,12 +334,12 @@ class TestGameOver:
 
 class TestTileCounting:
     def test_counts_enum_tiles_in_factory(self):
-        from app.azul.rules import count_tiles_of_color
+        from tiles.azul.rules import count_tiles_of_color
         tiles = [TileColor.RED] * 3 + [TileColor.BLUE]
         assert count_tiles_of_color(tiles, TileColor.RED) == 3
 
     def test_counts_string_tiles_in_center(self):
-        from app.azul.rules import count_tiles_of_color
+        from tiles.azul.rules import count_tiles_of_color
         assert count_tiles_of_color(["red", "red", "firstPlayer"], TileColor.RED) == 2
 
 

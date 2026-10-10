@@ -5,12 +5,12 @@ import random
 
 import pytest
 
-from app.azul.game import apply_action, floor_size, new_game, play_game, score_round
-from app.azul.rules import calculate_floor_penalty, get_legal_actions
-from app.explain.explainer import Explainer, LLMExplainer, move_facts
-from app.ml.minimax_player import MinimaxPlayer
-from app.ml.random_player import RandomPlayer
-from app.models.schemas import DestinationType, GameAction, SourceType, TileColor
+from tiles.azul.game import apply_action, floor_size, new_game, play_game, score_round
+from tiles.azul.rules import calculate_floor_penalty, get_legal_actions
+from tiles.explain.explainer import Explainer, LLMExplainer, move_facts
+from tiles.ml.minimax_player import MinimaxPlayer
+from tiles.ml.random_player import RandomPlayer
+from tiles.models.schemas import DestinationType, GameAction, SourceType, TileColor
 
 
 def positions(games=4, per_state=6, seed=0):

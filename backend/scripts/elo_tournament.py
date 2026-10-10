@@ -16,13 +16,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.ml.elo import round_robin  # noqa: E402
-from app.ml.greedy_player import BlockerPlayer, ColorCollectorPlayer, GreedyPlayer, RecklessPlayer, RusherPlayer  # noqa: E402
-from app.ml.mcts_player import MCTSPlayer  # noqa: E402
-from app.ml.minimax_player import MinimaxPlayer  # noqa: E402
-from app.ml.random_player import RandomPlayer  # noqa: E402
-from app.ml.rollout_player import RolloutPlayer  # noqa: E402
-from app.ml.td_player import TDPlayer  # noqa: E402
+from tiles.bridge import TilesMCTSPlayer, TilesMinimaxPlayer, TilesProfiledMCTSPlayer  # noqa: E402
+from tiles.ml.elo import round_robin  # noqa: E402
+from tiles.ml.greedy_player import BlockerPlayer, ColorCollectorPlayer, GreedyPlayer, RecklessPlayer, RusherPlayer  # noqa: E402
+from tiles.ml.mcts_player import MCTSPlayer  # noqa: E402
+from tiles.ml.minimax_player import MinimaxPlayer  # noqa: E402
+from tiles.ml.random_player import RandomPlayer  # noqa: E402
+from tiles.ml.rollout_player import RolloutPlayer  # noqa: E402
+from tiles.ml.td_player import TDPlayer  # noqa: E402
 
 FACTORIES = {
     "RandomPlayer": lambda s: RandomPlayer(seed=s),
@@ -35,6 +36,9 @@ FACTORIES = {
     "MinimaxPlayer": lambda s: MinimaxPlayer(),
     "MCTSPlayer": lambda s: MCTSPlayer(seed=s, iterations=120),
     "TDPlayer": lambda s: TDPlayer(),
+    "TilesMinimax": lambda s: TilesMinimaxPlayer(seed=s),
+    "TilesMCTS": lambda s: TilesMCTSPlayer(seed=s),
+    "TilesProfiledMCTS": lambda s: TilesProfiledMCTSPlayer(seed=s),
 }
 
 
@@ -58,7 +62,7 @@ async def main():
     for r in names:
         print(f"{r:<22}" + "".join(f"{'-':>10}" if r == c else f"{res.win_rate(r, c):>10.2f}" for c in names))
     if a.mlflow:
-        from app import tracking
+        from tiles import tracking
         tracking.log_run(tracking.EVALUATION_EXPERIMENT, "elo tournament",
                          params={"players": ", ".join(a.players), "deals": a.deals, "seed": a.seed},
                          metrics={f"elo.{n}": e for n, e in res.elo.items()}, tags={"kind": "elo"},

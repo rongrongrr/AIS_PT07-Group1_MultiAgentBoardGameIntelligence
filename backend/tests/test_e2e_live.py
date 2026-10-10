@@ -21,11 +21,11 @@ import time
 
 import pytest
 
-from app.engine.play_engine import BotBrowser, MultiPlayerSession
-from app.engine.state_parser import parse_state_from_dom
-from app.azul.rules import get_legal_actions
-from app.ml.greedy_player import GreedyPlayer
-from app.models.schemas import BrowserMode, GameStateData
+from tiles.engine.play_engine import BotBrowser, MultiPlayerSession
+from tiles.engine.state_parser import parse_state_from_dom
+from tiles.azul.rules import get_legal_actions
+from tiles.ml.greedy_player import GreedyPlayer
+from tiles.models.schemas import BrowserMode, GameStateData
 
 pytestmark = pytest.mark.live
 

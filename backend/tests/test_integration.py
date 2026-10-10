@@ -13,14 +13,14 @@ os.environ["TILES_DB_PATH"] = "/tmp/tiles_integration_test.db"
 
 from fastapi.testclient import TestClient
 
-from app.main import app
-from app.models.db import Base, engine, init_db
-from app.ml.random_player import RandomPlayer
-from app.ml.greedy_player import GreedyPlayer
-from app.ml.registry import registry
-from app.azul.rules import get_legal_actions
-from app.engine.state_parser import parse_game_state_from_event
-from app.models.schemas import (
+from tiles.main import app
+from tiles.models.db import Base, engine, init_db
+from tiles.ml.random_player import RandomPlayer
+from tiles.ml.greedy_player import GreedyPlayer
+from tiles.ml.registry import registry
+from tiles.azul.rules import get_legal_actions
+from tiles.engine.state_parser import parse_game_state_from_event
+from tiles.models.schemas import (
     DestinationType,
     GameStateData,
     PlayerState,

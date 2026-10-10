@@ -4,10 +4,10 @@ import asyncio
 
 import pytest
 
-from app.azul.game import apply_action, new_game, play_game
-from app.azul.rules import get_legal_actions
-from app.ml.greedy_player import ARCHETYPES, BlockerPlayer, GreedyPlayer, RecklessPlayer
-from app.ml.opponent_model import STYLE_LIBRARY, OpponentModel, move_distribution
+from tiles.azul.game import apply_action, new_game, play_game
+from tiles.azul.rules import get_legal_actions
+from tiles.ml.greedy_player import ARCHETYPES, BlockerPlayer, GreedyPlayer, RecklessPlayer
+from tiles.ml.opponent_model import STYLE_LIBRARY, OpponentModel, move_distribution
 
 
 def run(c):

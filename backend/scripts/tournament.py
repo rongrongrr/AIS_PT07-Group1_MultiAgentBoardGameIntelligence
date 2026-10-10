@@ -21,12 +21,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.azul.game import play_game  # noqa: E402
-from app.ml.greedy_player import GreedyPlayer  # noqa: E402
-from app.ml.random_player import RandomPlayer  # noqa: E402
-from app.ml.mcts_player import ConditionedMCTSPlayer, MCTSPlayer  # noqa: E402
-from app.ml.minimax_player import MinimaxPlayer  # noqa: E402
-from app.ml.rollout_player import RolloutPlayer  # noqa: E402
+from tiles.azul.game import play_game  # noqa: E402
+from tiles.ml.greedy_player import GreedyPlayer  # noqa: E402
+from tiles.ml.random_player import RandomPlayer  # noqa: E402
+from tiles.ml.mcts_player import ConditionedMCTSPlayer, MCTSPlayer  # noqa: E402
+from tiles.ml.minimax_player import MinimaxPlayer  # noqa: E402
+from tiles.ml.rollout_player import RolloutPlayer  # noqa: E402
 
 PLAYERS = {"GreedyPlayer": GreedyPlayer, "RandomPlayer": RandomPlayer, "RolloutPlayer": RolloutPlayer, "MinimaxPlayer": MinimaxPlayer,
            "MCTSPlayer": MCTSPlayer, "ConditionedMCTSPlayer": ConditionedMCTSPlayer}
@@ -91,7 +91,7 @@ async def main():
         r = await run_pair(a, b, args.games, args.seed)
         results.append(r)
         if args.mlflow:
-            from app import tracking
+            from tiles import tracking
             tracking.log_run(
                 tracking.EVALUATION_EXPERIMENT, f"tournament {a} vs {b}",
                 params={"a": a, "b": b, "games": r["games"], "seed": args.seed},

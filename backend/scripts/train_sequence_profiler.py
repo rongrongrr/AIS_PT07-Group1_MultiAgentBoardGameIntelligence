@@ -22,8 +22,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import train_archetypes as ta  # noqa: E402
-from app.ml.archetypes import ArchetypeClassifier, extract_features  # noqa: E402
-from app.ml.sequence_profiler import DEFAULT_SEQ_MODEL_PATH, SequenceProfiler, sequence_matrix  # noqa: E402
+from tiles.ml.archetypes import ArchetypeClassifier, extract_features  # noqa: E402
+from tiles.ml.sequence_profiler import DEFAULT_SEQ_MODEL_PATH, SequenceProfiler, sequence_matrix  # noqa: E402
 
 
 def to_sequences(games):

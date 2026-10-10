@@ -7,15 +7,15 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.azul.game import new_game, play_game
-from app.azul.rules import get_legal_actions
-from app.main import app
-from app.ml.greedy_player import GreedyPlayer
-from app.ml.registry import registry
-from app.ml.remote_player import RemotePlayer
-from app.models.db import MLModel
-from app.models.schemas import DestinationType, GameAction, SourceType, TileColor
-from app.routers.players import load_registered_players
+from tiles.azul.game import new_game, play_game
+from tiles.azul.rules import get_legal_actions
+from tiles.main import app
+from tiles.ml.greedy_player import GreedyPlayer
+from tiles.ml.registry import registry
+from tiles.ml.remote_player import RemotePlayer
+from tiles.models.db import MLModel
+from tiles.models.schemas import DestinationType, GameAction, SourceType, TileColor
+from tiles.routers.players import load_registered_players
 
 
 def run(c):

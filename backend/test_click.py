@@ -4,7 +4,7 @@ import asyncio, sys, time
 sys.path.insert(0, ".")
 from playwright.async_api import async_playwright
 from base64 import b64encode
-from app.engine.state_parser import parse_socketio_message, parse_game_state_from_event
+from tiles.engine.state_parser import parse_socketio_message, parse_game_state_from_event
 
 INIT = """(function(){let _io;try{Object.defineProperty(window,'io',{configurable:true,get(){return _io;},set(v){_io=v;if(v&&typeof v.connect==='function'){const o=v.connect.bind(v);v.connect=function(){const s=o.apply(v,arguments);window.__tiles_socket=s;return s;};}}});}catch(e){}})();"""
 

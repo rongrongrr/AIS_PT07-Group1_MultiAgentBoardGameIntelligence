@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install (CPU PyTorch + pinned requirements)
+        working-directory: backend
+        run: |
+          pip install --index-url https://download.pytorch.org/whl/cpu "torch==2.4.1"
+          pip install -r requirements.txt
+      - name: Test (coverage floor 80% enforced by .coveragerc)
+        working-directory: backend
+        run: python -m pytest tests --cov=tiles -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start the stack
+        run: docker compose up --build -d
+      - name: Smoke test (API through the nginx proxy)
+        run: |
+          for i in $(seq 1 60); do
+            sleep 2
+            curl -sf http://127.0.0.1:8080/api/health && break
+          done
+          curl -sf http://127.0.0.1:8080/api/players | grep -q TilesProfiledMCTS
+          curl -sf http://127.0.0.1:8080/ | grep -qi "<div id=\"root\""
+      - if: always()
+        run: docker compose down -v

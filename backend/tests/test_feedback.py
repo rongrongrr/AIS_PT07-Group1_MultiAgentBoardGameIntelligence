@@ -5,9 +5,9 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-from app.models.db import Move
-from app.routers.feedback import mean_ci
+from tiles.main import app
+from tiles.models.db import Move
+from tiles.routers.feedback import mean_ci
 
 
 @pytest.fixture

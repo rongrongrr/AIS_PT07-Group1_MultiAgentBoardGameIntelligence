@@ -6,11 +6,11 @@ import random
 import numpy as np
 import pytest
 
-from app.azul.game import new_game
-from app.azul.rules import get_legal_actions
-from app.ml.registry import registry
-from app.ml.td_player import FEATURES, TDPlayer, features, td_update
-from app.models.schemas import TileColor
+from tiles.azul.game import new_game
+from tiles.azul.rules import get_legal_actions
+from tiles.ml.registry import registry
+from tiles.ml.td_player import FEATURES, TDPlayer, features, td_update
+from tiles.models.schemas import TileColor
 
 
 def run(c):
@@ -74,7 +74,7 @@ def test_save_load_roundtrip_and_registry(tmp_path):
     path = tmp_path / "td.json"
     TDPlayer(w=w).save(path, meta={"games": 1})
     import json
-    from app.ml import td_player
+    from tiles.ml import td_player
     td_player.DEFAULT_TD_PATH, old = path, td_player.DEFAULT_TD_PATH
     try:
         assert np.allclose(TDPlayer().w, w)

@@ -8,11 +8,11 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-from app.ml.base import ProfilerAgent
-from app.ml.registry import registry
-from app.models.db import GameState, Move, Session
-from app.routers import sessions as S
+from tiles.main import app
+from tiles.ml.base import ProfilerAgent
+from tiles.ml.registry import registry
+from tiles.models.db import GameState, Move, Session
+from tiles.routers import sessions as S
 from tests.fakes import FakeMP, FakePlatform, FakeBot
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -133,7 +133,7 @@ def test_broadcast_drops_dead_sockets():
 
 def test_broadcast_move_and_state_payloads():
     from datetime import datetime
-    from app.models.schemas import DestinationType, GameAction, GameStateData, MoveRecord, SourceType, TileColor
+    from tiles.models.schemas import DestinationType, GameAction, GameStateData, MoveRecord, SourceType, TileColor
 
     sent = []
 

@@ -14,8 +14,8 @@ import asyncio
 
 from duel import duel
 
-from app.ml.adaptive_player import AdaptivePlayer
-from app.ml.greedy_player import (
+from tiles.ml.adaptive_player import AdaptivePlayer
+from tiles.ml.greedy_player import (
     BlockerPlayer, ColorCollectorPlayer, GreedyPlayer, RecklessPlayer, RusherPlayer,
 )
 

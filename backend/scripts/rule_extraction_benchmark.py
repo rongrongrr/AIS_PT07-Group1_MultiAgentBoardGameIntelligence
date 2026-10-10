@@ -17,10 +17,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.rules_ingest.benchmark import run_benchmark  # noqa: E402
-from app.rules_ingest.extract import PatternExtractor  # noqa: E402
-from app.rules_ingest.ingest import ingest_file  # noqa: E402
-from app.rules_ingest.schema import FIELDS  # noqa: E402
+from tiles.rules_ingest.benchmark import run_benchmark  # noqa: E402
+from tiles.rules_ingest.extract import PatternExtractor  # noqa: E402
+from tiles.rules_ingest.ingest import ingest_file  # noqa: E402
+from tiles.rules_ingest.schema import FIELDS  # noqa: E402
 
 
 def main():

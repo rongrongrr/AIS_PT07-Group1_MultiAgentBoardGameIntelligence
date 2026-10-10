@@ -20,8 +20,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from duel import duel  # noqa: E402
 
-from app.ml.greedy_player import BlockerPlayer, DEFAULT_WEIGHTS, GreedyPlayer, RusherPlayer  # noqa: E402
-from app.ml.tuning import GENES, evolve, to_genome  # noqa: E402
+from tiles.ml.greedy_player import BlockerPlayer, DEFAULT_WEIGHTS, GreedyPlayer, RusherPlayer  # noqa: E402
+from tiles.ml.tuning import GENES, evolve, to_genome  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[1] / "models" / "ga_weights.json"
 
@@ -58,7 +58,7 @@ async def main():
         print(f"  tuned vs {opp.__name__}: win {rr['win_rate']:.2f} {rr['ci95']} margin {rr['mean_score_diff']:+.1f}")
         metrics[f"validation_win_rate.{opp.__name__}"] = rr["win_rate"]
     if a.mlflow:
-        from app import tracking
+        from tiles import tracking
         tracking.log_run(tracking.EVALUATION_EXPERIMENT, "ga weight tuning",
                          params={**{f"w.{g}": round(v, 3) for g, v in zip(GENES, to_genome(w))},
                                  "generations": a.generations, "population": a.population, "seed": a.seed},

@@ -1,5 +1,5 @@
 [run]
-source = app
+source = tiles
 
 [report]
 fail_under = 80

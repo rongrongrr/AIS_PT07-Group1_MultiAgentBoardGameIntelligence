@@ -16,8 +16,8 @@ from pathlib import Path
 
 from duel import duel
 
-from app.ml.adaptive_player import BEST_RESPONSE_PATH
-from app.ml.greedy_player import (
+from tiles.ml.adaptive_player import BEST_RESPONSE_PATH
+from tiles.ml.greedy_player import (
     COUNTER_STYLES, BlockerPlayer, ColorCollectorPlayer, GreedyPlayer, RecklessPlayer, RusherPlayer,
 )
 

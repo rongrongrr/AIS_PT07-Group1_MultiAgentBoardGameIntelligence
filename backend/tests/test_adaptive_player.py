@@ -2,12 +2,12 @@
 
 import asyncio
 
-from app.azul.game import new_game, play_game
-from app.ml.adaptive_player import AdaptivePlayer
-from app.ml.archetypes import Prediction
-from app.ml.greedy_player import COUNTER_STYLES, GreedyPlayer
-from app.ml.random_player import RandomPlayer
-from app.ml.registry import registry
+from tiles.azul.game import new_game, play_game
+from tiles.ml.adaptive_player import AdaptivePlayer
+from tiles.ml.archetypes import Prediction
+from tiles.ml.greedy_player import COUNTER_STYLES, GreedyPlayer
+from tiles.ml.random_player import RandomPlayer
+from tiles.ml.registry import registry
 
 
 class FakeClassifier:

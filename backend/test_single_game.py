@@ -17,11 +17,11 @@ from playwright.async_api import async_playwright
 # Add app to path
 sys.path.insert(0, ".")
 
-from app.engine.state_parser import parse_socketio_message, parse_game_state_from_event, parse_state_from_dom
-from app.engine.action_executor import execute_action
-from app.azul.rules import get_legal_actions
-from app.ml.greedy_player import GreedyPlayer
-from app.models.schemas import BrowserMode, TileColor
+from tiles.engine.state_parser import parse_socketio_message, parse_game_state_from_event, parse_state_from_dom
+from tiles.engine.action_executor import execute_action
+from tiles.azul.rules import get_legal_actions
+from tiles.ml.greedy_player import GreedyPlayer
+from tiles.models.schemas import BrowserMode, TileColor
 
 
 def log(phase, msg, data=None):

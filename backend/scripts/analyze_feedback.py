@@ -12,8 +12,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.models.db import ExplanationFeedback, SessionLocal  # noqa: E402
-from app.routers.feedback import ITEMS, mean_ci  # noqa: E402
+from tiles.models.db import ExplanationFeedback, SessionLocal  # noqa: E402
+from tiles.routers.feedback import ITEMS, mean_ci  # noqa: E402
 
 
 def main():

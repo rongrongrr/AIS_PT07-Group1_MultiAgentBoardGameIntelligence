@@ -9,8 +9,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from app.ml.analyzers import analyzer_registry
-from app.ml.archetypes import (
+from tiles.ml.analyzers import analyzer_registry
+from tiles.ml.archetypes import (
     DEFAULT_MODEL_PATH, FEATURE_NAMES, ArchetypeClassifier, extract_features,
 )
 import train_archetypes as ta

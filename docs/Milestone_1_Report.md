@@ -77,7 +77,7 @@ However, no existing platform connects a live game environment to a modular ML p
 | Tests | pytest, FastAPI TestClient |
 
 - **15 API endpoints** (REST + WebSocket)
-- **333 automated backend tests (plus 9 frontend tests)** (`python -m pytest`; 97% line coverage of `app/`)
+- **412 automated backend tests (plus 9 frontend tests)** (`python -m pytest`; about 90% line coverage of `tiles/`)
 - **5 database tables** (sessions, game_states, moves, player_profiles, ml_models). `player_profiles` and `ml_models` are defined but not yet used.
 
 ---

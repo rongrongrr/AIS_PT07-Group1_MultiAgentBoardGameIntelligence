@@ -15,7 +15,7 @@ import random
 import pytest
 from typing import List, Optional, Tuple
 
-from app.azul.rules import (
+from tiles.azul.rules import (
     WALL_PATTERN,
     can_place_on_pattern_line,
     calculate_end_game_bonuses,
@@ -27,9 +27,9 @@ from app.azul.rules import (
     score_tile_placement,
     wall_column_for_color,
 )
-from app.ml.greedy_player import GreedyPlayer
-from app.ml.random_player import RandomPlayer
-from app.models.schemas import (
+from tiles.ml.greedy_player import GreedyPlayer
+from tiles.ml.random_player import RandomPlayer
+from tiles.models.schemas import (
     DestinationType,
     GameAction,
     GameStateData,

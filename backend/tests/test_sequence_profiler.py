@@ -12,8 +12,8 @@ torch = pytest.importorskip("torch")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import train_archetypes as ta  # noqa: E402
-from app.ml import sequence_profiler as sp  # noqa: E402
-from app.ml.analyzers import SequenceProfileAnalyzer  # noqa: E402
+from tiles.ml import sequence_profiler as sp  # noqa: E402
+from tiles.ml.analyzers import SequenceProfileAnalyzer  # noqa: E402
 
 
 @pytest.fixture(scope="module")

@@ -4,8 +4,8 @@ import asyncio
 
 import pytest
 
-import app.engine.play_engine as pe
-from app.models.schemas import GameStateData, PlayerState
+import tiles.engine.play_engine as pe
+from tiles.models.schemas import GameStateData, PlayerState
 
 
 def make_bot(monkeypatch, signals=None, empty=(), dom_state=None):

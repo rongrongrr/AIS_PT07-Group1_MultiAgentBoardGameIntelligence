@@ -2,8 +2,8 @@
 
 import pytest
 
-from app.ml.greedy_player import GreedyPlayer, _score_action
-from app.models.schemas import (
+from tiles.ml.greedy_player import GreedyPlayer, _score_action
+from tiles.models.schemas import (
     DestinationType,
     GameAction,
     GameStateData,
@@ -190,7 +190,7 @@ class TestScoringLogic:
 
 class TestFactoryTileCounting:
     def test_factory_pick_counts_all_matching_tiles(self):
-        from app.ml.greedy_player import _count_source_tiles
+        from tiles.ml.greedy_player import _count_source_tiles
         state = make_state(
             factories=[[TileColor.RED, TileColor.RED, TileColor.RED, TileColor.BLUE]]
         )

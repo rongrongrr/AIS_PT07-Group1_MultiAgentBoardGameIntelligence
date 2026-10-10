@@ -3,14 +3,14 @@
 import os
 import tempfile
 
-# Must be set before app.models.db is imported anywhere.
+# Must be set before tiles.models.db is imported anywhere.
 _TMP = os.path.join(tempfile.gettempdir(), "tiles_pytest.db")
 os.environ.setdefault("TILES_DB_PATH", _TMP)
 os.environ.setdefault("TILES_MLFLOW_DISABLED", "1")   # tests that exercise tracking opt in
 
 import pytest  # noqa: E402
 
-from app.models.db import Base, SessionLocal, engine, init_db  # noqa: E402
+from tiles.models.db import Base, SessionLocal, engine, init_db  # noqa: E402
 
 
 @pytest.fixture

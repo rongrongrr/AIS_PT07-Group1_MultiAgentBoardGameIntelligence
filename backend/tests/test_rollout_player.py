@@ -4,15 +4,15 @@ import asyncio
 
 import pytest
 
-from app.azul.game import apply_action, new_game, play_game
-from app.azul.rules import get_legal_actions
-from app.ml.adaptive_player import AdaptiveRolloutPlayer
-from app.ml.archetypes import Prediction
-from app.ml.greedy_player import ARCHETYPES, DEFAULT_WEIGHTS, GreedyPlayer
-from app.ml.random_player import RandomPlayer
-from app.ml.registry import registry
-from app.ml.rollout_player import RolloutPlayer, potential
-from app.models.schemas import PlayerState, TileColor
+from tiles.azul.game import apply_action, new_game, play_game
+from tiles.azul.rules import get_legal_actions
+from tiles.ml.adaptive_player import AdaptiveRolloutPlayer
+from tiles.ml.archetypes import Prediction
+from tiles.ml.greedy_player import ARCHETYPES, DEFAULT_WEIGHTS, GreedyPlayer
+from tiles.ml.random_player import RandomPlayer
+from tiles.ml.registry import registry
+from tiles.ml.rollout_player import RolloutPlayer, potential
+from tiles.models.schemas import PlayerState, TileColor
 
 
 def run(c):

@@ -25,9 +25,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from duel import duel  # noqa: E402
 
-from app.azul.game import apply_action, finish_game, new_game, round_over, step_round_boundary  # noqa: E402
-from app.ml.greedy_player import GreedyPlayer  # noqa: E402
-from app.ml.td_player import DEFAULT_TD_PATH, FEATURES, TDPlayer, td_update  # noqa: E402
+from tiles.azul.game import apply_action, finish_game, new_game, round_over, step_round_boundary  # noqa: E402
+from tiles.ml.greedy_player import GreedyPlayer  # noqa: E402
+from tiles.ml.td_player import DEFAULT_TD_PATH, FEATURES, TDPlayer, td_update  # noqa: E402
 
 REWARD_SCALE = 50.0
 
@@ -100,7 +100,7 @@ async def main():
     zero = await duel(lambda: TDPlayer(w=np.zeros(len(FEATURES))), GreedyPlayer, a.eval_games // 2, a.seed + 5000)
     print(f"untrained (all-zero value) vs GreedyPlayer: win {zero['win_rate']:.2f} margin {zero['mean_score_diff']:+.1f}")
     if a.mlflow:
-        from app import tracking
+        from tiles import tracking
         tracking.log_run(tracking.EVALUATION_EXPERIMENT, "td reinforcement learning",
                          params={"games": a.games, "alpha": a.alpha, "seed": a.seed},
                          metrics={"win_rate_vs_greedy": r["win_rate"], "margin_vs_greedy": r["mean_score_diff"],

@@ -1,6 +1,6 @@
 # TILES: Evaluation
 
-All results come from the simulation engine (`backend/app/azul/game.py`), are seeded, and can be regenerated with the commands shown. Numbers are from the runs recorded here; re-running with the same seed and code gives the same output.
+All results come from the simulation engine (`backend/tiles/azul/game.py`), are seeded, and can be regenerated with the commands shown. Numbers are from the runs recorded here; re-running with the same seed and code gives the same output.
 
 **Scope of these results.** They describe bots playing bots in simulation. They do not measure play against humans or on the live platform, and the archetype classifier has never been tested on human games.
 
@@ -258,7 +258,7 @@ The honest generalisation estimate is the **fresh first-run figure: about 63% fi
 
 ## 15. Explainability
 
-* **Rationales** (`app/explain`): each move gets a natural-language rationale and a one-line commentary built from engine-derived facts (tiles taken, line completion and the points it is worth, overflow and floor cost, first-player token, tiles passed to opponents, denial, margin over the next-best option, inferred opponent styles). In live Docker games 51 of 51 moves carried a rationale; they appear in the Game Monitor, the Replay and the export. An optional `LLMExplainer` rewrites the text from the facts only (stub-tested, not run live).
+* **Rationales** (`tiles/explain`): each move gets a natural-language rationale and a one-line commentary built from engine-derived facts (tiles taken, line completion and the points it is worth, overflow and floor cost, first-player token, tiles passed to opponents, denial, margin over the next-best option, inferred opponent styles). In live Docker games 51 of 51 moves carried a rationale; they appear in the Game Monitor, the Replay and the export. An optional `LLMExplainer` rewrites the text from the facts only (stub-tested, not run live).
 * **Faithfulness** (`tests/test_explainer.py`): over more than 1,500 simulated positions every claim is re-derived by *simulating the move in the game engine* (tiles removed, line completed, floor spill, token, and the exact points awarded when the engine scores the round). All claims matched.
 * **Human-centred evaluation:** the instrument is built (1-5 ratings of understandable / useful / trustworthy per explained move, comment, per-model and overall statistics with 95% CIs, a text-vs-scores-only control condition at `?explain=scores`; see [HUMAN_EVALUATION_PROTOCOL.md](HUMAN_EVALUATION_PROTOCOL.md)). **No participant ratings have been collected**; this study has to be run by the team.
 

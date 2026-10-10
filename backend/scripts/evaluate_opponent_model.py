@@ -19,14 +19,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.azul.game import play_game  # noqa: E402
-from app.azul.rules import get_legal_actions  # noqa: E402
-from app.ml.greedy_player import (  # noqa: E402
+from tiles.azul.game import play_game  # noqa: E402
+from tiles.azul.rules import get_legal_actions  # noqa: E402
+from tiles.ml.greedy_player import (  # noqa: E402
     DEFAULT_WEIGHTS, BlockerPlayer, ColorCollectorPlayer, GreedyPlayer, RecklessPlayer, RusherPlayer,
 )
-from app.ml.minimax_player import MinimaxPlayer  # noqa: E402
-from app.ml.opponent_model import OpponentModel, move_distribution  # noqa: E402
-from app.ml.rollout_player import RolloutPlayer  # noqa: E402
+from tiles.ml.minimax_player import MinimaxPlayer  # noqa: E402
+from tiles.ml.opponent_model import OpponentModel, move_distribution  # noqa: E402
+from tiles.ml.rollout_player import RolloutPlayer  # noqa: E402
 
 WARMUP = 6
 

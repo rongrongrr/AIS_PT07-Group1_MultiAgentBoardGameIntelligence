@@ -22,11 +22,11 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.azul.game import play_game  # noqa: E402
-from app.ml.archetypes import (  # noqa: E402
+from tiles.azul.game import play_game  # noqa: E402
+from tiles.ml.archetypes import (  # noqa: E402
     DEFAULT_MODEL_PATH, FEATURE_NAMES, ArchetypeClassifier, ArchetypeModel, extract_features, move_record,
 )  # noqa: E402
-from app.ml.greedy_player import (  # noqa: E402
+from tiles.ml.greedy_player import (  # noqa: E402
     BlockerPlayer, ColorCollectorPlayer, GreedyPlayer, RecklessPlayer, RusherPlayer,
 )
 

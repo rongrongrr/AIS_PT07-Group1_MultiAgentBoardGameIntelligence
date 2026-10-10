@@ -5,8 +5,8 @@ import json
 
 import pytest
 
-from app import tracking
-from app.models.db import Move, Session
+from tiles import tracking
+from tiles.models.db import Move, Session
 from tests.test_orchestration import make_session, run_game, setup
 
 mlflow = pytest.importorskip("mlflow")

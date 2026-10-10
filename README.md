@@ -27,7 +27,7 @@ Prerequisites: Python 3.11+, Node.js 18+, Chromium (installed by Playwright).
 cd backend
 python -m venv venv && source venv/bin/activate     # Windows: venv\Scripts\activate
 pip install -r requirements.txt && playwright install chromium
-uvicorn app.main:app --host 127.0.0.1 --port 8000   # API docs at http://localhost:8000/docs
+uvicorn tiles.main:app --host 127.0.0.1 --port 8000   # API docs at http://localhost:8000/docs
 
 cd ../frontend
 npm install && npm run dev                          # http://localhost:5173 (proxies /api and WebSockets to :8000)
@@ -49,6 +49,7 @@ npm install && npm run dev                          # http://localhost:5173 (pro
 | **`MinimaxPlayer`** (default) | Depth-3 alpha-beta search over the exact in-round game tree with greedy playouts. Highest Elo in the round robin (1741); beats the lookahead player 81% and the heuristic 88%. |
 | `MCTSPlayer` | UCT tree search over the same tree. Statistically tied with Minimax (Elo 1738). |
 | `ConditionedMCTSPlayer`, `ConditionedMinimaxPlayer` | The same searches, but opponents are simulated as the play style the opponent model infers from their moves (profiler conditioning). |
+| `TilesMCTS`, `TilesProfiledMCTS`, `TilesMinimax` | The teammate-built Decision Stack tacticians from `tiles/agents/` (PUCT MCTS with determinised redeals, the same with profiler-predicted opponent priors, paranoid minimax), running on the bit-packed core engine and bridged into live play by `tiles/bridge.py`. Strength vs the `ml/` players: see EVALUATION.md section 11. |
 | `RolloutPlayer` | Shortlists heuristic moves and simulates the rest of the round for each. |
 | `GreedyPlayer` | One-ply heuristic (wall points, line progress, bonus potential, floor penalties). Baseline. |
 | `ColorCollectorPlayer`, `RusherPlayer`, `RecklessPlayer`, `BlockerPlayer` | The same heuristic engine with different weights: distinct play styles used to train and test the profilers. |
@@ -72,7 +73,7 @@ All are trained on simulated bot-vs-bot play, so labels on human games are hypot
 
 ## Rulebook ingestion
 
-`app/rules_ingest` turns rulebook text into structured rules: it chunks the text, ranks passages with TF-IDF, parses 16 rule fields, verifies them against the engine, and builds a `RulesConfig` that drives the validator and simulator. `docs/rules/azul_rules.md` is the corpus (16/16 fields match the engine; games played with the extracted rules are identical). A pluggable LLM extractor exists (stub-tested, not run live). Benchmark on generated rulebooks: `python scripts/rule_extraction_benchmark.py` (honest generalisation estimate: about 63% field accuracy on unseen phrasings; see EVALUATION.md section 14).
+`tiles/rules_ingest` turns rulebook text into structured rules: it chunks the text, ranks passages with TF-IDF, parses 16 rule fields, verifies them against the engine, and builds a `RulesConfig` that drives the validator and simulator. `docs/rules/azul_rules.md` is the corpus (16/16 fields match the engine; games played with the extracted rules are identical). A pluggable LLM extractor exists (stub-tested, not run live). Benchmark on generated rulebooks: `python scripts/rule_extraction_benchmark.py` (honest generalisation estimate: about 63% field accuracy on unseen phrasings; see EVALUATION.md section 14).
 
 ## Experiment tracking
 
@@ -95,14 +96,14 @@ python scripts/rule_extraction_benchmark.py --count 100 --seed 1     # rulebook 
 python scripts/best_response.py / evaluate_adaptive.py / evaluate_lookahead.py   # earlier adaptive-play studies
 ```
 
-`app/azul/game.py` is the simulation engine (move application, round scoring, tile recycling); `app/azul/rules.py` holds legality and scoring; `app/azul/config.py` the rule parameters.
+`tiles/azul/game.py` is the simulation engine (move application, round scoring, tile recycling); `tiles/azul/rules.py` holds legality and scoring; `tiles/azul/config.py` the rule parameters.
 
 ## Tests
 
 ```bash
 cd backend
 python -m pytest                                  # offline tests (live test excluded); coverage report below
-python -m pytest --cov=app --cov-report=term      # fails below 80% (currently ~97%)
+python -m pytest --cov=tiles --cov-report=term    # fails below 80% (currently ~90%)
 python -m pytest -m live -s                       # live game on buddyboardgames.com (network + Chromium)
 cd ../frontend && npm test && npx tsc -b          # UI tests (Vitest + Testing Library) and type-check
 ```
@@ -115,24 +116,38 @@ Debugging live play: `TILES_DEBUG_FRAMES=frames.jsonl uvicorn ...` logs every pl
 
 ```
 backend/
-  app/
-    main.py                    FastAPI entry
-    azul/                      rules.py (legality, scoring), game.py (simulation), config.py (rule parameters)
+  pyproject.toml, requirements.txt   `pip install -e .` gives the `tiles` command; requirements.txt is what Docker installs
+  tiles/
+    main.py                    FastAPI entry (live runtime API; optional UI hosting via TILES_UI_DIST)
+    cli.py                     `tiles serve | play | tournament | ablate | predict-eval | verify-rules`
+    azul/                      live-runtime rules: rules.py (legality, scoring), game.py (simulation), config.py
     engine/                    play_engine.py (Playwright browsers), action_executor.py, state_parser.py
     ml/                        players (greedy, rollout, minimax, mcts, td, remote), opponent_model.py,
                                archetypes.py, sequence_profiler.py, analyzers.py, elo.py, tuning.py, registry.py
     explain/explainer.py       rationales + commentary from engine-derived facts
-    rules_ingest/              rulebook retrieval, extraction, benchmark, ingestion
-    tracking.py                MLflow logging
-    models/                    SQLAlchemy + Pydantic
-    routers/                   sessions, players, history, profiler, feedback
+    rules_ingest/              rulebook retrieval, extraction, benchmark, validator configuration
+    core/                      bit-packed rules engine, 300-slot action space, simulator
+    agents/                    Decision Stack: tacticians (PUCT MCTS, minimax, heuristics), profiler + move predictor,
+                               template/LLM explainer, validator
+    orchestration/             per-turn pipeline (validate -> decide -> explain -> record, with retry)
+    sim/                       local matches, tournament, profiler ablation, prediction evaluation
+    ledger/, telemetry/, rl/   SQLite ledger, MLflow/JSONL tracker, PettingZoo environment
+    rulebook/                  second rule-extraction pipeline (rulebook text -> specs -> verified against core)
+    bridge.py                  converts between the two engines; exposes core tacticians as live players
+    tracking.py                MLflow logging of live games
+    models/, routers/          SQLAlchemy + Pydantic; sessions, players, history, profiler, feedback
   scripts/                     training, tournament and evaluation scripts
   models/                      trained models (JSON / .pt)
   tests/
-frontend/src/                  React + Zustand UI (config, monitor, replay, profile) + Vitest tests
-docs/                          evaluation, status, protocol, rules corpus, evidence, report corrections
+frontend/src/                  React + Zustand UI (config, monitor, replay, profile, rating) + Vitest tests
+docs/                          evaluation, status, architecture, API, merge notes, protocol, evidence, corrections
 docker-compose.yml             one-command run (+ optional MLflow UI profile)
+.github/workflows/ci.yml       backend tests with coverage floor, frontend tests + build, Docker smoke test
 ```
+
+`tiles/azul/game.py` is the simulation engine for the live runtime (move application, round scoring, tile recycling); `tiles/azul/rules.py` holds legality and scoring; `tiles/azul/config.py` the rule parameters. `tiles/core/` is an independent implementation; `tests/test_bridge.py` checks the two agree over full games. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/MERGE_NOTES.md](docs/MERGE_NOTES.md).
+
+Command-line (no browser needed): `cd backend && pip install -e . && tiles tournament --player a=greedy --player b=mcts_profiled`, `tiles ablate`, `tiles verify-rules`, `tiles serve`.
 
 ## API
 

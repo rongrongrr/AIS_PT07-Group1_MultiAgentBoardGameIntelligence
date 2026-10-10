@@ -10,12 +10,12 @@ import json
 
 import pytest
 
-from app.azul.rules import is_game_over
-from app.ml.base import MachinePlayer
-from app.ml.registry import registry
-from app.models.db import GameState, Move, Session
-from app.models.schemas import DestinationType, GameAction, SourceType, TileColor
-from app.routers import sessions as S
+from tiles.azul.rules import is_game_over
+from tiles.ml.base import MachinePlayer
+from tiles.ml.registry import registry
+from tiles.models.db import GameState, Move, Session
+from tiles.models.schemas import DestinationType, GameAction, SourceType, TileColor
+from tiles.routers import sessions as S
 from tests.fakes import FakeBot, FakeClock, FakeMP, FakePlatform, instant_sleep
 
 NAMES = ["Alice", "Bob"]
@@ -230,7 +230,7 @@ def test_update_status_picks_highest_score_as_winner(db):
 
 
 def test_states_equal_helper():
-    from app.models.schemas import GameStateData
+    from tiles.models.schemas import GameStateData
     a = GameStateData(factories=[[TileColor.RED]])
     assert S._states_equal(a, a.model_copy(deep=True))
     assert not S._states_equal(a, GameStateData(factories=[[TileColor.BLUE]]))

@@ -44,3 +44,4 @@ htmlcov/
 
 # Experiment tracking store (MLflow)
 mlruns/
+experiments.jsonl

@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Callable, List, Optional, Tuple
 
-from app.azul.game import apply_action, new_game, round_over, step_round_boundary
-from app.engine.action_executor import ExecutionResult
-from app.models.schemas import DestinationType, GameAction
+from tiles.azul.game import apply_action, new_game, round_over, step_round_boundary
+from tiles.engine.action_executor import ExecutionResult
+from tiles.models.schemas import DestinationType, GameAction
 
 
 class FakeElement:

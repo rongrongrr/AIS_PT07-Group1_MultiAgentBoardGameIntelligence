@@ -2,12 +2,12 @@
 
 import pytest
 
-from app.engine.state_parser import (
+from tiles.engine.state_parser import (
     parse_game_state_from_event,
     parse_socketio_message,
     parse_start_game_response,
 )
-from app.models.schemas import TileColor
+from tiles.models.schemas import TileColor
 
 
 class TestSocketIOMessageParsing:

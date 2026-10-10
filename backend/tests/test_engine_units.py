@@ -5,12 +5,12 @@ import base64
 
 import pytest
 
-import app.engine.play_engine as pe
-from app.engine import state_parser as sp
-from app.engine.action_executor import (
+import tiles.engine.play_engine as pe
+from tiles.engine import state_parser as sp
+from tiles.engine.action_executor import (
     ExecutionResult, _build_choose_payload, _build_place_payload, _emit_and_wait, execute_action,
 )
-from app.models.schemas import (
+from tiles.models.schemas import (
     BrowserMode, DestinationType, GameAction, GameStateData, PlayerState, SourceType, TileColor,
 )
 from tests.fakes import FakeElement, FakePage, FakeSocketPage, instant_sleep
