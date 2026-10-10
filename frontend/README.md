@@ -9,8 +9,11 @@ view is for.
 
 ## Develop
 
+`./start.sh` at the repository root (`start.cmd` on Windows) starts this dev
+server together with the backend. To run it on its own:
+
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 

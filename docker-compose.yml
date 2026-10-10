@@ -1,41 +1,43 @@
-# TILES stack.
+# TILES in containers. Start it through the launcher rather than directly:
 #
-#   docker compose up tiles                 # server + UI at :8000 (local mode)
-#   docker compose --profile live up        # live-play-capable variant
-#   docker compose --profile telemetry up   # + MLflow UI at :5000
-#   docker compose --profile dev up ui-dev  # hot-reload frontend at :5173
+#   ./start.sh docker          (Windows: start.cmd docker)   app at :8000
+#   ./start.sh docker --live   the same, with Chromium for live play
+#
+# Optional extra: `docker compose --profile telemetry up mlflow` runs an
+# MLflow UI at :5000 (then set MLFLOW_TRACKING_URI below).
+
+x-tiles: &tiles
+  volumes:
+    - tiles-db:/data
+  ports:
+    - "${TILES_API_PORT:-8000}:8000"
+  environment:
+    PYTHONUNBUFFERED: "1"
+    # Passed through from your shell when set; enables the LLM Explainer.
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    # Uncomment to send ablation/tournament metrics to the mlflow service:
+    # MLFLOW_TRACKING_URI: http://mlflow:5000
+  restart: unless-stopped
 
 services:
   tiles:
+    <<: *tiles
+    image: tiles:local
     build:
       context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    volumes:
-      - tiles-db:/data
-    environment:
-      # Uncomment to send ablation/tournament metrics to the mlflow service:
-      # MLFLOW_TRACKING_URI: http://mlflow:5000
-      # Uncomment to enable the LLM explainer / rule extractor:
-      # ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      PYTHONUNBUFFERED: "1"
-    restart: unless-stopped
+      args:
+        LIVE: "false"
 
   tiles-live:
+    <<: *tiles
     profiles: ["live"]
+    image: tiles:live
     build:
       context: .
-      dockerfile: Dockerfile.live
-    ports:
-      - "8000:8000"
-    volumes:
-      - tiles-db:/data
+      args:
+        LIVE: "true"
     # Chromium in a container needs a bigger /dev/shm.
     shm_size: "1gb"
-    environment:
-      PYTHONUNBUFFERED: "1"
-    restart: unless-stopped
 
   mlflow:
     profiles: ["telemetry"]
@@ -47,24 +49,6 @@ services:
       - mlflow-data:/mlruns
     restart: unless-stopped
 
-  # Frontend dev server with hot reload, proxying /api to the tiles service.
-  ui-dev:
-    profiles: ["dev"]
-    image: node:22-alpine
-    working_dir: /ui
-    command: sh -c "npm ci --ignore-scripts && npx vite --host 0.0.0.0"
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/ui
-      - ui-dev-node-modules:/ui/node_modules
-    environment:
-      # vite.config.ts proxies /api to this target inside the compose network
-      TILES_API_PROXY: http://tiles:8000
-    depends_on:
-      - tiles
-
 volumes:
   tiles-db:
   mlflow-data:
-  ui-dev-node-modules:

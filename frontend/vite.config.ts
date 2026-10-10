@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 // The FastAPI backend serves /api; in dev we proxy to it (including the
 // session WebSocket). `npm run build` emits to dist/, which the backend
 // serves statically in production. TILES_API_PROXY overrides the proxy
-// target (used by the docker-compose ui-dev service).
+// target (the launcher sets it when the API runs on another port).
 export default defineConfig({
   plugins: [react()],
   server: {
