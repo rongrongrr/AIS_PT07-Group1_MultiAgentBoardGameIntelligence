@@ -19,6 +19,8 @@ from tiles import tracking
 from tiles.explain.explainer import Explainer
 from tiles.ml.archetypes import move_record
 from tiles.ml.registry import registry
+from tiles.auth import api_key_ok
+from tiles.engine.human_tracker import HumanMoveTracker
 from tiles.models.db import Move, Session, get_db, GameState as GameStateModel
 from tiles.models.schemas import (
     DestinationType,
@@ -190,6 +192,9 @@ async def stop_session(session_id: str, db: DBSession = Depends(get_db)):
 
 @router.websocket("/{session_id}/ws")
 async def session_websocket(websocket: WebSocket, session_id: str):
+    if not api_key_ok(websocket.query_params.get("api_key")):
+        await websocket.close(code=1008)          # policy violation: missing / invalid API key
+        return
     await websocket.accept()
     if session_id not in _ws_connections:
         _ws_connections[session_id] = []
@@ -298,7 +303,41 @@ async def _run_multi_bot_game(
         total_turns = 0
         last_successful_move_time = time.time()
 
+        human_tracker = HumanMoveTracker([b.player_name for b in mp.bots]) if mp.human_count else None
+
+        async def record_human_moves():
+            nonlocal step_counter, last_successful_move_time
+            if human_tracker is None:
+                return
+            ref = next((b.ws_state or b.current_state for b in mp.bots if (b.ws_state or b.current_state)), None)
+            for om in human_tracker.update(ref):
+                step_counter += 1
+                record = MoveRecord(session_id=session_id, step_id=step_counter, player_name=om.player_name,
+                                    system_tag="human", action=om.action, game_state_before=om.before,
+                                    decision_time_ms=None, timestamp=datetime.utcnow())
+                try:
+                    rec = move_record(om.before, om.player_index, om.action)
+                    for other_bot in mp.bots:
+                        bot_models[other_bot.player_name].observe(rec, other_bot.player_name)
+                except Exception:
+                    logger.exception("observe hook failed")
+                extra = {"inferred": True, "round": om.before.round,
+                         "scores": {p.name: p.score for p in om.before.players},
+                         "board": _board_snapshot(om.before),
+                         "commentary": _commentary(om.before, om.player_index, om.action)}
+                _save_state_snapshot(session_id, step_counter, om.before, db)
+                _save_move_record(session_id, record, db, extra=extra)
+                await _broadcast_move(session_id, record, extra=extra)
+                await syslog("info", om.player_name, "human_move",
+                             f"Recorded human move: {om.action.color.value} from "
+                             f"{om.action.source_type.value}[{om.action.source_index}] -> "
+                             f"{om.action.destination.value}[{om.action.destination_row}]")
+                last_successful_move_time = time.time()
+
         while total_turns < max_total_turns:
+            # Record moves made by humans (inferred from the board) before any bot acts on the new state
+            await record_human_moves()
+
             # Check game-over for ALL bots FIRST (before any turn logic)
             if total_turns > 0:
                 for bot in mp.bots:
@@ -487,23 +526,7 @@ async def _run_multi_bot_game(
                 if state:
                     cur_round = state.round
                     cur_scores = {p.name: p.score for p in state.players}
-                    board_snapshot = {
-                        "factories": [[t.value if hasattr(t, 'value') else str(t) for t in f] for f in state.factories],
-                        "center_pool": state.center_pool,
-                        "players": [
-                            {
-                                "name": p.name,
-                                "score": p.score,
-                                "pattern_lines": [
-                                    [t.value if hasattr(t, 'value') else str(t) for t in row]
-                                    for row in p.pattern_lines
-                                ],
-                                "wall": p.wall,
-                                "floor_line": [t.value if hasattr(t, 'value') else str(t) for t in p.floor_line],
-                            }
-                            for p in state.players
-                        ],
-                    }
+                    board_snapshot = _board_snapshot(state)
 
                 extra = {
                     "click_ms": click_ms,
@@ -646,6 +669,21 @@ def _states_equal(a: Optional[GameStateData], b: Optional[GameStateData]) -> boo
         )
     except Exception:
         return False
+
+
+def _board_snapshot(state: GameStateData) -> dict:
+    """JSON board stored with each move (replay, profiling features)."""
+    val = lambda t: t.value if hasattr(t, "value") else str(t)  # noqa: E731
+    return {
+        "factories": [[val(t) for t in f] for f in state.factories],
+        "center_pool": state.center_pool,
+        "players": [
+            {"name": p.name, "score": p.score,
+             "pattern_lines": [[val(t) for t in row] for row in p.pattern_lines],
+             "wall": p.wall, "floor_line": [val(t) for t in p.floor_line]}
+            for p in state.players
+        ],
+    }
 
 
 # ---- DB helpers ----

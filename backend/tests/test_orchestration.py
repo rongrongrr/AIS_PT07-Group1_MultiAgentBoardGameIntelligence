@@ -235,3 +235,54 @@ def test_states_equal_helper():
     assert S._states_equal(a, a.model_copy(deep=True))
     assert not S._states_equal(a, GameStateData(factories=[[TileColor.BLUE]]))
     assert S._states_equal(None, None) and not S._states_equal(a, None)
+
+
+class BotWithHumanOpponent(FakeBot):
+    """A bot whose room also holds a human: the human thinks for one poll, then plays a random legal move."""
+
+    def __init__(self, platform, name, human_seat, **kw):
+        super().__init__(platform, name, **kw)
+        self.human_seat = human_seat
+        self.polls = 0
+        self.rng = __import__("random").Random(2)
+        self.human_moves = 0
+
+    def _view(self):
+        s = super()._view()
+        s.current_turn = self.platform.sim.state.current_turn
+        return s
+
+    async def is_my_turn(self):
+        from tiles.azul.game import apply_action, round_over, step_round_boundary
+        from tiles.azul.rules import get_legal_actions
+        sim = self.platform.sim
+        if not sim.finished and round_over(sim.state):
+            step_round_boundary(sim)                            # the site deals the next round by itself
+        if not sim.finished and sim.current == self.human_seat:
+            self.current_state = self._view()
+            self.polls += 1
+            if self.polls % 2 == 0:
+                apply_action(sim, self.rng.choice(get_legal_actions(sim.state, sim.current)))
+                self.human_moves += 1
+                self.current_state = self._view()
+            return False
+        return await super().is_my_turn()
+
+
+def test_human_moves_are_inferred_and_recorded(db):
+    platform = FakePlatform(NAMES, seed=3)
+    bot = BotWithHumanOpponent(platform, "Alice", human_seat=1, is_host=True)
+    mp = FakeMP(platform, [bot], human_count=1)
+    make_session(db, players=[{"slot": 0, "type": "GreedyPlayer", "name": "Alice"}, {"slot": 1, "type": "human", "name": "Bob"}])
+    models = {"Alice": registry.create_player("AdaptivePlayer")}
+    row = run_game(db, mp, models)
+    assert mp.humans_waited and row.status == "completed"
+
+    moves = db.query(Move).filter(Move.session_id == "sess_test").order_by(Move.step_id).all()
+    human = [m for m in moves if m.player_name == "Bob"]
+    assert len(human) >= bot.human_moves - 1                    # at most the unobservable final move is missing
+    assert all(m.system_tag == "human" for m in human)
+    assert [m.step_id for m in moves] == list(range(1, len(moves) + 1))
+    assert json.loads(human[0].action_json)["_extra"]["inferred"] is True
+    assert list(models["Alice"].history) == ["Bob"]             # the adaptive bot modelled the human's moves
+    assert len(models["Alice"].history["Bob"]) == len(human)

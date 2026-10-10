@@ -17,7 +17,7 @@ TILES is an AI-driven platform that automates gameplay on the board game Azul, e
 - Analyze player behavior through a pluggable profiling framework, including a learned play-style classifier
 - Visualize games in real time and provide post-game review of the move log
 
-The platform is built on a modern, extensible architecture (React + FastAPI + Playwright + SQLite) with 333 automated backend tests (plus 9 frontend tests) (rules, game engine, ML players, archetype pipeline, API, parsers, game-over detection) plus one manual live end-to-end test. Measured results are in [EVALUATION.md](EVALUATION.md).
+The platform is built on a modern, extensible architecture (React + FastAPI + Playwright + SQLite) with 421 automated backend tests (plus 10 frontend tests) (rules, game engine, ML players, archetype pipeline, API, parsers, game-over detection) plus one manual live end-to-end test. Measured results are in [EVALUATION.md](EVALUATION.md).
 
 ---
 
@@ -77,7 +77,7 @@ However, no existing platform connects a live game environment to a modular ML p
 | Tests | pytest, FastAPI TestClient |
 
 - **15 API endpoints** (REST + WebSocket)
-- **412 automated backend tests (plus 9 frontend tests)** (`python -m pytest`; about 90% line coverage of `tiles/`)
+- **421 automated backend tests (plus 10 frontend tests)** (`python -m pytest`; about 95% line coverage of `tiles/`)
 - **5 database tables** (sessions, game_states, moves, player_profiles, ml_models). `player_profiles` and `ml_models` are defined but not yet used.
 
 ---

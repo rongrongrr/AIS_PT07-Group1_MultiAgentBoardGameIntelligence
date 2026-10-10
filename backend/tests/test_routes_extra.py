@@ -238,3 +238,69 @@ def test_players_routes_include_profilers(client):
         assert registry.get_profiler("TestProfiler") is not None
     finally:
         registry._profilers.pop("TestProfiler", None)
+
+
+def test_session_insights_and_external_ingest(client, db):
+    import asyncio as aio
+    game = aio.run(ta.simulate(1, seed=6))[0]
+    sid = create(client)
+    assert client.get("/api/profiler/nope/insights").status_code == 404
+    assert client.get(f"/api/profiler/{sid}/insights").json()["insights"] == []   # no moves yet
+    for i, m in enumerate(game["moves"], start=1):
+        action = dict(m["action"], _extra={"board": m["board"], "scores": {}})
+        db.add(Move(session_id=sid, step_id=i, player_name=m["player_name"], system_tag="x",
+                    action_json=json.dumps(action), decision_time_ms=1))
+    db.commit()
+    body = client.get(f"/api/profiler/{sid}/insights").json()
+    assert body["total_moves"] == len(game["moves"]) and len(body["insights"]) == 2
+    assert all(i["moves_observed"] > 0 and i["summary"] for i in body["insights"])
+    assert client.get(f"/api/profiler/{sid}/insights?analyzer_name=Nope").status_code == 400
+    early = client.get(f"/api/profiler/{sid}/insights?upto_step=3").json()
+    assert early["total_moves"] == 3
+
+    # push a stream from an external source, move by move
+    first = game["moves"][0]
+    r = client.post("/api/profiler/ingest", json={
+        "stream_id": "ext-1", "player_name": first["player_name"], "action": first["action"],
+        "decision_time_ms": 12, "board": first["board"]})
+    assert r.status_code == 200 and r.json()["step_id"] == 1
+    assert r.json()["insight"]["moves_observed"] == 1
+    got = client.get("/api/profiler/stream/ext-1/insights").json()
+    assert got["total_moves"] == 1
+    assert client.get("/api/profiler/stream/missing/insights").status_code == 404
+
+
+def test_ingest_limits(client, monkeypatch):
+    from tiles.routers import profiler as P
+    action = {"source_type": "center", "color": "red", "destination": "floor"}
+    monkeypatch.setattr(P, "MAX_STREAMS", 2)
+    monkeypatch.setattr(P, "MAX_MOVES_PER_STREAM", 1)
+    P._streams.clear()
+    for sid in ("a", "b", "c"):
+        assert client.post("/api/profiler/ingest", json={"stream_id": sid, "player_name": "X", "action": action}).status_code == 200
+    assert set(P._streams) == {"b", "c"}                       # oldest stream evicted
+    assert client.post("/api/profiler/ingest", json={"stream_id": "c", "player_name": "X", "action": action}).status_code == 413
+    P._streams.clear()
+
+
+def test_optional_api_key(client, monkeypatch):
+    assert client.get("/api/players").status_code == 200                  # auth is off by default
+    monkeypatch.setenv("TILES_API_KEY", "s3cret")
+    assert client.get("/api/health").status_code == 200                   # health stays open
+    assert client.get("/api/players").status_code == 401
+    assert client.get("/api/players", headers={"X-API-Key": "wrong"}).status_code == 401
+    assert client.get("/api/players", headers={"X-API-Key": "s3cret"}).status_code == 200
+    sid = create_with_key(client)
+    from starlette.websockets import WebSocketDisconnect
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect(f"/api/sessions/{sid}/ws"):
+            pass
+    with client.websocket_connect(f"/api/sessions/{sid}/ws?api_key=s3cret"):
+        pass
+
+
+def create_with_key(client):
+    r = client.post("/api/sessions", headers={"X-API-Key": "s3cret"}, json={"room_name": "auth-room", "players": [
+        {"slot": 0, "type": "GreedyPlayer", "name": "A"}, {"slot": 1, "type": "RandomPlayer", "name": "B"}]})
+    assert r.status_code == 200
+    return r.json()["id"]

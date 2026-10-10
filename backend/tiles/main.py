@@ -6,9 +6,11 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+from tiles.auth import api_key_ok
 from tiles.models.db import init_db
 from tiles.routers import feedback, history, players, profiler, sessions
 
@@ -53,6 +55,16 @@ app.include_router(players.action_router, prefix="/api/player", tags=["players"]
 app.include_router(history.router, prefix="/api/history", tags=["history"])
 app.include_router(profiler.router, prefix="/api/profiler", tags=["profiler"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["feedback"])
+
+
+@app.middleware("http")
+async def require_api_key(request: Request, call_next):
+    """Optional shared-secret auth: when TILES_API_KEY is set every /api call (except health) needs
+    the key in the ``X-API-Key`` header. WebSockets are checked separately (see ``ws_guard``)."""
+    path = request.url.path
+    if path.startswith("/api/") and path != "/api/health" and not api_key_ok(request.headers.get("x-api-key")):
+        return JSONResponse({"detail": "Missing or invalid API key"}, status_code=401)
+    return await call_next(request)
 
 
 @app.get("/api/health")

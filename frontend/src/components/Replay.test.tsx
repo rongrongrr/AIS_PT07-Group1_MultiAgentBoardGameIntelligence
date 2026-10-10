@@ -29,11 +29,21 @@ const MOVES = [move(1, 20), move(2, 12), move(3, 4), move(4, 20, 'Bob', {
 }), move(5, 10)];
 
 beforeEach(() => {
+  vi.spyOn(api.profiler, 'insights').mockResolvedValue({ total_moves: 1, analyzer: 'ArchetypeProfileAnalyzer', insights: [
+    { player_name: 'Alice', moves_observed: 2, archetype: 'RusherPlayer', archetype_confidence: 0.8, style: 'aggressive', summary: 'Alice plays fast.' }] });
   vi.spyOn(api.history, 'get').mockResolvedValue({ session_id: 's', room_name: 'r', total_moves: MOVES.length, moves: MOVES });
 });
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe('Replay', () => {
+  it('overlays the profile as it stood at the current move', async () => {
+    render(<Replay sessionId="s" />);
+    expect(await screen.findByText(/Profile after move 1/)).toBeInTheDocument();
+    expect(await screen.findByText(/Rusher 80%/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Next/ }));
+    await waitFor(() => expect(api.profiler.insights).toHaveBeenLastCalledWith('s', MOVES[1].step_id));
+  });
+
   it('shows the first move and steps with Next / Prev', async () => {
     render(<Replay sessionId="s" />);
     expect(await screen.findByText('Move 1 / 5')).toBeInTheDocument();

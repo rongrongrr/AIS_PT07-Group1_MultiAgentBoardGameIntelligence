@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, type MoveResponse } from '../api/client';
 import BoardSnapshot from './BoardSnapshot';
 import FeedbackWidget from './FeedbackWidget';
+import ProfilerInsights from './ProfilerInsights';
 
 const SPEEDS = [0.5, 1, 2, 4];
 
@@ -91,6 +92,8 @@ export default function Replay({ sessionId }: { sessionId: string }) {
       </div>
 
       <BoardSnapshot board={m.board!} action={m.action} activePlayer={m.player_name} />
+
+      <ProfilerInsights sessionId={sessionId} uptoStep={m.step_id} title={`Profile after move ${idx + 1}`} />
 
       {m.explanation?.rationale && (
         <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 space-y-1">

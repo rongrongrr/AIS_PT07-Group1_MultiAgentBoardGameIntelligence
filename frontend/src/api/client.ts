@@ -1,10 +1,23 @@
 const BASE = '/api';
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+/** Optional API key (the backend enforces one only when TILES_API_KEY is set). */
+function apiKey(): string | null {
+  try { return window.localStorage.getItem('tiles_api_key'); } catch { return null; }
+}
+
+async function request<T>(path: string, options?: RequestInit, retried = false): Promise<T> {
+  const key = apiKey();
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: { 'Content-Type': 'application/json', ...(key ? { 'X-API-Key': key } : {}), ...(options?.headers || {}) },
   });
+  if (res.status === 401 && !retried) {
+    const entered = typeof window.prompt === 'function' ? window.prompt('This TILES server requires an API key:') : null;
+    if (entered) {
+      try { window.localStorage.setItem('tiles_api_key', entered); } catch { /* storage unavailable */ }
+      return request<T>(path, options, true);
+    }
+  }
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(error.detail || `HTTP ${res.status}`);
@@ -167,6 +180,10 @@ export const api = {
   },
 
   profiler: {
+    insights: (sessionId: string, uptoStep?: number) =>
+      request<{ total_moves: number; analyzer: string; insights: PlayerInsight[] }>(
+        `/profiler/${sessionId}/insights${uptoStep !== undefined ? `?upto_step=${uptoStep}` : ''}`
+      ),
     listAnalyzers: () =>
       request<{ analyzers: { name: string; description: string }[] }>('/profiler/analyzers'),
     analyze: (sessionId: string, playerName: string, analyzerName = 'BasicProfileAnalyzer') =>
@@ -177,6 +194,16 @@ export const api = {
   },
 };
 
+export interface PlayerInsight {
+  player_name: string;
+  moves_observed: number;
+  style?: string | null;
+  archetype?: string | null;
+  archetype_confidence?: number | null;
+  archetype_reasons?: { feature: string; meaning: string }[];
+  summary: string;
+}
+
 // --- WebSocket ---
 
 export function connectSessionWs(
@@ -185,7 +212,8 @@ export function connectSessionWs(
   onClose?: () => void
 ): WebSocket {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const ws = new WebSocket(`${protocol}//${window.location.host}/api/sessions/${sessionId}/ws`);
+  const key = apiKey();
+  const ws = new WebSocket(`${protocol}//${window.location.host}/api/sessions/${sessionId}/ws${key ? `?api_key=${encodeURIComponent(key)}` : ''}`);
 
   ws.onmessage = (event) => {
     try {

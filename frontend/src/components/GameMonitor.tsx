@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import ProfilerInsights from './ProfilerInsights';
 import { api, connectSessionWs, type GameStateData, type MoveResponse, type SysLogEntry, type Session } from '../api/client';
 import { useGameStore } from '../stores/gameStore';
 import PlayerBoard, { FactoryDisplay, CenterPoolDisplay } from './PlayerBoard';
@@ -594,6 +595,9 @@ export default function GameMonitor({ sessionId, session: externalSession }: {
           </div>
         </>
       )}
+
+      {/* Profiler insights (live) */}
+      {moves.length > 0 && <ProfilerInsights sessionId={sessionId} refreshKey={moves.length} />}
 
       {/* Move Log — grouped by round */}
       <div>

@@ -117,6 +117,7 @@ class FakeBot:
         self.game_over = False
         self.game_started = False
         self.current_state = None
+        self.ws_state = None
         self.page = object()
         self.ws_updates = ws_updates
         self.fail_first = fail_first

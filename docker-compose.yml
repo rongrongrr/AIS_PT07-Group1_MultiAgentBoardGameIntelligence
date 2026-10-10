@@ -5,6 +5,7 @@ services:
     build: ./backend
     environment:
       TILES_DB_PATH: /data/tiles.db
+      TILES_API_KEY: "${TILES_API_KEY:-}"  # optional: set to require an API key on /api (the UI prompts for it)
       TILES_FORCE_HEADLESS: "1"        # no display in a container, so browsers always run headless
       TILES_MLFLOW_URI: sqlite:////mlruns/mlflow.db
     volumes:
