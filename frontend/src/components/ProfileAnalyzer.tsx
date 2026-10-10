@@ -19,6 +19,8 @@ interface ProfileResult {
   color_preferences: Record<string, number>;
   source_split: { factory: number; center: number };
   destination_split: { pattern_line: number; floor: number };
+  floor_tiles?: { taken: number; on_floor: number; pct: number } | null;
+  score_is_final?: boolean;
   row_preferences: Record<string, number>;
   timing: { avg_total_ms: number; avg_decide_ms: number };
   score_trajectory: number[];
@@ -131,7 +133,10 @@ export default function ProfileAnalyzer({ sessionId, session }: {
         <div key={name} className="bg-gray-900 rounded-xl p-4 border border-gray-800 space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-base font-semibold text-teal-300">{name}</h3>
-            <span className="text-lg font-bold text-teal-400">{profile.final_score} pts</span>
+            <span className="text-lg font-bold text-teal-400"
+                title={profile.score_is_final ? 'Final score of the finished game' : 'Latest score seen in a recorded position; the game has not finished'}>
+            {profile.final_score} pts{profile.score_is_final ? '' : ' so far'}
+          </span>
           </div>
 
           {/* Summary */}
@@ -190,7 +195,12 @@ export default function ProfileAnalyzer({ sessionId, session }: {
             </div>
             <div className="bg-gray-800 rounded-lg p-3 text-center">
               <div className="text-[10px] text-gray-500">Floor use<Help text={GLOSSARY.floor} /></div>
-              <div className="text-lg font-bold text-red-300">{profile.destination_split.floor}%</div>
+              <div className="text-lg font-bold text-red-300"
+                   title={profile.floor_tiles
+                     ? `${profile.floor_tiles.on_floor} of ${profile.floor_tiles.taken} tiles taken ended on the floor; ${profile.destination_split.floor}% of moves went straight there`
+                     : `${profile.destination_split.floor}% of moves went straight to the floor`}>
+                {profile.floor_tiles ? profile.floor_tiles.pct : profile.destination_split.floor}%
+              </div>
             </div>
           </div>
 

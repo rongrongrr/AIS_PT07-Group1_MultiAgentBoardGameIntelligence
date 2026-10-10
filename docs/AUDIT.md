@@ -20,6 +20,7 @@ Done after the stage-2 merge by probing the running system (API with bad input, 
 | 12 | Unknown `/api/...` paths returned the HTML page when the UI was hosted by the API | Confusing errors | JSON 404 |
 | 13 | 422 validation errors showed as "[object Object]" in the UI | Poor feedback | Error list is formatted |
 | 14 | `alembic` was a dependency nothing used; `pyproject` listed 3 of ~10 real dependencies | Broken `pip install -e .` | Removed / corrected, verified in a fresh venv |
+| 15 | Profile score was the score *before* the player's last move; floor use counted only moves sent straight to the floor | A finished game showed e.g. 35 instead of the final 76 points (real recorded game), and a player who overflowed pattern lines looked "conservative" | Profiles use the session's recorded final scores for completed games (and the latest snapshot otherwise, labelled "so far"); floor use now counts tiles that end on the floor including overflow, and drives the aggressive/conservative label |
 
 ## Known limitations (not bugs, but be aware)
 

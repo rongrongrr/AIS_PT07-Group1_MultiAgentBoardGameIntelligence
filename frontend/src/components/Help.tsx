@@ -17,6 +17,6 @@ export const GLOSSARY = {
   confidence: 'How strongly the profiler favours this label over the other styles. It is not the chance the label is right: the model was trained on simulated bots, so treat labels on real players as hypotheses.',
   archetype: 'A recurring play style (for example Rusher: finishes lines fast; Blocker: takes what opponents need). Inferred from the moves seen so far.',
   decision: 'Time the bot spent choosing its move. The click and network time of the browser is shown separately.',
-  floor: 'Tiles that could not be placed fall to the floor line and cost points; heavy floor use usually means a risky or rushed style.',
+  floor: 'Share of the tiles this player took that ended on the floor line (taken straight there, or overflowing a full pattern line). Each costs points, so a high share usually means a risky or rushed style.',
   alternatives: 'The best moves the bot considered, with its own score for each. Higher is better for the bot.',
 } as const;

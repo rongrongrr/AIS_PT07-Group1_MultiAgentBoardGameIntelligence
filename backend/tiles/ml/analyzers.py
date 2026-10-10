@@ -30,18 +30,47 @@ class ProfileAnalyzer(ABC):
         ...
 
     @abstractmethod
-    def analyze(self, player_name: str, moves: List[dict]) -> dict:
+    def analyze(self, player_name: str, moves: List[dict], final_scores: Optional[dict] = None) -> dict:
         """Analyze a player's moves and return a profile.
 
         Args:
             player_name: The player to analyze.
             moves: List of move dicts (from the history API) for the entire game.
+            final_scores: The session's recorded final scores, when the game is complete. Board
+                snapshots are taken *before* each move, so without this the last round's scoring
+                and the end-of-game bonuses are missing from the score.
 
         Returns:
             A dict with profile data. Must include a "summary" key with
             a human-readable description.
         """
         ...
+
+
+def _tiles_to_floor(move: dict, player_name: str) -> Optional[tuple]:
+    """(tiles taken, tiles that end up on the floor) for one move, or None without a board snapshot.
+
+    Taking tiles straight to the floor sends them all there; placing on a pattern line sends the
+    overflow beyond the line's free space. The first-player token is not counted as a tile.
+    """
+    board = move.get("board")
+    action = move.get("action") or {}
+    if not board:
+        return None
+    color = action.get("color")
+    try:
+        if action.get("source_type") == "factory":
+            picked = sum(1 for t in board["factories"][action["source_index"]] if t == color)
+        else:
+            picked = sum(1 for t in board["center_pool"] if t == color)
+        if action.get("destination") == "floor":
+            return picked, picked
+        me = next(p for p in board["players"] if p["name"] == player_name)
+        row = action["destination_row"]
+        space = (row + 1) - len(me["pattern_lines"][row])
+        return picked, max(0, picked - space)
+    except (KeyError, IndexError, TypeError, StopIteration):
+        return None
 
 
 class BasicProfileAnalyzer(ProfileAnalyzer):
@@ -56,7 +85,7 @@ class BasicProfileAnalyzer(ProfileAnalyzer):
     def description(self) -> str:
         return "Analyzes play patterns: color/source preferences, floor usage, timing, scoring efficiency."
 
-    def analyze(self, player_name: str, moves: List[dict]) -> dict:
+    def analyze(self, player_name: str, moves: List[dict], final_scores: Optional[dict] = None) -> dict:
         player_moves = [m for m in moves if m.get("player_name") == player_name]
         if not player_moves:
             return {"summary": f"No moves found for {player_name}."}
@@ -96,7 +125,23 @@ class BasicProfileAnalyzer(ProfileAnalyzer):
             s = m.get("scores", {})
             if player_name in s:
                 scores_over_time.append(s[player_name])
-        final_score = scores_over_time[-1] if scores_over_time else 0
+        # Score: the session's recorded final score if the game is complete; otherwise the most recent
+        # score anyone's snapshot shows for this player (later moves by other players are newer than
+        # this player's own last move).
+        latest = next((m["scores"][player_name] for m in reversed(moves)
+                       if player_name in (m.get("scores") or {})), None)
+        final = (final_scores or {}).get(player_name)
+        final_score = final if final is not None else (latest if latest is not None else 0)
+        score_is_final = final is not None
+        if scores_over_time and score_is_final and scores_over_time[-1] != final_score:
+            scores_over_time.append(final_score)
+
+        # Floor: moves sent straight to the floor, and tiles that end up there (including overflow)
+        counted = [t for t in (_tiles_to_floor(m, player_name) for m in player_moves) if t is not None]
+        taken = sum(t[0] for t in counted)
+        on_floor = sum(t[1] for t in counted)
+        floor_tiles = ({"taken": taken, "on_floor": on_floor, "pct": round(on_floor / taken * 100)}
+                       if taken else None)
 
         # Build profile
         color_dist = {c: round(n / total * 100) for c, n in colors.most_common()}
@@ -104,9 +149,10 @@ class BasicProfileAnalyzer(ProfileAnalyzer):
 
         # Generate summary
         style_traits = []
-        if floor_pct > 20:
+        floor_basis = floor_tiles["pct"] if floor_tiles else floor_pct      # tiles are the real cost when known
+        if floor_basis > 20:
             style_traits.append("aggressive (high floor usage)")
-        elif floor_pct < 5:
+        elif floor_basis < 5:
             style_traits.append("conservative (avoids floor)")
         if center_pct > 40:
             style_traits.append("center-focused")
@@ -117,12 +163,19 @@ class BasicProfileAnalyzer(ProfileAnalyzer):
 
         style = ", ".join(style_traits) if style_traits else "balanced"
 
+        floor_text = (
+            f"Floor: {floor_pct}% of moves went straight to the floor; {floor_tiles['pct']}% of the tiles taken "
+            f"({floor_tiles['on_floor']} of {floor_tiles['taken']}) ended on the floor, counting overflow. "
+            if floor_tiles else f"Floor usage: {floor_pct}% of moves went straight to the floor. "
+        )
+        score_text = (f"finished with {final_score} points" if score_is_final
+                      else f"had {final_score} points at the latest recorded position")
         summary = (
-            f"{player_name} played {total} moves across the game, scoring {final_score} points. "
+            f"{player_name} played {total} moves across the game and {score_text}. "
             f"Play style: {style}. "
             f"Favorite color: {fav_color[0]} ({round(fav_color[1]/total*100)}% of picks). "
             f"Source split: {factory_pct}% factory / {center_pct}% center. "
-            f"Floor usage: {floor_pct}% of placements. "
+            f"{floor_text}"
             f"Average decision time: {avg_decide}ms."
         )
 
@@ -135,6 +188,8 @@ class BasicProfileAnalyzer(ProfileAnalyzer):
             "color_preferences": color_dist,
             "source_split": {"factory": factory_pct, "center": center_pct},
             "destination_split": {"pattern_line": pattern_pct, "floor": floor_pct},
+            "floor_tiles": floor_tiles,
+            "score_is_final": score_is_final,
             "row_preferences": row_dist,
             "timing": {"avg_total_ms": avg_time, "avg_decide_ms": avg_decide},
             "score_trajectory": scores_over_time,
@@ -162,10 +217,10 @@ class ArchetypeProfileAnalyzer(ProfileAnalyzer):
     def description(self) -> str:
         return "Basic statistics plus a learned play-style archetype with feature-level reasons."
 
-    def analyze(self, player_name: str, moves: List[dict]) -> dict:
+    def analyze(self, player_name: str, moves: List[dict], final_scores: Optional[dict] = None) -> dict:
         from tiles.ml.archetypes import extract_features
 
-        profile = self._basic.analyze(player_name, moves)
+        profile = self._basic.analyze(player_name, moves, final_scores)
         if "total_moves" not in profile:
             return profile
         feats = extract_features(moves, player_name)
@@ -203,8 +258,8 @@ class SequenceProfileAnalyzer(ProfileAnalyzer):
     def description(self) -> str:
         return f"Basic statistics plus a {self._model.kind} sequence model over the move sequence."
 
-    def analyze(self, player_name: str, moves: List[dict]) -> dict:
-        profile = self._basic.analyze(player_name, moves)
+    def analyze(self, player_name: str, moves: List[dict], final_scores: Optional[dict] = None) -> dict:
+        profile = self._basic.analyze(player_name, moves, final_scores)
         if "total_moves" not in profile:
             return profile
         pred = self._model.predict(moves, player_name)

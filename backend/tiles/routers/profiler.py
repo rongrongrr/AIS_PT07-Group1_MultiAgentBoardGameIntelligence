@@ -37,9 +37,16 @@ def _load_moves(db: DBSession, session_id: str) -> List[dict]:
     return out
 
 
-def _insight(analyzer_name: str, player: str, moves: List[dict]) -> dict:
+def _final_scores(session: Optional[Session]) -> Optional[dict]:
+    """The recorded final scores of a completed session (None while it is running or was aborted)."""
+    if session is not None and session.status == "completed" and session.final_scores:
+        return json.loads(session.final_scores)
+    return None
+
+
+def _insight(analyzer_name: str, player: str, moves: List[dict], final_scores: Optional[dict] = None) -> dict:
     analyzer = analyzer_registry.get(analyzer_name)
-    profile = analyzer.analyze(player, moves)
+    profile = analyzer.analyze(player, moves, final_scores)
     return {
         "player_name": player,
         "analyzer": analyzer_name,
@@ -69,15 +76,18 @@ def session_insights(session_id: str, analyzer_name: Optional[str] = None, upto_
     ``upto_step`` limits the profile to moves up to that step, which is how the replay overlays the
     profile as it stood at each point of the game.
     """
-    if not db.query(Session).filter(Session.id == session_id).first():
+    session = db.query(Session).filter(Session.id == session_id).first()
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     name = _default_analyzer(analyzer_name)
     moves = _load_moves(db, session_id)
+    final = _final_scores(session)
     if upto_step is not None:
         moves = [m for m in moves if m["step_id"] <= upto_step]
+        final = None                       # a profile "as of move N" must not use the end-of-game score
     players = list(dict.fromkeys(m["player_name"] for m in moves))
     return {"session_id": session_id, "analyzer": name, "total_moves": len(moves),
-            "insights": [_insight(name, p, moves) for p in players]}
+            "insights": [_insight(name, p, moves, final) for p in players]}
 
 
 # ---- external ingestion: push move records from any source and get a running profile back ----
@@ -156,7 +166,7 @@ def analyze_player(
 
     move_list = _load_moves(db, session_id)
 
-    profile = analyzer.analyze(player_name, move_list)
+    profile = analyzer.analyze(player_name, move_list, _final_scores(session))
     profile["analyzer"] = analyzer_name
     profile["session_id"] = session_id
 
