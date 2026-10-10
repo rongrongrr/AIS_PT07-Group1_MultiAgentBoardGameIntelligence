@@ -68,8 +68,11 @@ Union: bugfixes' real dependencies (sqlalchemy, numpy, scikit-learn, httpx, play
 - `backend/tiles/cli.py`: git auto-merged bugfixes' `cmd_serve` (serving `tiles.main`),
   which made `start.sh` boot the wrong API — no `/api/stats` or `/api/agents`, and an
   import of `tiles.ml` triggered a torch warning. Restored stage2's
-  `tiles.server.app.create_app` wiring. Verified on the merged tree with
-  `tiles.cli serve`: `/api/health`, `/api/stats`, `/api/agents`, `/api/sessions` → 200.
+  `tiles.server.app.create_app` wiring. Verified end-to-end with
+  `python -m tiles.cli serve`: `/api/health`, `/api/stats`, `/api/agents`, `/api/sessions` → 200.
+- Database hygiene: removed 3 stale live sessions (running/failed/aborted) plus their
+  51 moves / 4 rounds, and checkpointed the committed 2.4 MB WAL sidecar into
+  `tiles.db`. Done on this branch and cherry-picked to `feature/stage2`.
 
 ## Follow-ups
 
