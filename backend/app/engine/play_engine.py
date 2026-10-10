@@ -87,7 +87,8 @@ class BotBrowser:
     async def launch(self):
         """Launch browser and navigate to the game page."""
         self._playwright = await async_playwright().start()
-        headless = self.browser_mode == BrowserMode.HEADLESS
+        # A container has no display, so TILES_FORCE_HEADLESS overrides a requested headed mode.
+        headless = self.browser_mode == BrowserMode.HEADLESS or bool(os.environ.get("TILES_FORCE_HEADLESS"))
         self._browser = await self._playwright.chromium.launch(headless=headless)
         self._context = await self._browser.new_context(
             viewport={"width": 1280, "height": 900}

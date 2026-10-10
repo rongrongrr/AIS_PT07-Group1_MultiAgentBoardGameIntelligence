@@ -6,6 +6,20 @@ AIS PT07 Capstone, Group 1 (NUS ISS). See [docs/EVALUATION.md](docs/EVALUATION.m
 
 ## Quick Start
 
+### Fastest: Docker (one command)
+
+```bash
+docker compose up --build        # first build downloads ~1.5 GB (Chromium image); later starts take seconds
+```
+
+Then open **http://localhost:8080**. Everything runs in two containers: `backend` (FastAPI + Playwright/Chromium) and `frontend` (nginx serving the UI and proxying `/api`, including WebSockets, to the backend). Sessions and move history are kept in the `tiles-data` Docker volume across restarts (`docker compose down -v` wipes them).
+
+- Browsers always run **headless** in a container (no display); the "Headed" option is ignored there.
+- The containers need outbound internet access to reach buddyboardgames.com.
+- Stop with `docker compose down`. Rebuild after code changes with `docker compose up --build`.
+
+### Without Docker
+
 ### Prerequisites
 
 - **Python 3.11+** (developed on 3.11)

@@ -1,0 +1,24 @@
+# One command to run everything:   docker compose up --build
+# Then open http://localhost:8080
+services:
+  backend:
+    build: ./backend
+    environment:
+      TILES_DB_PATH: /data/tiles.db
+      TILES_FORCE_HEADLESS: "1"        # no display in a container, so browsers always run headless
+    volumes:
+      - tiles-data:/data               # keeps sessions, moves and profiles between restarts
+    shm_size: "1gb"                    # Chromium needs more shared memory than Docker's 64MB default
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  tiles-data:
