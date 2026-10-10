@@ -53,7 +53,8 @@ def test_orphaned_sessions_are_aborted_on_startup(db):
     assert _abort_orphaned_sessions(db) == 2
     status = {s.id: s.status for s in db.query(Session)}
     assert status == {"a": "aborted", "b": "aborted", "c": "completed", "d": "created"}
-    assert db.query(Session).filter_by(id="a").one().completed_at is not None
+    first = db.query(Session).filter_by(id="a").one()
+    assert first.completed_at is not None and "restarted" in first.abort_reason
 
 
 # ------------------------------------------------------------ winner
@@ -97,7 +98,7 @@ def test_idle_human_session_is_aborted(db, monkeypatch):
     make_session(db, players=[{"slot": 0, "type": "GreedyPlayer", "name": "Alice"},
                               {"slot": 1, "type": "human", "name": "Bob"}])
     row = run_game(db, mp, {"Alice": registry.create_player("GreedyPlayer")})
-    assert row.status == "aborted"
+    assert row.status == "aborted" and "No progress" in row.abort_reason
 
 
 # ------------------------------------------------------------ search off the event loop

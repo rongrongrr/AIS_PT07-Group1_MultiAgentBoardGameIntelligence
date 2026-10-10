@@ -31,6 +31,7 @@ def _abort_orphaned_sessions(db) -> int:
     rows = db.query(Session).filter(Session.status.in_(live)).all()
     for row in rows:
         row.status = SessionStatus.ABORTED.value
+        row.abort_reason = "The server restarted while this session was running"
         row.completed_at = datetime.utcnow()
     db.commit()
     if rows:

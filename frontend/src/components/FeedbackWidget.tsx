@@ -12,10 +12,16 @@ function savedRater(): string {
 }
 
 /** Collects a participant's 1-5 ratings of one move's explanation (human-centred evaluation). */
-export default function FeedbackWidget({ sessionId, stepId }: { sessionId: string; stepId: number }) {
+export default function FeedbackWidget({ sessionId, stepId, alreadyRated = false, onSaved }: {
+  sessionId: string;
+  stepId: number;
+  alreadyRated?: boolean;
+  onSaved?: () => void;
+}) {
   const [rater, setRater] = useState(savedRater());
   const [scores, setScores] = useState<Record<string, number>>({});
   const [comment, setComment] = useState('');
+  const [again, setAgain] = useState(false);
   const [status, setStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
 
   const complete = rater.trim() && SCALES.every((s) => scores[s.key]);
@@ -30,24 +36,34 @@ export default function FeedbackWidget({ sessionId, stepId }: { sessionId: strin
         comment: comment.trim() || undefined,
       });
       setStatus('done');
+      onSaved?.();
     } catch {
       setStatus('error');
     }
   }
 
-  if (status === 'done') {
-    return <div className="text-[11px] text-teal-400 pt-1">Thanks - rating saved.</div>;
+  if (status === 'done' || (alreadyRated && !again)) {
+    return (
+      <div className="text-[11px] text-teal-400 pt-1" role="status">
+        Thanks - rating saved.{' '}
+        {alreadyRated && status !== 'done' && (
+          <button className="text-gray-400 underline" onClick={() => setAgain(true)}>Rate again</button>
+        )}
+      </div>
+    );
   }
 
   return (
     <div className="border-t border-gray-700/50 mt-2 pt-2 space-y-1.5" data-testid="feedback">
-      <div className="text-[10px] text-gray-500">Rate this explanation (1 = poor, 5 = excellent)</div>
+      <div className="text-[10px] text-gray-500">Rate this explanation (1 = poor, 5 = excellent). Your ID is remembered for the next move.</div>
       {SCALES.map((s) => (
         <div key={s.key} className="flex items-center gap-2 text-[11px] text-gray-400">
           <span className="w-32">{s.label}</span>
           {[1, 2, 3, 4, 5].map((n) => (
             <button
               key={n}
+              aria-label={`${s.label}: ${n}`}
+              aria-pressed={scores[s.key] === n}
               onClick={() => setScores({ ...scores, [s.key]: n })}
               className={`w-6 h-6 rounded ${scores[s.key] === n ? 'bg-teal-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}
             >{n}</button>
@@ -55,7 +71,7 @@ export default function FeedbackWidget({ sessionId, stepId }: { sessionId: strin
         </div>
       ))}
       <div className="flex gap-2">
-        <input value={rater} onChange={(e) => setRater(e.target.value)} placeholder="Your name / ID" maxLength={40}
+        <input value={rater} onChange={(e) => setRater(e.target.value)} placeholder="Participant ID" aria-label="Participant ID" maxLength={40}
                className="bg-gray-800 text-xs rounded px-2 py-1 border border-gray-700 w-36" />
         <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Comment (optional)" maxLength={500}
                className="bg-gray-800 text-xs rounded px-2 py-1 border border-gray-700 flex-1" />

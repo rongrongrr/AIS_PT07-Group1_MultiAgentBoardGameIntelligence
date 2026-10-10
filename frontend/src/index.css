@@ -14,3 +14,21 @@ body {
   color: #e0e0e0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
+
+/* Keyboard users get a visible focus ring everywhere. */
+:focus-visible {
+  outline: 2px solid #2dd4bf;
+  outline-offset: 2px;
+}
+
+/* The tiles taken by the move pulse so the eye lands on them. */
+@keyframes tiles-pulse {
+  0%, 100% { transform: scale(1.1); }
+  50% { transform: scale(1.3); }
+}
+.tile-pulse {
+  animation: tiles-pulse 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile-pulse { animation: none; }
+}

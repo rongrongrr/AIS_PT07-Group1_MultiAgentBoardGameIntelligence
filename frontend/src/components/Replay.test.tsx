@@ -29,11 +29,80 @@ const MOVES = [move(1, 20), move(2, 12), move(3, 4), move(4, 20, 'Bob', {
 }), move(5, 10)];
 
 beforeEach(() => {
+  localStorage.clear();
   vi.spyOn(api.profiler, 'insights').mockResolvedValue({ total_moves: 1, analyzer: 'ArchetypeProfileAnalyzer', insights: [
     { player_name: 'Alice', moves_observed: 2, archetype: 'RusherPlayer', archetype_confidence: 0.8, style: 'aggressive', summary: 'Alice plays fast.' }] });
   vi.spyOn(api.history, 'get').mockResolvedValue({ session_id: 's', room_name: 'r', total_moves: MOVES.length, moves: MOVES });
 });
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
+
+describe('Replay UX', () => {
+  it('toggles between the board before and after a move', async () => {
+    render(<Replay sessionId="s" />);
+    await screen.findByText('Move 1 / 5');
+    expect(screen.getByText('Board state before this move')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'After the move' }));
+    expect(screen.getByText('Board state after this move')).toBeInTheDocument();
+    fireEvent.click(screen.getByTitle('Jump to end'));
+    expect(screen.getByRole('button', { name: 'After the move' })).toBeDisabled();   // nothing recorded after the last move
+  });
+
+  it('steps with the arrow keys and plays with space', async () => {
+    render(<Replay sessionId="s" />);
+    await screen.findByText('Move 1 / 5');
+    const root = screen.getByTestId('replay');
+    fireEvent.keyDown(root, { key: 'ArrowRight' });
+    expect(screen.getByText('Move 2 / 5')).toBeInTheDocument();
+    fireEvent.keyDown(root, { key: 'ArrowLeft' });
+    expect(screen.getByText('Move 1 / 5')).toBeInTheDocument();
+    fireEvent.keyDown(root, { key: ' ' });
+    expect(screen.getByRole('button', { name: /Pause/ })).toBeInTheDocument();
+    fireEvent.keyDown(root, { key: ' ' });
+    expect(screen.getByRole('button', { name: /Play/ })).toBeInTheDocument();
+  });
+
+  it('draws the alternatives, counts rated moves and jumps to the next unrated one', async () => {
+    vi.spyOn(api.feedback, 'submit').mockResolvedValue({ id: 1 });
+    const explained = [1, 2, 3].map((n) => move(n, 20 - n, 'Alice', {
+      explanation: { model: 'MinimaxPlayer', chosen_score: 3, n_legal: 10, rationale: `Reason ${n}.`,
+        top_alternatives: [{ action: { source_type: 'factory', source_index: 0, color: 'red', destination: 'pattern_line', destination_row: 1 }, score: 5 }] },
+    }));
+    vi.spyOn(api.history, 'get').mockResolvedValue({ session_id: 's', room_name: 'r', total_moves: 3, moves: explained });
+    render(<Replay sessionId="s" />);
+    await screen.findByText('Move 1 / 3');
+    expect(screen.getByTestId('alternatives')).toBeInTheDocument();
+    expect(screen.getByTestId('rated-progress')).toHaveTextContent('Rated 0 of 3');
+
+    fireEvent.change(screen.getByLabelText('Participant ID'), { target: { value: 'p1' } });
+    for (const label of ['Easy to understand', 'Useful', 'Trustworthy']) fireEvent.click(screen.getByLabelText(`${label}: 4`));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    await waitFor(() => expect(screen.getByTestId('rated-progress')).toHaveTextContent('Rated 1 of 3'));
+    expect(JSON.parse(localStorage.getItem('tiles_rated_s')!)).toEqual([1]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next unrated' }));
+    expect(screen.getByText('Move 2 / 3')).toBeInTheDocument();
+  });
+
+  it('explains why a human move has no reasoning, and offers the scores-only condition', async () => {
+    const human = [move(1, 20, 'Bob', { system_tag: 'human' }), move(2, 12, 'Alice', {
+      explanation: { model: 'M', chosen_score: 1, n_legal: 3, rationale: 'Because.', top_alternatives: [{ action: { source_type: 'center', source_index: null, color: 'blue', destination: 'floor', destination_row: null }, score: 1 }] },
+    })];
+    vi.spyOn(api.history, 'get').mockResolvedValue({ session_id: 's', room_name: 'r', total_moves: 2, moves: human });
+    render(<Replay sessionId="s" />);
+    await screen.findByText('Move 1 / 2');
+    expect(screen.getByText(/made by a human/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Next/ }));
+    fireEvent.change(screen.getByLabelText('Explanation style'), { target: { value: 'scores' } });
+    expect(screen.getByTestId('scores-only')).toBeInTheDocument();
+    expect(localStorage.getItem('tiles_explain_style')).toBe('scores');
+  });
+
+  it('shows guidance when a session has no recorded moves yet', async () => {
+    vi.spyOn(api.history, 'get').mockResolvedValue({ session_id: 's', room_name: 'r', total_moves: 0, moves: [] });
+    render(<Replay sessionId="s" />);
+    expect(await screen.findByTestId('replay-empty')).toHaveTextContent(/once the game has made at least one move/);
+  });
+});
 
 describe('Replay', () => {
   it('overlays the profile as it stood at the current move', async () => {

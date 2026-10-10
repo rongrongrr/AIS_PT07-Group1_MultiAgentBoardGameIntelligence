@@ -58,6 +58,7 @@ def _session_to_response(s: Session) -> SessionResponse:
         stuck_abort_sec=s.stuck_abort_sec,
         final_scores=json.loads(s.final_scores) if s.final_scores else None,
         winner=s.winner,
+        abort_reason=s.abort_reason,
         created_at=s.created_at,
         completed_at=s.completed_at,
     )
@@ -203,6 +204,7 @@ async def stop_session(session_id: str, db: DBSession = Depends(get_db)):
         await mp.close_all()
 
     session.status = SessionStatus.ABORTED.value
+    session.abort_reason = "Stopped by user"
     session.completed_at = datetime.utcnow()
     db.commit()
     return {"status": "stopped", "session_id": session_id}
@@ -633,7 +635,7 @@ async def _run_multi_bot_game(
         })
 
         if abort_reason:
-            _update_db_status(session_id, SessionStatus.ABORTED, db, scores=scores)
+            _update_db_status(session_id, SessionStatus.ABORTED, db, scores=scores, abort_reason=abort_reason)
         else:
             _update_db_status(session_id, SessionStatus.COMPLETED, db, scores=scores,
                               completed_rows=_completed_rows(mp.bots[0].current_state))
@@ -644,7 +646,7 @@ async def _run_multi_bot_game(
         logger.info(f"[{session_id}] Game cancelled")
     except Exception as e:
         logger.error(f"[{session_id}] Game error: {e}", exc_info=True)
-        _update_db_status(session_id, SessionStatus.ABORTED, db)
+        _update_db_status(session_id, SessionStatus.ABORTED, db, abort_reason=f"Unexpected error: {e}")
     finally:
         await mp.close_all()
         _active_sessions.pop(session_id, None)
@@ -732,10 +734,12 @@ def _completed_rows(state: Optional[GameStateData]) -> dict:
 
 
 def _update_db_status(session_id: str, status: SessionStatus, db: DBSession,
-                      scores: dict = None, completed_rows: dict = None):
+                      scores: dict = None, completed_rows: dict = None, abort_reason: str = None):
     session = db.query(Session).filter(Session.id == session_id).first()
     if session:
         session.status = status.value
+        if abort_reason and status == SessionStatus.ABORTED:
+            session.abort_reason = abort_reason
         if status in (SessionStatus.COMPLETED, SessionStatus.ABORTED):
             session.completed_at = datetime.utcnow()
         if scores:

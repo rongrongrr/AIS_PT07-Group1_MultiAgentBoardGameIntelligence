@@ -57,6 +57,7 @@ export interface Session {
   stuck_abort_sec: number;
   final_scores: Record<string, number> | null;
   winner: string | null;
+  abort_reason?: string | null;
   created_at: string;
   completed_at: string | null;
 }

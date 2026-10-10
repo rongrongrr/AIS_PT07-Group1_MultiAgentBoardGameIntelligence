@@ -1,4 +1,10 @@
+import { createContext, useContext } from 'react';
 import type { MoveResponse } from '../api/client';
+
+/** When true every coloured tile also shows a letter, for colour-blind players. */
+export const PatternsContext = createContext(false);
+const LETTERS: Record<string, string> = { blue: 'B', yellow: 'Y', red: 'R', black: 'G', white: 'W' };
+
 
 export const TILE_DOTS: Record<string, string> = {
   blue: 'bg-[#67c0dd]',
@@ -27,25 +33,41 @@ const TILE_GHOST: Record<string, string> = {
 const FLOOR_PENALTIES = [-1, -1, -2, -2, -2, -3, -3];
 const TS = 'w-5 h-5'; // tile size class
 
-function Tile({ color, highlight, ring }: { color?: string | null; highlight?: boolean; ring?: string }) {
-  if (!color || color === 'firstPlayer') {
-    return <div className={`${TS} rounded bg-gray-800 border border-gray-700`} />;
-  }
+function ColorCell({ color, className = '', title }: { color: string; className?: string; title?: string }) {
+  const patterns = useContext(PatternsContext);
   return (
     <div
-      className={`${TS} rounded ${TILE_DOTS[color] || 'bg-gray-500'} ${
-        highlight ? 'ring-2 ring-red-400 scale-110 z-10' : ''
-      } ${ring || ''}`}
-      title={color}
+      className={`${TS} rounded ${TILE_DOTS[color] || 'bg-gray-500'} ${className} ${
+        patterns ? 'flex items-center justify-center text-[10px] font-bold text-gray-900' : ''
+      }`}
+      title={title ?? color}
+    >{patterns ? LETTERS[color] ?? '' : null}</div>
+  );
+}
+
+function Tile({ color, highlight, ring }: { color?: string | null; highlight?: boolean; ring?: string }) {
+  if (!color || color === 'firstPlayer') {
+    return <div className={`${TS} rounded bg-gray-800 border border-gray-700`} title={color === 'firstPlayer' ? 'first-player token' : 'empty'} />;
+  }
+  return (
+    <ColorCell
+      color={color}
+      className={`${highlight ? 'ring-2 ring-red-400 scale-110 z-10 tile-pulse' : ''} ${ring || ''}`}
     />
   );
 }
 
-export default function BoardSnapshot({ board, action, activePlayer }: {
+export default function BoardSnapshot({ board, action, activePlayer, heading = 'Board state before this move', showMove = true, compact = false }: {
   board: NonNullable<MoveResponse['board']>;
   action: MoveResponse['action'];
   activePlayer: string;
+  heading?: string;
+  /** false for the "after" view, where the move has already happened and nothing is highlighted */
+  showMove?: boolean;
+  /** hide the per-player boards (factories and the move arrow only) */
+  compact?: boolean;
 }) {
+  if (!showMove) action = { ...action, source_index: -1, source_type: 'none', destination: 'none', destination_row: -1 };
   const srcFactory = action.source_type === 'factory' ? action.source_index : null;
   const srcCenter = action.source_type === 'center';
   const dstRow = action.destination === 'pattern_line' ? action.destination_row : null;
@@ -54,7 +76,7 @@ export default function BoardSnapshot({ board, action, activePlayer }: {
 
   return (
     <div className="bg-gray-800/60 rounded-xl p-4 space-y-4 border border-gray-700/50">
-      <div className="text-xs text-gray-500">Board state before this move</div>
+      <div className="text-xs text-gray-500">{heading}</div>
 
       {/* Factories row */}
       <div className="flex flex-wrap items-center gap-3 justify-center">
@@ -99,7 +121,7 @@ export default function BoardSnapshot({ board, action, activePlayer }: {
       )}
 
       {/* Player boards */}
-      {board.players.map((p) => {
+      {!compact && board.players.map((p) => {
         const isActive = p.name === activePlayer;
         return (
           <div
@@ -149,11 +171,8 @@ export default function BoardSnapshot({ board, action, activePlayer }: {
                       ))}
                       {/* Filled tiles (right side, closest to wall) */}
                       {Array.from({ length: filled }).map((_, i) => {
-                        const tile = row[i];
                         return (
-                          <div key={`t${i}`} className={`${TS} rounded ${
-                            TILE_DOTS[tile] || 'bg-gray-500'
-                          } ${isTargetRow ? 'ring-1 ring-yellow-400' : ''}`} />
+                          <ColorCell key={`t${i}`} color={row[i]} className={isTargetRow ? 'ring-1 ring-yellow-400' : ''} />
                         );
                       })}
                     </div>
@@ -167,15 +186,12 @@ export default function BoardSnapshot({ board, action, activePlayer }: {
                 {WALL_PATTERN.map((wallRow, ri) => (
                   <div key={ri} className="flex gap-0.5">
                     {wallRow.map((wc, ci) => (
-                      <div
-                        key={ci}
-                        className={`${TS} rounded ${
-                          p.wall[ri]?.[ci]
-                            ? `${TILE_DOTS[wc] || 'bg-gray-500'} border border-white/30 shadow-sm`
-                            : `${TILE_GHOST[wc] || 'bg-gray-800/30 border border-gray-700/30'}`
-                        }`}
-                        title={`${wc}${p.wall[ri]?.[ci] ? ' (placed)' : ' (empty)'}`}
-                      />
+                      p.wall[ri]?.[ci] ? (
+                        <ColorCell key={ci} color={wc} className="border border-white/30 shadow-sm" title={`${wc} (placed)`} />
+                      ) : (
+                        <div key={ci} className={`${TS} rounded ${TILE_GHOST[wc] || 'bg-gray-800/30 border border-gray-700/30'}`}
+                             title={`${wc} (empty)`} />
+                      )
                     ))}
                   </div>
                 ))}
@@ -187,13 +203,11 @@ export default function BoardSnapshot({ board, action, activePlayer }: {
               <span className="text-[10px] text-gray-500 mr-1">Floor:</span>
               {FLOOR_PENALTIES.map((penalty, i) => (
                 <div key={i} className="text-center">
-                  <div className={`${TS} rounded ${
-                    p.floor_line[i]
-                      ? `${TILE_DOTS[p.floor_line[i]] || 'bg-gray-500'} ${
-                          isActive && dstFloor ? 'ring-1 ring-yellow-400' : ''
-                        }`
-                      : 'bg-gray-900 border border-gray-700'
-                  }`} />
+                  {p.floor_line[i] ? (
+                    <ColorCell color={p.floor_line[i]} className={isActive && dstFloor ? 'ring-1 ring-yellow-400' : ''} />
+                  ) : (
+                    <div className={`${TS} rounded bg-gray-900 border border-gray-700`} />
+                  )}
                   <div className="text-[9px] text-red-400/70 mt-0.5">{penalty}</div>
                 </div>
               ))}
@@ -203,7 +217,7 @@ export default function BoardSnapshot({ board, action, activePlayer }: {
       })}
 
       {/* Move arrow annotation */}
-      <div className="flex items-center justify-center gap-2 py-1 text-xs">
+      {showMove && <div className="flex items-center justify-center gap-2 py-1 text-xs">
         <span className={`px-2 py-1 rounded ${
           srcFactory !== null ? 'bg-red-900/30 text-red-300 ring-1 ring-red-500/50' : 'bg-red-900/30 text-red-300 ring-1 ring-red-500/50'
         }`}>
@@ -227,7 +241,7 @@ export default function BoardSnapshot({ board, action, activePlayer }: {
           {dstFloor ? 'Floor' : `Row ${(dstRow ?? 0) + 1}`}
         </span>
         <span className="text-gray-500">by {activePlayer}</span>
-      </div>
+      </div>}
     </div>
   );
 }

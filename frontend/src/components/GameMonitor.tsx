@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import ProfilerInsights from './ProfilerInsights';
+import StatusBanner, { describeStatus } from './StatusBanner';
 import { api, connectSessionWs, type GameStateData, type MoveResponse, type SysLogEntry, type Session } from '../api/client';
 import { useGameStore } from '../stores/gameStore';
 import PlayerBoard, { FactoryDisplay, CenterPoolDisplay } from './PlayerBoard';
@@ -385,6 +386,7 @@ export default function GameMonitor({ sessionId, session: externalSession }: {
   const sysLogRef = useRef<HTMLDivElement>(null);
   const [showSysLog, setShowSysLog] = useState(true);
   const [sysLogFilter, setSysLogFilter] = useState<string>('all');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     setCurrentSession(externalSession);
@@ -400,6 +402,9 @@ export default function GameMonitor({ sessionId, session: externalSession }: {
     api.sessions.get(sessionId).then(setCurrentSession).catch((e) => setError(e.message));
     api.history.get(sessionId).then((data) => setMoves(data.moves)).catch(() => {});
 
+    let disposed = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const open = () => {
     const ws = connectSessionWs(
       sessionId,
       (msg) => {
@@ -419,12 +424,17 @@ export default function GameMonitor({ sessionId, session: externalSession }: {
           });
         }
       },
-      () => setConnected(false)
+      () => {
+        setConnected(false);
+        if (!disposed) retry = setTimeout(open, 2000);   // keep trying: the game runs on regardless
+      }
     );
     ws.onopen = () => setConnected(true);
     wsRef.current = ws;
+    };
+    open();
 
-    return () => { ws.close(); wsRef.current = null; };
+    return () => { disposed = true; clearTimeout(retry); wsRef.current?.close(); wsRef.current = null; };
   }, [sessionId]);
 
   useEffect(() => {
@@ -450,6 +460,14 @@ export default function GameMonitor({ sessionId, session: externalSession }: {
 
   return (
     <div className="space-y-6">
+      <StatusBanner view={describeStatus(currentSession || externalSession, gameState, moves.length, isConnected)} />
+      {actionError && (
+        <div role="alert" className="bg-red-900/50 border border-red-700 text-red-200 px-4 py-2 rounded-lg text-sm flex justify-between">
+          <span>{actionError}</span>
+          <button onClick={() => setActionError(null)} className="text-red-400 hover:text-red-200 text-xs">Dismiss</button>
+        </div>
+      )}
+
       {/* Game result banner */}
       {(status === 'completed' || status === 'aborted') && externalSession?.final_scores && (
         <div className={`rounded-xl p-4 mb-2 ${
@@ -506,7 +524,10 @@ export default function GameMonitor({ sessionId, session: externalSession }: {
           </span>
           {status === 'playing' && (
             <button
-              onClick={async () => { try { await api.sessions.stop(sessionId); } catch {} }}
+              onClick={async () => {
+                if (!window.confirm('Stop this session? The browsers close and the game is marked aborted.')) return;
+                try { setActionError(null); await api.sessions.stop(sessionId); } catch (e: any) { setActionError(e.message); }
+              }}
               className="px-3 py-1 bg-red-800 hover:bg-red-700 rounded text-xs transition"
             >
               Stop
@@ -514,7 +535,7 @@ export default function GameMonitor({ sessionId, session: externalSession }: {
           )}
           {status === 'created' && (
             <button
-              onClick={async () => { try { await api.sessions.start(sessionId); } catch {} }}
+              onClick={async () => { try { setActionError(null); await api.sessions.start(sessionId); } catch (e: any) { setActionError(e.message); } }}
               className="px-3 py-1 bg-green-700 hover:bg-green-600 rounded text-xs transition"
             >
               Start

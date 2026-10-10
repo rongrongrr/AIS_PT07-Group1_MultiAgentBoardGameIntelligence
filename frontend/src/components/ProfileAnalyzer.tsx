@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type Session } from '../api/client';
+import Help, { GLOSSARY } from './Help';
 
 const TILE_DOTS: Record<string, string> = {
   blue: 'bg-[#67c0dd]',
@@ -73,7 +74,8 @@ export default function ProfileAnalyzer({ sessionId, session }: {
     <div className="space-y-6">
       {/* Config */}
       <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 space-y-4">
-        <h3 className="text-sm font-semibold text-teal-400">Profile Analysis</h3>
+        <h3 className="text-sm font-semibold text-teal-400">Player profiles</h3>
+        <p className="text-xs text-gray-500">Describes how each player played in this session. Labels come from models trained on simulated bots, so for real players they are hypotheses, not facts.</p>
 
         {/* Analyzer selection */}
         <div>
@@ -139,11 +141,11 @@ export default function ProfileAnalyzer({ sessionId, session }: {
           {profile.archetype && (
             <div className="bg-gray-800 rounded-lg p-3 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-500">Archetype</span>
+                <span className="text-xs text-gray-500">Play style<Help text={GLOSSARY.archetype} /></span>
                 <span className="text-sm font-semibold text-yellow-300">
                   {profile.archetype.replace('Player', '')}
                   <span className="text-xs text-gray-400 font-normal ml-2">
-                    {Math.round((profile.archetype_confidence ?? 0) * 100)}% confidence
+                    {Math.round((profile.archetype_confidence ?? 0) * 100)}% confidence<Help text={GLOSSARY.confidence} />
                   </span>
                 </span>
               </div>
@@ -183,11 +185,11 @@ export default function ProfileAnalyzer({ sessionId, session }: {
               <div className="text-sm font-medium text-yellow-300 capitalize">{profile.style}</div>
             </div>
             <div className="bg-gray-800 rounded-lg p-3 text-center">
-              <div className="text-[10px] text-gray-500">Avg Decision</div>
+              <div className="text-[10px] text-gray-500">Avg decision time<Help text={GLOSSARY.decision} /></div>
               <div className="text-lg font-bold text-blue-300">{profile.timing.avg_decide_ms}ms</div>
             </div>
             <div className="bg-gray-800 rounded-lg p-3 text-center">
-              <div className="text-[10px] text-gray-500">Floor Usage</div>
+              <div className="text-[10px] text-gray-500">Floor use<Help text={GLOSSARY.floor} /></div>
               <div className="text-lg font-bold text-red-300">{profile.destination_split.floor}%</div>
             </div>
           </div>

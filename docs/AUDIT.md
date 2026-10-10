@@ -37,8 +37,14 @@ Done after the stage-2 merge by probing the running system (API with bad input, 
 
 1. Run the human-centred study and train/validate the profilers on real human games (needs people).
 2. Run `pytest -m live` on a schedule outside CI to detect platform changes early.
-3. Add an end-to-end browser test of the UI against a fake platform (Playwright against the Docker stack).
+3. Add an end-to-end browser test of the UI against a fake platform (Playwright against the Docker stack). The UI now has 31 component and logic tests and screenshots from real runs (`docs/evidence/ux_*.png`), but no scripted click-through.
 4. Drop to a non-root container user and set resource limits in `docker-compose.yml`.
 5. Persist active-session state so a restart can resume a game instead of aborting it.
 6. Make the second-engine duplication smaller by letting the live runtime use `tiles.core` for legality, once the platform parser is the only remaining `GameStateData` consumer.
 7. Re-run the tournament with more deals and several seeds and publish confidence intervals in the Leaderboard.
+
+## UI / UX pass (after the audit)
+
+Replay: two-column layout with a sticky "why" panel, board before/after each move, a bar chart of the options weighed, keyboard control, rating progress with "next unrated", scores-only condition selector, human-move explanation. Session setup: presets, inline validation, bot descriptions. Monitor: plain-language status banner, abort reason (new `abort_reason` column, added to existing databases automatically), WebSocket auto-reconnect, confirm-before-stop, visible start/stop errors (these were silently swallowed before). App: searchable, filterable session list, tile-letter mode for colour-blind players, tab semantics, focus rings, reduced-motion, collapsible sidebar on narrow screens, `?` help on Elo / confidence / archetype, 95% intervals on the leaderboard.
+
+Still open: a light theme, replay export (PDF/GIF), animated tile movement (the move is highlighted and the after-board is one click away), and a scripted end-to-end UI test.

@@ -41,7 +41,10 @@ export default function ProfilerInsights({ sessionId, uptoStep, refreshKey, poll
             </span>
           )}
           {p.style && <span className="text-gray-400"> &middot; {p.style}</span>}
-          <div className="text-gray-400 leading-snug">{p.summary}</div>
+          <details className="text-gray-400 leading-snug">
+            <summary className="cursor-pointer text-gray-500 hover:text-gray-300">Details</summary>
+            {p.summary}
+          </details>
         </div>
       ))}
     </div>

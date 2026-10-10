@@ -1,5 +1,15 @@
 import { useEffect, useState } from 'react';
 import { api, type TournamentResults } from '../api/client';
+import Help, { GLOSSARY } from './Help';
+
+/** 95% Wilson interval for a win rate p measured over n games. */
+export function wilson(p: number, n: number): [number, number] {
+  if (n <= 0) return [0, 1];
+  const z = 1.96, d = 1 + (z * z) / n;
+  const centre = (p + (z * z) / (2 * n)) / d;
+  const half = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / d;
+  return [Math.max(0, centre - half), Math.min(1, centre + half)];
+}
 
 /** Elo ranking and win-rate matrix from the latest saved round-robin (scripts/elo_tournament.py --save). */
 export default function Leaderboard() {
@@ -26,7 +36,7 @@ export default function Leaderboard() {
   return (
     <div className="space-y-6" data-testid="leaderboard">
       <div>
-        <h3 className="text-sm font-semibold text-teal-400">Elo ranking</h3>
+        <h3 className="text-sm font-semibold text-teal-400">Elo ranking<Help text={GLOSSARY.elo} /></h3>
         <p className="text-xs text-gray-500">
           {data.games} simulated games, {data.deals_per_pair} deals per pair from both seats ({data.generated}). Small samples:
           differences of under about 100 Elo are within noise.
@@ -47,6 +57,7 @@ export default function Leaderboard() {
       </table>
       <div>
         <h3 className="text-sm font-semibold text-teal-400 mb-1">Win rate of row against column</h3>
+        <p className="text-xs text-gray-500 mb-1">Hover a cell for its 95% interval: with only {(data.deals_per_pair ?? 0) * 2} games per pair the interval is wide, so a rate is only meaningful when it is clearly away from 50%.</p>
         <div className="overflow-x-auto">
           <table className="text-xs">
             <thead>
@@ -58,7 +69,14 @@ export default function Leaderboard() {
                   <th className="text-left pr-2 text-gray-400 font-normal">{row}</th>
                   {names.map((col) => {
                     const p = data.win_rates?.[row]?.[col];
-                    return <td key={col} className={`text-center px-2 py-1 ${cell(p)}`}>{row === col ? '-' : p?.toFixed(2)}</td>;
+                    const games = (data.deals_per_pair ?? 0) * 2;
+                    const [lo, hi] = p === undefined ? [0, 1] : wilson(p, games);
+                    return (
+                      <td key={col} className={`text-center px-2 py-1 ${cell(p)}`}
+                          title={p === undefined ? undefined : `${games} games; 95% interval ${Math.round(lo * 100)}-${Math.round(hi * 100)}%`}>
+                        {row === col ? '-' : p?.toFixed(2)}
+                      </td>
+                    );
                   })}
                 </tr>
               ))}

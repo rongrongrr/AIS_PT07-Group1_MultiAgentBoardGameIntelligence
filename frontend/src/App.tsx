@@ -5,6 +5,8 @@ import GameMonitor from './components/GameMonitor';
 import ProfileAnalyzer from './components/ProfileAnalyzer';
 import Replay from './components/Replay';
 import Leaderboard from './components/Leaderboard';
+import { PatternsContext } from './components/BoardSnapshot';
+import { useFlag, usePref } from './lib/prefs';
 import { useGameStore } from './stores/gameStore';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -30,7 +32,10 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'config' | 'monitor' | 'replay' | 'profile' | 'leaderboard'>('config');
   const [sidebarWidth, setSidebarWidth] = useState(240);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
+  const [patterns, setPatterns] = useFlag('tiles_patterns', false);
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = usePref('tiles_status_filter', 'all');
   const resizing = useRef(false);
 
   useEffect(() => {
@@ -66,23 +71,31 @@ export default function App() {
   }, []);
 
   const selected = sessions.find((s) => s.id === selectedId) || null;
+  const shown = sessions.filter((s) =>
+    (statusFilter === 'all' || s.status === statusFilter || (statusFilter === 'running' && ['lobby', 'playing'].includes(s.status))) &&
+    (!query.trim() || `${s.room_name} ${s.player_config.map((p) => p.name || p.type).join(' ')} ${s.winner || ''}`.toLowerCase().includes(query.trim().toLowerCase())));
   const sw = sidebarCollapsed ? 0 : sidebarWidth;
 
   return (
+    <PatternsContext.Provider value={patterns}>
     <div className="h-screen flex flex-col bg-gray-950 text-gray-100">
       {/* Top bar */}
-      <nav className="bg-gray-900 border-b border-gray-700 px-3 py-1.5 flex items-center gap-1 shrink-0">
+      <nav className="bg-gray-900 border-b border-gray-700 px-3 py-1.5 flex items-center gap-1 shrink-0 overflow-x-auto" aria-label="Main" role="tablist">
+        <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} aria-label="Toggle the session list"
+                aria-expanded={!sidebarCollapsed} className="md:hidden px-2 py-1 text-gray-400 hover:text-gray-200">&#9776;</button>
         <span className="text-lg font-bold text-teal-400 tracking-tight mr-3">TILES</span>
 
         <button
+          role="tab" aria-selected={activeTab === 'config'}
           onClick={() => setActiveTab('config')}
           className={`px-3 py-1.5 rounded text-sm font-medium transition ${
             activeTab === 'config' ? 'bg-gray-800 text-teal-400' : 'text-gray-400 hover:text-gray-200'
           }`}
         >
-          Session Configuration
+          New session
         </button>
         <button
+          role="tab" aria-selected={activeTab === 'leaderboard'}
           onClick={() => setActiveTab('leaderboard')}
           className={`px-3 py-1.5 rounded text-sm font-medium transition ${
             activeTab === 'leaderboard' ? 'bg-gray-800 text-teal-400' : 'text-gray-400 hover:text-gray-200'
@@ -93,7 +106,8 @@ export default function App() {
         {selectedId && selected && (
           <>
             <button
-              onClick={() => setActiveTab('monitor')}
+              role="tab" aria-selected={activeTab === 'monitor'}
+          onClick={() => setActiveTab('monitor')}
               className={`px-3 py-1.5 rounded text-sm font-medium transition ${
                 activeTab === 'monitor' ? 'bg-gray-800 text-teal-400' : 'text-gray-400 hover:text-gray-200'
               }`}
@@ -101,7 +115,8 @@ export default function App() {
               Game Monitor
             </button>
             <button
-              onClick={() => setActiveTab('replay')}
+              role="tab" aria-selected={activeTab === 'replay'}
+          onClick={() => setActiveTab('replay')}
               className={`px-3 py-1.5 rounded text-sm font-medium transition ${
                 activeTab === 'replay' ? 'bg-gray-800 text-teal-400' : 'text-gray-400 hover:text-gray-200'
               }`}
@@ -109,16 +124,22 @@ export default function App() {
               Replay
             </button>
             <button
-              onClick={() => setActiveTab('profile')}
+              role="tab" aria-selected={activeTab === 'profile'}
+          onClick={() => setActiveTab('profile')}
               className={`px-3 py-1.5 rounded text-sm font-medium transition ${
                 activeTab === 'profile' ? 'bg-gray-800 text-teal-400' : 'text-gray-400 hover:text-gray-200'
               }`}
             >
-              Profile Analyzing
+              Player profiles
             </button>
-            <span className="text-xs text-gray-600 ml-2">{selected.room_name}</span>
+            <span className="text-xs text-gray-600 ml-2 whitespace-nowrap">{selected.room_name}</span>
           </>
         )}
+        <label className="ml-auto flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap cursor-pointer"
+               title="Adds a letter to every tile (B, Y, R, G, W) so colours are not the only cue">
+          <input type="checkbox" checked={patterns} onChange={(e) => setPatterns(e.target.checked)} className="accent-teal-500" />
+          Tile letters
+        </label>
       </nav>
 
       <div className="flex flex-1 overflow-hidden relative">
@@ -138,14 +159,29 @@ export default function App() {
               </button>
 
               <div className="px-3 py-1.5 text-[10px] text-gray-500 font-medium uppercase tracking-wider border-b border-gray-800">
-                Sessions ({sessions.length})
+                Sessions ({shown.length}{shown.length !== sessions.length ? ` of ${sessions.length}` : ''})
+              </div>
+              <div className="px-2 py-1.5 space-y-1.5 border-b border-gray-800">
+                <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search room, player, winner"
+                       aria-label="Search sessions"
+                       className="w-full bg-gray-800 text-xs rounded px-2 py-1 border border-gray-700 focus:border-teal-500 focus:outline-none" />
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filter sessions by status"
+                        className="w-full bg-gray-800 text-xs rounded px-2 py-1 border border-gray-700">
+                  <option value="all">All statuses</option>
+                  <option value="running">Running</option>
+                  <option value="completed">Completed</option>
+                  <option value="aborted">Aborted</option>
+                  <option value="created">Not started</option>
+                </select>
               </div>
 
               <div className="flex-1 overflow-y-auto">
-                {sessions.length === 0 ? (
-                  <div className="px-3 py-4 text-xs text-gray-600 text-center">No sessions</div>
+                {shown.length === 0 ? (
+                  <div className="px-3 py-4 text-xs text-gray-600 text-center">
+                    {sessions.length === 0 ? 'No sessions yet. Create one to get started.' : 'No sessions match the search or filter.'}
+                  </div>
                 ) : (
-                  sessions.map((s) => {
+                  shown.map((s) => {
                     const players = s.player_config.map((p) => {
                       const label = p.type === 'human' ? 'H' : p.type.charAt(0);
                       return `${label}:${p.name || p.type}`;
@@ -242,12 +278,17 @@ export default function App() {
               <ProfileAnalyzer sessionId={selectedId} session={selected} />
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-600">
-              <div className="text-center text-sm">Select a session or create a new one</div>
+            <div className="flex-1 flex items-center justify-center text-gray-500 p-6">
+              <div className="text-center text-sm space-y-2 max-w-sm">
+                <div>Select a session from the list, or create a new one.</div>
+                <button onClick={() => { setActiveTab('config'); setSelectedId(null); }}
+                        className="px-4 py-2 bg-teal-700 hover:bg-teal-600 rounded-lg text-gray-100">New session</button>
+              </div>
             </div>
           )}
         </main>
       </div>
     </div>
+    </PatternsContext.Provider>
   );
 }

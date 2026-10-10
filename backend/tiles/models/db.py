@@ -45,6 +45,7 @@ class Session(Base):
     winner = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
+    abort_reason = Column(String, nullable=True)   # why an aborted session stopped, shown in the UI
 
 
 class GameState(Base):
@@ -116,6 +117,10 @@ def init_db():
     """Create all tables."""
     os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
     Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:       # databases created before abort_reason existed
+        cols = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(sessions)")}
+        if "abort_reason" not in cols:
+            conn.exec_driver_sql("ALTER TABLE sessions ADD COLUMN abort_reason VARCHAR")
     # The move ledger is append-only: the database itself refuses to change or delete a recorded move.
     with engine.begin() as conn:
         for op in ("UPDATE", "DELETE"):

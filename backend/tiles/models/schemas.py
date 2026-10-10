@@ -135,6 +135,7 @@ class SessionResponse(BaseModel):
     stuck_abort_sec: int = 3
     final_scores: Optional[dict] = None
     winner: Optional[str] = None
+    abort_reason: Optional[str] = None
     created_at: datetime
     completed_at: Optional[datetime] = None
 
