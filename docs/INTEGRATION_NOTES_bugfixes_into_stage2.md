@@ -63,6 +63,14 @@ Union: bugfixes' real dependencies (sqlalchemy, numpy, scikit-learn, httpx, play
 - Backend: **544 passed, 2 skipped, 1 deselected** (`pytest`, both suites, 50s)
 - Frontend: `npm run build` ✓ (stage2 stack untouched)
 
+## Post-merge fixes
+
+- `backend/tiles/cli.py`: git auto-merged bugfixes' `cmd_serve` (serving `tiles.main`),
+  which made `start.sh` boot the wrong API — no `/api/stats` or `/api/agents`, and an
+  import of `tiles.ml` triggered a torch warning. Restored stage2's
+  `tiles.server.app.create_app` wiring. Verified on the merged tree with
+  `tiles.cli serve`: `/api/health`, `/api/stats`, `/api/agents`, `/api/sessions` → 200.
+
 ## Follow-ups
 
 1. Decide the long-term fate of the two backend apps (`tiles.server.app` vs `tiles.main`) and wire
