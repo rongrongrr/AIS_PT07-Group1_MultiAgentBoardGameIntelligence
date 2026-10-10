@@ -130,6 +130,7 @@ class LiveSession:
         self._stop = asyncio.Event()
         self._step = 0
         self._last_state: Optional[GameState] = None
+        self._last_state_at: Optional[float] = None
         self._rounds_recorded: set = set()
         self._consecutive_rejects = 0
 
@@ -491,6 +492,11 @@ class LiveSession:
         if self.ledger is not None:
             self.ledger.record_move(self.session_id, record)
         await self._emit({"type": "move", "step": self._step, "record": record})
+        if state_after is not None and state_after.round_number == state.round_number:
+            # Baseline for the next seat's move, so a quick human reply
+            # isn't diffed against the state before our own move.
+            self._last_state = state_after
+            self._last_state_at = time.perf_counter()
         if state_after is not None:
             await self._emit(
                 {"type": "state", "step": self._step, "state": state_after.to_dict()}
@@ -499,31 +505,68 @@ class LiveSession:
     # -- observation of opponents ------------------------------------------------
 
     def _observe_transition(self, state: GameState) -> None:
-        """Diff against the previous mirrored state so the Profiler sees
-        opponent (human/remote) moves too, and round boundaries are
-        reported."""
+        """Diff against the previous mirrored state so moves by seats we
+        don't control (humans, remote players) are recorded and profiled
+        like our own, and round boundaries are reported."""
         prev = self._last_state
+        prev_at = self._last_state_at
+        if prev is not None and prev.to_dict() == state.to_dict():
+            return  # re-read of the same frame; keep the think-time clock
         self._last_state = state
+        self._last_state_at = time.perf_counter()
         if prev is None:
             return
+        mover = prev.current_player
+        # Bots record themselves in conclude(); only infer other seats.
+        mover_name = prev.players[mover].name if mover < len(prev.players) else ""
+        if mover_name and mover_name not in self.seats:
+            action = infer_action(prev, state, mover)
+            if action is not None:
+                self._record_observed_move(prev, state, mover, action, prev_at)
         if prev.round_number != state.round_number:
             self._record_round(prev.round_number, state)
-            return
-        if self.profiler is None:
-            return
-        mover = prev.current_player
-        # Bots observe themselves in conclude(); only infer other seats.
-        mover_name = prev.players[mover].name if mover < len(prev.players) else ""
-        if mover_name in self.seats:
-            return
-        action = infer_action(prev, state, mover)
-        if action is None:
-            return
+
+    def _record_observed_move(
+        self,
+        prev: GameState,
+        state: GameState,
+        mover: int,
+        action,
+        prev_at: Optional[float],
+    ) -> None:
+        before = prev.clone()
+        before.current_player = mover
         try:
-            move = apply_action(prev.clone(), action)
-            self.profiler.observe(prev, action, move)
+            move = apply_action(before.clone(), action)
         except ValueError:
-            pass
+            return
+        # Think time: from the state that put them on turn to their move.
+        think_ms = (time.perf_counter() - prev_at) * 1000 if prev_at else None
+        if self.profiler is not None:
+            self.profiler.observe(before, action, move, think_ms)
+
+        self._step += 1
+        timing = {"decide_ms": round(think_ms, 3)} if think_ms is not None else {}
+        if think_ms is not None:
+            timing["total_ms"] = timing["decide_ms"]
+        record = {
+            "step": self._step,
+            "round": before.round_number,
+            "player_index": mover,
+            "player_name": before.players[mover].name,
+            "tactician": "human",
+            "action": action.to_dict(),
+            "state_before": before.to_dict(),
+            "state_after": state.to_dict(),
+            "explanation": None,
+            "report": None,
+            "profiles": {},
+            "validation": {"ok": True, "violation": None, "attempts": 1, "inferred": True},
+            "timing": timing,
+        }
+        if self.ledger is not None:
+            self.ledger.record_move(self.session_id, record)
+        self._emit_nowait({"type": "move", "step": self._step, "record": record})
 
     def _record_round(self, round_number: int, state_after: GameState) -> None:
         if round_number in self._rounds_recorded:

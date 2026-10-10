@@ -390,3 +390,53 @@ def test_v2_roundtrip_through_inverse_mapping():
     assert back.current_player == 2 and back.round_number == 2
     assert back.bag == original.bag
     assert [p.name for p in back.players] == ["a", "b", "c"]
+
+
+def test_infer_round_ending_move_from_the_tiled_board():
+    """The platform shows a round-ending move already wall-tiled (and
+    maybe redealt), so the pattern-line diff alone would misread a move
+    that completed a line as a floor move."""
+    import random
+
+    from tiles.core import apply_action, new_game, resolve_round, step
+
+    checked = 0
+    for seed in range(40):
+        rng = random.Random(seed)
+        state = new_game(2, seed=seed, player_names=["A", "B"])
+        while True:
+            legal = legal_actions(state)
+            last = [a for a in legal if _ends_round_completing_a_line(state, a)]
+            if last or not any(not _ends_round(state, a) for a in legal):
+                break
+            step(state, rng.choice([a for a in legal if not _ends_round(state, a)]))
+        for action in last:
+            before = state.clone()
+            after = before.clone()
+            apply_action(after, action)
+            resolve_round(after)
+            got = infer_action(before, after, before.current_player)
+            assert got is not None and not got.to_floor
+            replay = before.clone()
+            apply_action(replay, got)
+            resolve_round(replay)
+            assert replay.scores() == after.scores()
+            assert [b.wall for b in replay.players] == [b.wall for b in after.players]
+            checked += 1
+    assert checked > 0
+
+
+def _ends_round(state, action):
+    from tiles.core import apply_action
+
+    sim = state.clone()
+    apply_action(sim, action)
+    return sim.drafting_exhausted()
+
+
+def _ends_round_completing_a_line(state, action):
+    from tiles.core import apply_action
+
+    sim = state.clone()
+    move = apply_action(sim, action)
+    return sim.drafting_exhausted() and move.completed_line

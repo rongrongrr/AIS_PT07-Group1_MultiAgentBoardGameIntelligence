@@ -279,18 +279,21 @@ def test_auto_deal_path_skips_manual_deal():
 
 
 # ---------------------------------------------------------------------------
-# Human seat: the loop waits, the Profiler infers the human's moves
+# Human seat: the loop waits, infers the human's moves, records and profiles them
 # ---------------------------------------------------------------------------
 
 
-def test_human_seat_moves_are_inferred_and_profiled():
+def test_human_seat_moves_are_inferred_recorded_and_profiled(tmp_path):
     site = FakeSite(["Bot", "Human"], seed=11, auto_deal=True)
     site.humans.append("Human")
     human_brain = GreedyTactician()
     seats = [LiveSeat("Bot", GreedyTactician()), LiveSeat("Human", None)]
     profiler = BasicProfiler()
+    ledger = Ledger(tmp_path / "human.db")
+    ledger.create_session("sess_human", mode="live")
     events = []
     stop = threading.Event()
+    human_turns = []
 
     async def play_human():
         # Acts like the human's own browser: moves when it is their turn.
@@ -306,7 +309,8 @@ def test_human_seat_moves_are_inferred_and_profiled():
                 from tiles.engine.state_translator import action_to_site_moves
 
                 choose, place = action_to_site_moves(decision.action)
-                site.take_turn("Human", choose, place)
+                if site.take_turn("Human", choose, place)["ok"]:
+                    human_turns.append(decision.action)
             elif site.started and site.needs_deal and \
                     site.state.players[site.state.current_player].name == "Human":
                 site.deal()
@@ -317,6 +321,8 @@ def test_human_seat_moves_are_inferred_and_profiled():
             fast_config(seats),
             on_event=events.append,
             profiler=profiler,
+            ledger=ledger,
+            session_id="sess_human",
             seat_factory=lambda **kw: FakeSeat(site, **kw),
         )
         human_task = asyncio.create_task(play_human())
@@ -330,11 +336,27 @@ def test_human_seat_moves_are_inferred_and_profiled():
     assert result["status"] == "completed"
     lobby = [e for e in events if e["type"] == "status" and e["status"] == "lobby"][0]
     assert lobby["waiting_for_humans"] == ["Human"]
-    bot_moves = [e for e in events if e["type"] == "move"]
-    assert all(m["record"]["player_name"] == "Bot" for m in bot_moves)
+    records = [e["record"] for e in events if e["type"] == "move"]
+    bot_moves = [r for r in records if r["player_name"] == "Bot"]
+    human_moves = [r for r in records if r["player_name"] == "Human"]
+    # Every human move -- including round- and game-ending ones -- is
+    # recorded with the action actually played, in step order.
+    assert [r["step"] for r in records] == list(range(1, len(records) + 1))
+    assert [Action.from_dict(r["action"]) for r in human_moves] == human_turns
+    assert len(bot_moves) + len(human_moves) == site.turns
+    for r in human_moves:
+        assert r["tactician"] == "human"
+        assert r["validation"]["inferred"] is True
+        assert r["explanation"] is None
+        assert r["state_before"]["players"][r["player_index"]]["name"] == "Human"
     human_index = [p.name for p in site.state.players].index("Human")
-    assert profiler.profile(human_index).moves_observed > 5
+    assert profiler.profile(human_index).moves_observed == len(human_moves)
     assert profiler.profile(1 - human_index).moves_observed == len(bot_moves)
+    # The ledger holds both seats, so post-hoc profiling sees the human.
+    history = ledger.get_history("sess_human")
+    assert len(history) == len(records)
+    assert {r["player_name"] for r in history} == {"Bot", "Human"}
+    ledger.close()
 
 
 # ---------------------------------------------------------------------------
