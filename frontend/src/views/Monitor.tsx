@@ -3,7 +3,7 @@ import { api, connectSessionWs, type WsStatus } from "../api/client";
 import { Board } from "../components/Board";
 import { MoveLog } from "../components/MoveLog";
 import { RoundTable } from "../components/RoundTable";
-import { SessionCard } from "../components/SessionCard";
+import { SessionCard, isRunning } from "../components/SessionCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { SystemLog } from "../components/SystemLog";
 import { XaiPanel } from "../components/XaiPanel";
@@ -59,6 +59,7 @@ export function Monitor({ sessionId }: { sessionId: string | null }) {
   const [selected, setSelected] = useState<TurnRecordDTO | null>(null);
   const [gameOver, setGameOver] = useState<{ winner: number; scores: number[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [stopping, setStopping] = useState(false);
 
   const handleEvent = useCallback((event: WsEvent) => {
     switch (event.type) {
@@ -128,6 +129,7 @@ export function Monitor({ sessionId }: { sessionId: string | null }) {
     setSelected(null);
     setGameOver(null);
     setError(null);
+    setStopping(false);
     refresh();
     const ws = connectSessionWs(sessionId, handleEvent, setWsStatus);
     return () => ws.close();
@@ -147,7 +149,19 @@ export function Monitor({ sessionId }: { sessionId: string | null }) {
   const shown = selected ?? lastMove;
   const playerNames = state?.players.map((p) => p.name) ?? session?.players.map((p) => p.name) ?? [];
   const isLive = session?.mode === "live";
-  const running = session && ["running", "connecting", "lobby"].includes(session.status);
+  const running = session != null && isRunning(session.status);
+
+  const stop = () => {
+    if (!sessionId) return;
+    setStopping(true);
+    api
+      .stopSession(sessionId)
+      .then(refresh)
+      .catch((e) => {
+        setStopping(false);
+        setError(`stop failed: ${e.message}`);
+      });
+  };
 
   return (
     <div className="page monitor-view">
@@ -159,8 +173,8 @@ export function Monitor({ sessionId }: { sessionId: string | null }) {
         {wsStatus !== "open" && <span className="small muted">polling</span>}
         <span className="spacer" />
         {running && (
-          <button className="btn-ghost" onClick={() => api.stopSession(sessionId).catch(() => undefined)}>
-            stop
+          <button className="btn-ghost" onClick={stop} disabled={stopping}>
+            {stopping ? "stopping…" : "stop"}
           </button>
         )}
         <a className="btn-ghost" href={`#/replay/${sessionId}`}>

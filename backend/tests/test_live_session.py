@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import random
 import threading
+import time
 
 import pytest
 
@@ -364,6 +365,27 @@ def test_stop_event_aborts_the_game():
     assert result["status"] == "aborted"
     assert 3 <= result["steps"] <= 5
     assert events[-1]["type"] == "status" and events[-1]["status"] == "aborted"
+
+
+def test_stop_interrupts_a_long_wait_on_a_human():
+    site = FakeSite(["Bot", "Human"], seed=4, auto_deal=True)
+    site.humans.append("Human")  # in the lobby, but never moves
+    stop_event = threading.Event()
+    config = fast_config(
+        [LiveSeat("Bot", GreedyTactician()), LiveSeat("Human", None)],
+        turn_timeout_s=60.0,
+    )
+    session = LiveSession(
+        config,
+        stop_event=stop_event,
+        seat_factory=lambda **kw: FakeSeat(site, **kw),
+    )
+    threading.Timer(0.5, stop_event.set).start()
+    t0 = time.monotonic()
+    result = asyncio.run(session.run())
+    assert result["status"] == "aborted"
+    assert time.monotonic() - t0 < 5
+    assert all(seat.closed for seat in session.seats.values())
 
 
 def test_persistent_rejection_raises():

@@ -179,9 +179,29 @@ class LiveSession:
         if not bots:
             raise ValueError("a live session needs at least one bot seat")
 
-        watcher = None
-        if self.stop_event is not None:
-            watcher = asyncio.create_task(self._watch_stop_event())
+        # A stop must land even mid-await (browser launch, lobby, a long
+        # wait on a human's turn), so the game races the stop signal and
+        # is cancelled wherever it is.
+        game = asyncio.ensure_future(self._play(bots, humans))
+        stopper = asyncio.ensure_future(self._wait_for_stop())
+        try:
+            await asyncio.wait({game, stopper}, return_when=asyncio.FIRST_COMPLETED)
+            if game.done():
+                return game.result()
+            game.cancel()
+            await asyncio.wait({game}, timeout=5)
+            await self._log("info", "session stopped by request", phase="session")
+            return await self._end("aborted")
+        finally:
+            stopper.cancel()
+            if not game.done():
+                game.cancel()
+            await asyncio.gather(
+                *(seat.close() for seat in self.seats.values()),
+                return_exceptions=True,
+            )
+
+    async def _play(self, bots: List[LiveSeat], humans: List[LiveSeat]) -> Dict[str, Any]:
         try:
             await self._join_all(bots, humans)
             await self._ensure_initial_state()
@@ -191,13 +211,6 @@ class LiveSession:
         except Exception as exc:
             await self._log("error", str(exc), phase="session")
             raise
-        finally:
-            if watcher is not None:
-                watcher.cancel()
-            await asyncio.gather(
-                *(seat.close() for seat in self.seats.values()),
-                return_exceptions=True,
-            )
 
     # -- setup ----------------------------------------------------------------
 
@@ -395,9 +408,11 @@ class LiveSession:
             if self.config.move_delay_ms:
                 await asyncio.sleep(self.config.move_delay_ms / 1000)
 
+        return await self._end("aborted" if self._stop.is_set() else "stalled")
+
+    async def _end(self, status: str) -> Dict[str, Any]:
         seat = self._freshest_seat()
         state = self._translate(seat) if seat is not None and seat.site_game else None
-        status = "aborted" if self._stop.is_set() else "stalled"
         self._ledger_status(status)
         await self._emit(self._status(status))
         return {
@@ -590,19 +605,18 @@ class LiveSession:
         if not waiters:
             await asyncio.sleep(timeout_s)
             return False
-        done, pending = await asyncio.wait(
-            waiters, return_when=asyncio.FIRST_COMPLETED
-        )
-        for task in pending:
-            task.cancel()
+        try:
+            done, _ = await asyncio.wait(
+                waiters, return_when=asyncio.FIRST_COMPLETED
+            )
+        finally:
+            for task in waiters:
+                task.cancel()
         return any(task.result() for task in done if not task.cancelled())
 
-    async def _watch_stop_event(self) -> None:
-        while not self._stop.is_set():
-            if self.stop_event is not None and self.stop_event.is_set():
-                self._stop.set()
-                return
-            await asyncio.sleep(0.25)
+    async def _wait_for_stop(self) -> None:
+        while not self._should_stop():
+            await asyncio.sleep(0.2)
 
     def _ledger_status(self, status: str) -> None:
         if self.ledger is not None:

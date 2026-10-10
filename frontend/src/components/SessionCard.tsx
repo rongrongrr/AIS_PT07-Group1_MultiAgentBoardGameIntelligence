@@ -3,7 +3,7 @@ import { formatTime, playersLabel } from "../types";
 import { hrefFor } from "../router";
 import { StatusBadge } from "./StatusBadge";
 
-const RUNNING = new Set(["running", "connecting", "lobby"]);
+const RUNNING = new Set(["starting", "running", "connecting", "lobby"]);
 
 export function isRunning(status: string): boolean {
   return RUNNING.has(status);
