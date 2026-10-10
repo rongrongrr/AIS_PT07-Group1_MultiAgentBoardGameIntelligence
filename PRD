@@ -1,6 +1,6 @@
-Product Requirements Document (PRD): OppoProfile
+Product Requirements Document (PRD): TILES
 1. Executive Summary
-OppoProfile is an extensible, AI-driven platform designed to interface with web-based board games (specifically Azul via buddyboardgames.com). It serves as a bridge between the game's web UI and custom Machine Learning (ML) models. The platform enables automated "Machine Players" to compete in the game while "Profiling Agents" observe, record, and analyze player behavior to build behavioral profiles.
+TILES is an extensible, AI-driven platform designed to interface with web-based board games (specifically Azul via buddyboardgames.com). It serves as a bridge between the game's web UI and custom Machine Learning (ML) models. The platform enables automated "Machine Players" to compete in the game while "Profiling Agents" observe, record, and analyze player behavior to build behavioral profiles.
 
 2. Scope & Objectives
 Play Engine: Utilize headless browser automation to parse game states and execute moves.
@@ -12,7 +12,7 @@ Extensibility: Provide standardized API endpoints so external developers can plu
 Data Integrity: Maintain a rigorous, ledger of all game states and player moves.
 
 3. User Interface (UI) Requirements
-The web interface for OppoProfile acts as the control panel for the automated sessions.
+The web interface for TILES acts as the control panel for the automated sessions.
 
 3.1. Session Configuration Page
 Game Platform Field: Editable text field to input the target game URL.
@@ -39,7 +39,7 @@ Action Execution: The engine must translate JSON commands from the Machine Playe
 Status Tracking: Capture win/loss conditions, total scores, and game-over triggers.
 
 4.2. Machine Player Architecture
-Game State Feed: OppoProfile must push the parsed game state to the active Machine Player at the start of every turn without data loss.
+Game State Feed: TILES must push the parsed game state to the active Machine Player at the start of every turn without data loss.
 
 Decision Loop: The Machine Player ingests the state, computes the optimal move via its ML algorithm, and returns the action to the Play Engine.
 
@@ -49,7 +49,7 @@ Passive Observation: The Profiling Agent receives real-time or post-game access 
 Unified Model Support: The architecture must allow a single external AI model to act as both the Machine Player and the Profiling Agent simultaneously, enabling dynamic strategies (e.g., "testing" an opponent's playstyle by making specific moves and observing the reaction).
 
 4.4. Game Ledger & Logging
-OppoProfile must record every action in an immutable log.
+TILES must record every action in an immutable log.
 
 Log Data Points: Player Name, System Tag Name (e.g., "YOLO-Player-v1"), Move Description, Game State Before Move, Game State After Move, and Time Taken (in milliseconds) for the decision.
 
@@ -119,7 +119,7 @@ JSON
 Copy and paste the following block directly to Claude to initiate the development phase.
 
 System Context:
-You are an expert Full-Stack Software Engineer and QA Automation Specialist. We are building a platform called "OppoProfile". It is an AI-driven framework that interfaces with the web-based board game Azul (hosted at https://buddyboardgames.com/azul).
+You are an expert Full-Stack Software Engineer and QA Automation Specialist. We are building a platform called "TILES". It is an AI-driven framework that interfaces with the web-based board game Azul (hosted at https://buddyboardgames.com/azul).
 
 Your immediate objectives for Phase 1 are:
 

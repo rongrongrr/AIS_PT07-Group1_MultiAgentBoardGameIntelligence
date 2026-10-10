@@ -11,13 +11,13 @@
 
 TILES is an AI-driven platform that automates gameplay on the board game Azul, enabling Machine Learning agents to compete, observe, and profile player behavior. The platform bridges the gap between a live web-based game (buddyboardgames.com) and custom ML models, creating an end-to-end pipeline for game intelligence research.
 
-**In the first milestone, we have delivered a fully functional MVP** that can:
-- Launch multiple independent AI agents that play complete Azul games autonomously
-- Record every move with full board-state snapshots for replay and analysis
-- Analyze player behavior through a pluggable profiling framework
-- Visualize games in real time and provide detailed post-game review
+**In the first milestone we delivered a working prototype** that can:
+- Launch multiple independent AI agents that play complete Azul games (2-4 players, 5 rounds) on the live platform; recorded games are in `docs/evidence/`
+- Record every move with the board state before the move, the scores, timings and the model's top alternatives
+- Analyze player behavior through a pluggable profiling framework, including a learned play-style classifier
+- Visualize games in real time and provide post-game review of the move log
 
-The platform is built on a modern, extensible architecture (React + FastAPI + Playwright + SQLite) with 105 automated tests covering rules validation, ML decision-making, API integrity, and full-game simulation.
+The platform is built on a modern, extensible architecture (React + FastAPI + Playwright + SQLite) with 217 automated offline tests (rules, game engine, ML players, archetype pipeline, API, parsers, game-over detection) plus one manual live end-to-end test. Measured results are in [EVALUATION.md](EVALUATION.md).
 
 ---
 
@@ -65,21 +65,20 @@ However, no existing platform connects a live game environment to a modular ML p
 |---|---|
 | **Socket.IO interception** over DOM scraping | The platform sends authoritative game state via WebSocket. Intercepting this is faster, more reliable, and less brittle than parsing CSS classes. |
 | **Multi-browser orchestration** | Each bot runs in its own Chromium instance, joining the same room. This accurately simulates real multiplayer and avoids single-player limitations. |
-| **Immutable move ledger** | Every action is recorded with the full board state before and after. This creates a rich dataset for ML training and enables frame-accurate replay. |
+| **Append-only move ledger** | Every move is recorded with the board state *before* it, the scores before it, timings, and the model's top alternatives. The application never updates or deletes moves (the database does not enforce this). This gives a dataset for training and for step-by-step review. |
 | **Pluggable ML interfaces** | Abstract base classes (`MachinePlayer`, `ProfilerAgent`, `ProfileAnalyzer`) allow swapping models without changing the engine. |
 
 ### 3.3 Codebase Summary
 
-| Layer | Technology | Lines of Code | Files |
-|---|---|---|---|
-| Backend | Python, FastAPI, SQLAlchemy, Playwright | 3,151 | 17 |
-| Frontend | React 18, TypeScript, Tailwind, Zustand | 2,027 | 8 |
-| Tests | pytest, FastAPI TestClient | 1,793 | 8 |
-| **Total** | | **6,971** | **33** |
+| Layer | Technology |
+|---|---|
+| Backend | Python, FastAPI, SQLAlchemy, Playwright, numpy, scikit-learn |
+| Frontend | React 19, TypeScript, Tailwind, Zustand |
+| Tests | pytest, FastAPI TestClient |
 
-- **17 API endpoints** (REST + WebSocket)
-- **105 automated tests** with comprehensive coverage
-- **5 database tables** (sessions, game_states, moves, player_profiles, ml_models)
+- **15 API endpoints** (REST + WebSocket)
+- **217 automated offline tests** (`python -m pytest`; 97% line coverage of `app/`)
+- **5 database tables** (sessions, game_states, moves, player_profiles, ml_models). `player_profiles` and `ml_models` are defined but not yet used.
 
 ---
 
@@ -94,14 +93,15 @@ A complete implementation of Azul's game rules including:
 - End-game bonus computation (complete rows +2, columns +7, colors +10)
 - Game-over detection (triggered when any player completes a wall row)
 
-**Validated by 47 rule-specific tests** covering edge cases like overflow, wall blocking, and multi-player scenarios.
+Legality and scoring live in `rules.py`; state transitions (applying a move, round scoring, tile recycling) live in `game.py`, which also runs full simulated games. **Validated by 34 rules tests plus 8 game-engine tests**, including an invariant that all 100 tiles are accounted for after every move of full 2-, 3- and 4-player games.
 
 ### 4.2 Play Engine (Browser Automation)
 The engine launches real Chromium browsers via Playwright and connects to the Azul platform:
 - Captures the Socket.IO socket reference via JavaScript injection at page load
 - Emits `chooseTiles` and `placeTiles` events directly via the game's protocol
 - Waits for server acknowledgment before confirming each move
-- Falls back to floor placement if the server rejects a pattern line (stale state recovery)
+- Falls back to floor placement if the server rejects a pattern line (stale state recovery); the ledger records the move actually played and flags it (`fell_back_to_floor`)
+- Rejects any move the rules engine does not consider legal before executing it
 - Supports 2-4 simultaneous bot browsers in the same room
 - Configurable headless/headed mode for debugging vs. performance
 
@@ -114,23 +114,30 @@ The engine launches real Chromium browsers via Playwright and connects to the Az
 - Floor overflow penalties
 - First-player token cost-benefit analysis
 
-In simulation testing: GreedyPlayer scores **43 vs. 3 against RandomPlayer** (a 14x advantage), and consistently wins multi-player games.
+In seeded simulation (200 games, both seats, same deals) GreedyPlayer **wins 100% of games against RandomPlayer (95% CI 98.1-100%)** with a mean score of 59.7 vs 0.8 (`scripts/tournament.py`). Four further style variants (colour-collector, rusher, reckless, blocker) use the same engine with different weights.
+
+**RolloutPlayer** (lookahead) shortlists the heuristic's best moves and simulates the rest of the round for each. In 100 seeded games it wins 98% against GreedyPlayer (95% CI 93-99.4%), 73.2 vs 42.3 points; live it plays at about 0.3 s per move. Counting the opponent's score at full weight made two such players wreck each other (about 16 points each); an opponent weight of 0.4 fixes that without losing strength.
+
+**AdaptivePlayer** observes opponent moves, classifies their style, and switches to the weights that did best against that style in simulation. On unseen deals its mean win rate against the five styles is 0.651 vs 0.604 for the static baseline (+4.7 points), concentrated against the reckless style; against the balanced and blocker styles the difference is not measurable. Full tables and caveats: [EVALUATION.md](EVALUATION.md).
 
 **RandomPlayer** — Uniform random baseline for comparison and testing.
 
 ### 4.4 Game Monitor & Replay Viewer
 The web UI provides:
 - **Real-time board visualization**: Factories, center pool, pattern lines, wall grid, and floor line — all rendered with accurate tile colors
-- **Round-grouped move log**: Moves organized by round with per-round scoring (+/- changes and accumulated totals)
+- **"Why this move"**: each move shows the model's top three options with their heuristic scores (and, for AdaptivePlayer, which opponent style it inferred)
+- **Round-grouped move log**: Moves organized by round (round boundaries are inferred from the board) with per-round scoring changes. Scores shown with each move are the scores *before* that move. Playback controls (play/pause/step) are not implemented.
 - **Expandable move details**: Click any move to see the full board state at that moment — which factory was picked from, which tiles were chosen, where they were placed
 - **Game result banner**: Winner announcement with final scores
 - **JSON export**: Download complete game data for external analysis
 
 ### 4.5 Profile Analyzer
 A pluggable behavioral analysis framework:
-- **BasicProfileAnalyzer** classifies play styles (aggressive, conservative, center-focused, color-biased)
+- **BasicProfileAnalyzer** applies threshold rules to label play styles (high floor usage, conservative, center-focused, factory-focused, colour-biased)
 - Computes color preferences, source/destination splits, timing metrics, and scoring trajectories
-- Generates natural language summaries: *"Alice played 35 moves, scoring 21 points. Play style: factory-focused, blue-biased. Average decision time: 3ms."*
+- **ArchetypeProfileAnalyzer** adds a learned archetype with class probabilities and the behaviours behind the label. A logistic-regression classifier over 10 behaviour features reaches **55.3% held-out accuracy on five simulated styles (chance 20%)**; unsupervised k-means does not separate the styles (adjusted Rand index 0.04). It is trained on bot-vs-bot simulation only, so labels on human games are hypotheses.
+- Generates summaries such as: *"Alice played 35 moves, scoring 21 points. Play style: factory-focused, blue-biased. Archetype: RecklessPlayer (62% confidence) because high: overfills lines and spills to the floor."* (illustrative format)
+- Profiles are computed on demand after a game; the live game loop feeds opponent moves to adaptive players but does not update the UI in real time
 - New analyzers can be registered without modifying core code
 
 ### 4.6 Data Export
@@ -146,9 +153,9 @@ Every completed game can be exported as a JSON document containing:
 
 | Feature | Status | Description |
 |---|---|---|
-| **Round transition handling** | 80% | Bots play through round 1 successfully. Round 2+ dealing needs the platform's client-side auto-deal mechanism to trigger reliably. |
+| **Round transition handling** | Done | Rounds are driven by the platform's own round state (`roundInProgress`) plus an empty-board check, with a deal cool-down because the page also auto-deals. Verified over 7 consecutive live games (5 rounds each); recorded in `docs/evidence/`. |
 | **Human-bot mixed games** | 70% | Join links are generated and displayed. Bots wait for humans in the lobby. Needs end-to-end validation with real human players. |
-| **Game-over detection** | 90% | Detects win screens and "no more turns" messages. Needs testing across more game variations. |
+| **Game-over detection** | Done | Derived from the platform's state (round finished and a wall row complete); text signals alone are not trusted (an early run was marked "completed" after 29 moves). A session is `completed` only if the final board shows a finished wall row. Confirmed on live games. |
 | **DOM state parser accuracy** | 75% | Pattern line state occasionally reads stale data after animations. Floor fallback mechanism compensates, but proper animation-wait logic would be more robust. |
 
 ---
@@ -156,6 +163,10 @@ Every completed game can be exported as a JSON document containing:
 ## 6. Future Roadmap: AI-Powered Features
 
 The modular architecture is specifically designed to enable the following advanced capabilities:
+
+### 6.0 Not yet implemented (from the original proposal)
+
+Rulebook ingestion with RAG/LLMs, MCTS and minimax players, MLflow experiment tracking, a replay viewer with playback controls, external-model REST endpoints, and a human-centred evaluation of the explanations. Everything below is planned work.
 
 ### 6.1 Reinforcement Learning Player
 Train a neural network player using the recorded game data:
