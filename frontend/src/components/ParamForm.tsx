@@ -1,3 +1,4 @@
+import { titleCase } from "../format";
 import type { ParamSpecDTO } from "../types";
 
 export type ParamValues = Record<string, unknown>;
@@ -101,12 +102,12 @@ export function ParamForm({
             {p.type === "bool" ? (
               <>
                 {input}
-                <span>{p.name.replace(/_/g, " ")}</span>
+                <span>{titleCase(p.name)}</span>
               </>
             ) : (
               <>
                 <span>
-                  {p.name.replace(/_/g, " ")}
+                  {titleCase(p.name)}
                   {p.min != null && p.max != null && (
                     <span className="muted"> · {p.min}–{p.max}</span>
                   )}

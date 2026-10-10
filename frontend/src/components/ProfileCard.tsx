@@ -1,3 +1,4 @@
+import { titleCase } from "../format";
 import type { PlayerProfileDTO } from "../types";
 
 export function TraitBars({ traits }: { traits: Record<string, number> }) {
@@ -6,8 +7,8 @@ export function TraitBars({ traits }: { traits: Record<string, number> }) {
   return (
     <div className="traits">
       {entries.map(([name, value]) => (
-        <div key={name} className="trait-row" title={`${name}: ${value.toFixed(2)}`}>
-          <span className="trait-name">{name.replace(/_/g, " ")}</span>
+        <div key={name} className="trait-row" title={`${titleCase(name)}: ${value.toFixed(2)}`}>
+          <span className="trait-name">{titleCase(name)}</span>
           <div className="bar-track bar-track-sm">
             <div
               className="bar-fill"
@@ -34,11 +35,11 @@ export function ProfileCard({
     <div className="profile-card">
       <div className="profile-card-header">
         <span className="player-name">{profile.player_name}</span>
-        <span className="archetype-chip">{profile.archetype.replace(/_/g, " ")}</span>
+        <span className="archetype-chip">{titleCase(profile.archetype)}</span>
       </div>
       <div className="confidence-row">
         <span className="small muted">
-          confidence {Math.round(profile.confidence * 100)}% · {profile.moves_observed} moves
+          Confidence {Math.round(profile.confidence * 100)}% · {profile.moves_observed} Moves
         </span>
         <div className="bar-track">
           <div

@@ -1,0 +1,15 @@
+# Only backend/tiles, backend/pyproject.toml, backend/README.md and
+# frontend/ are copied into the image; keep local state out of the context.
+.git
+**/node_modules
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+frontend/dist
+**/*.db
+**/*.db-shm
+**/*.db-wal
+backend/tests
+docs
+frontend/coverage

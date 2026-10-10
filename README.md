@@ -23,116 +23,109 @@ Intelligent Systems, ISS, National University of Singapore.*
 
 ## Quick start
 
-You need **Python 3.10 or newer** and **Node.js 18 or newer** on macOS or
-Linux. On Windows, use WSL or the Docker route below.
+One launcher starts everything, on every platform. You need **Python 3.10 or
+newer**, plus **Node.js 18 or newer** to run it directly or **Docker** to run
+it in a container.
 
-```bash
-./start.sh
-```
+| | macOS and Linux | Windows (Command Prompt or PowerShell) |
+|---|---|---|
+| Run on this machine | `./start.sh` | `start.cmd` |
+| Run in a container | `./start.sh docker` | `start.cmd docker` |
 
-Then open <http://localhost:5173>.
+Then open <http://localhost:5173> (or <http://localhost:8000> for the
+container).
 
-The first run takes a few minutes. The script creates a Python virtual
-environment in `backend/.venv`, installs the backend, downloads the Chromium
-browser used for live play, installs the frontend packages, and starts two
-processes: the API on port 8000 and the web app on port 5173. Press `Ctrl+C`
-to stop both. Later runs reuse what is already installed.
+Both wrappers only find a suitable Python and hand over to `run.py`, which
+does the real work. You can also call it directly: `python run.py [mode]`.
+Press `Ctrl+C` to stop; everything the launcher started is stopped with it.
 
 **Play your first game.** Go to **Sessions**, fill in the *New session* form
 (leave the mode on *local* and pick a Tactician for each seat), and start it.
 The app takes you to the **Monitor**, where you can watch the board, the move
 log and the explanation for each move as the game is played.
 
-### Manual setup
+### Modes
 
-If you would rather run the two halves yourself, use two terminals.
-
-Backend:
-
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e '.[dev]'
-tiles serve
-```
-
-Frontend:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-`tiles serve` starts the API at <http://127.0.0.1:8000> and keeps its database
-in `db/tiles.db`, relative to the folder you run it from. `npm run dev` starts
-the web app at <http://localhost:5173> and forwards its API calls to port 8000.
-
-To run everything from a single process, build the web app once with
-`npm run build`. `tiles serve` then serves it at <http://localhost:8000>
-alongside the API.
-
-For live play you also need the browser itself:
-
-```bash
-playwright install chromium
-```
-
-The backend has optional extras you can add to the `pip install` line, for
-example `pip install -e '.[dev,llm]'`:
-
-| Extra | Installs | You need it for |
+| Mode | Starts | Open |
 |---|---|---|
-| `dev` | pytest and plugins | running the tests |
-| `llm` | the Anthropic SDK | LLM-written explanations and LLM rule extraction |
-| `rl` | PettingZoo, Gymnasium | the reinforcement-learning environment |
-| `telemetry` | MLflow | logging ablation runs to MLflow |
-| `ml` | PyTorch | the sequence-model profiler in the evaluation scripts |
+| `dev` (default) | The API on port 8000 and the web app's dev server on port 5173, which reloads as you edit the frontend | <http://localhost:5173> |
+| `app` | One process: the web app is built once and served by the API | <http://localhost:8000> |
+| `docker` | The same single-process app in a container. The database lives in a Docker volume, so games survive restarts | <http://localhost:8000> |
+| `docker --live` | The container, plus the Chromium browser needed for live play (a much larger image) | <http://localhost:8000> |
 
-### Run with Docker
+The first local run takes a few minutes: the launcher creates a Python
+environment in `backend/.venv`, installs the backend, downloads Chromium for
+live play, and installs the frontend packages. Later runs start straight away,
+and reinstall only when `backend/pyproject.toml` or
+`frontend/package-lock.json` has changed (for example after a pull). Pass
+`--no-live` to skip the Chromium download if you only play locally.
 
-```bash
-docker compose up tiles
+The local container image cannot play live games because it has no browser;
+use `docker --live` for that. Run one container at a time: they share a port.
+
+### Options
+
+```text
+./start.sh [dev|app|docker] [--api-port N] [--ui-port N] [--host ADDR] [--no-live] [--live]
 ```
 
-This builds the web app, bundles it with the API, and serves both at
-<http://localhost:8000>. The database lives in a Docker volume, so your games
-survive a restart.
+| Option | Environment variable | Default | What it does |
+|---|---|---|---|
+| `--api-port` | `TILES_API_PORT` | `8000` | Port of the API (and of the app, in `app` and `docker` modes) |
+| `--ui-port` | `TILES_UI_PORT` | `5173` | Port of the web app's dev server (`dev` mode) |
+| `--host` | `TILES_API_HOST` | `127.0.0.1` | Address the API listens on (`dev` and `app`) |
+| `--no-live` | | off | Skip installing Chromium (`dev` and `app`) |
+| `--live` | | off | Use the image with Chromium (`docker`) |
 
-That image cannot play live games because it has no browser. For live play use
-the larger image instead:
+Other settings, read by the server itself:
 
-```bash
-docker compose up tiles-live
-```
-
-Run one or the other, not both: they use the same port.
+| Variable | Default | What it does |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | not set | Turns on the LLM Explainer and the LLM rule extractor. The launcher installs what they need, and `docker` mode passes the key into the container |
+| `TILES_UI_DIST` | `frontend/dist` | Folder containing the built web app to serve |
 
 ### Optional: LLM-written explanations
 
 By default the Explainer writes its rationale from templates and needs no
 network access. To have Claude rewrite those rationales in more natural
-language, and to enable the LLM rule extractor, install the `llm` extra and set
-your key before starting the server:
+language, and to enable the LLM rule extractor, set your key before starting:
 
 ```bash
-export ANTHROPIC_API_KEY=your-key-here
+export ANTHROPIC_API_KEY=your-key-here      # Windows: set ANTHROPIC_API_KEY=your-key-here
 ```
 
-If the key or the package is missing, TILES quietly falls back to the template
-text. The Docker images do not include the `llm` extra.
+If the key is missing, TILES quietly falls back to the template text.
 
-### Settings
+### Running the pieces by hand
 
-| Variable | Read by | Default | What it does |
-|---|---|---|---|
-| `TILES_API_HOST` | `start.sh` | `127.0.0.1` | Address the API listens on |
-| `TILES_API_PORT` | `start.sh` | `8000` | Port the API listens on |
-| `TILES_UI_PORT` | `start.sh` | `5173` | Port the web app listens on |
-| `TILES_API_PROXY` | the web app's dev server | `http://localhost:8000` | Where the web app sends its API calls. Set this too if you change the API port |
-| `TILES_UI_DIST` | the API server | `frontend/dist` | Folder containing the built web app to serve |
-| `ANTHROPIC_API_KEY` | the API server and CLI | not set | Turns on the LLM Explainer and LLM rule extractor |
+The launcher is the supported way to start TILES, but the two halves are
+ordinary projects if you want to run them yourself (for example in an IDE).
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -e '.[dev,live]'
+playwright install chromium        # only needed for live play
+tiles serve                        # API at http://127.0.0.1:8000
+```
+
+```bash
+cd frontend
+npm ci
+npm run dev                        # web app at http://localhost:5173
+```
+
+`tiles serve` keeps its database in `db/tiles.db`, relative to the folder you
+run it from. The backend's optional extras are:
+
+| Extra | Installs | You need it for |
+|---|---|---|
+| `dev` | pytest and plugins | running the tests |
+| `live` | Playwright | live play on buddyboardgames.com |
+| `llm` | the Anthropic SDK | LLM-written explanations and LLM rule extraction |
+| `rl` | PettingZoo, Gymnasium, NumPy | the reinforcement-learning environment |
+| `telemetry` | MLflow | logging ablation runs to MLflow |
 
 ## How it works
 
@@ -360,10 +353,11 @@ in [docs/EVALUATION.md](docs/EVALUATION.md).
 
 ```
 .
-├── start.sh               one-command launcher for local development
-├── Dockerfile             API and built web app in one image
-├── Dockerfile.live        the same, plus Chromium for live play
-├── docker-compose.yml
+├── run.py                 the launcher: dev, app and docker modes
+├── start.sh               launcher wrapper for macOS and Linux
+├── start.cmd              launcher wrapper for Windows
+├── Dockerfile             API and built web app in one image (LIVE=true adds Chromium)
+├── docker-compose.yml     the services docker mode runs
 ├── backend/
 │   ├── pyproject.toml     package definition, the tiles command, optional extras
 │   ├── tiles/             the Python package
@@ -409,8 +403,8 @@ simulated site.
 Tests that depend on an optional extra are skipped when that extra is not
 installed.
 
-The web app has no tests of its own. `npm run build` in `frontend/` type-checks
-it.
+The web app has its own tests (`npm test` in `frontend/`, or `npm run coverage`
+for the 80% coverage gate). `npm run build` also type-checks it.
 
 ## Good to know
 

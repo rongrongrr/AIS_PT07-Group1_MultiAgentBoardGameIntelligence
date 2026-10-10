@@ -12,11 +12,10 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
     "pydantic>=2.5",
-    "playwright>=1.40",          # live play on buddyboardgames.com (then: playwright install chromium)
 ]
 
 [project.optional-dependencies]
-live = ["playwright>=1.40"]        # referenced by Dockerfile.live and start.sh
+live = ["playwright>=1.40"]        # live play on buddyboardgames.com (then: playwright install chromium)
 telemetry = ["mlflow>=2.10"]       # experiment tracking (server + tracker)
 llm = ["anthropic>=0.40"]          # LLM-refined explanations & rule extraction
 rl = ["pettingzoo>=1.24.3", "gymnasium>=0.29", "numpy>=1.26"]  # PettingZoo environment

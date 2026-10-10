@@ -1,3 +1,4 @@
+import { titleCase } from "../format";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { LineChart, type Annotation } from "../components/charts/LineChart";
@@ -30,9 +31,9 @@ function SplitBar({
             key={key}
             className={`split-seg ${colorClass ? colorClass(key) : ""}`}
             style={{ width: `${pct}%` }}
-            title={`${key}: ${Math.round(pct)}%`}
+            title={`${titleCase(key)}: ${Math.round(pct)}%`}
           >
-            {pct >= 14 ? `${key} ${Math.round(pct)}%` : ""}
+            {pct >= 14 ? `${titleCase(key)} ${Math.round(pct)}%` : ""}
           </div>
         );
       })}
@@ -51,7 +52,7 @@ function PlayerAnalysisCard({ p }: { p: PlayerAnalysisDTO }) {
       let run = 1;
       while (i + run < timeline.length && timeline[i + run].archetype === t.archetype) run += 1;
       if (run >= 3 || i === timeline.length - 1) {
-        annotations.push({ index: i, label: t.archetype.replace(/_/g, " ") });
+        annotations.push({ index: i, label: titleCase(t.archetype) });
       }
     }
   });
@@ -63,7 +64,7 @@ function PlayerAnalysisCard({ p }: { p: PlayerAnalysisDTO }) {
     <div className="card analysis-card">
       <div className="analysis-head">
         <h3>
-          {p.player_name} <span className="muted small">· {p.tactician ?? "unknown tactician"}</span>
+          {p.player_name} <span className="muted small">· {p.tactician ? titleCase(p.tactician) : "Unknown Tactician"}</span>
         </h3>
       </div>
       <div className="two-col">
@@ -101,7 +102,7 @@ function PlayerAnalysisCard({ p }: { p: PlayerAnalysisDTO }) {
             <div className="concept-chips">
               {concepts.map(([c, n]) => (
                 <span key={c} className="concept-chip">
-                  {c.replace(/_/g, " ")} · {n}
+                  {titleCase(c)} · {n}
                 </span>
               ))}
             </div>
@@ -113,9 +114,9 @@ function PlayerAnalysisCard({ p }: { p: PlayerAnalysisDTO }) {
           <h4>Score trajectory</h4>
           <LineChart
             labels={stats.score_trajectory.map((_, i) => String(i + 1))}
-            series={[{ name: "score", values: stats.score_trajectory }]}
-            xLabel="own move"
-            yLabel="score"
+            series={[{ name: "Score", values: stats.score_trajectory }]}
+            xLabel="Own Move"
+            yLabel="Score"
             height={200}
             markers={false}
           />
@@ -127,9 +128,9 @@ function PlayerAnalysisCard({ p }: { p: PlayerAnalysisDTO }) {
           ) : (
             <LineChart
               labels={timeline.map((t) => String(t.step))}
-              series={[{ name: "confidence", values: timeline.map((t) => t.confidence) }]}
-              xLabel="step"
-              yLabel="confidence"
+              series={[{ name: "Confidence", values: timeline.map((t) => t.confidence) }]}
+              xLabel="Step"
+              yLabel="Confidence"
               height={200}
               annotations={annotations}
               markers={false}
@@ -219,7 +220,7 @@ export function Profiles({
               </option>
               {sessions.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.id} — {s.players.map((p) => p.name).join(" vs ")} ({s.status})
+                  {s.id} — {s.players.map((p) => p.name).join(" vs ")} ({titleCase(s.status)})
                 </option>
               ))}
             </select>
@@ -229,7 +230,7 @@ export function Profiles({
             <select value={profiler} onChange={(e) => setProfiler(e.target.value)}>
               {profilers.map((p) => (
                 <option key={p.name} value={p.name}>
-                  {p.name}
+                  {titleCase(p.name)}
                   {p.description ? ` — ${p.description.length > 60 ? `${p.description.slice(0, 58)}…` : p.description}` : ""}
                 </option>
               ))}
@@ -265,7 +266,7 @@ export function Profiles({
 
       {analysis && (
         <p className="small muted">
-          {analysis.moves_analyzed} moves analyzed with the <strong>{analysis.profiler}</strong> profiler.
+          {analysis.moves_analyzed} moves analyzed with the <strong>{titleCase(analysis.profiler)}</strong> profiler.
         </p>
       )}
       {shownPlayers.map((p) => (
@@ -282,7 +283,7 @@ export function Profiles({
             {archetypes.map((a) => (
               <div key={a.name} className="profile-card">
                 <div className="profile-card-header">
-                  <span className="archetype-chip">{a.name.replace(/_/g, " ")}</span>
+                  <span className="archetype-chip">{titleCase(a.name)}</span>
                 </div>
                 <p className="small">{a.description}</p>
                 <TraitBars traits={a.signature} />

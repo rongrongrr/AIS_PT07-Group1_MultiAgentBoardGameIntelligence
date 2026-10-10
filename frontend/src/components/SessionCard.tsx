@@ -1,3 +1,4 @@
+import { titleCase } from "../format";
 import type { SessionSummaryDTO } from "../types";
 import { formatTime, playersLabel } from "../types";
 import { hrefFor } from "../router";
@@ -27,40 +28,40 @@ export function SessionCard({
         <div className="session-card-title">
           <span className="mono small">{session.id}</span>
           <StatusBadge status={session.status} />
-          <span className="mode-chip">{session.mode}</span>
+          <span className="mode-chip">{titleCase(session.mode)}</span>
         </div>
         <div className="small">{playersLabel(session.players)}</div>
         <div className="small muted">
           {formatTime(session.created_at)}
-          {session.steps != null && ` · ${session.steps} moves`}
+          {session.steps != null && ` · ${session.steps} Moves`}
           {session.scores && ` · ${session.scores.join(" : ")}`}
           {session.winner_name && ` · 🏆 ${session.winner_name}`}
         </div>
       </div>
       <div className="session-card-actions">
         <a className="btn-ghost" href={hrefFor("monitor", session.id)}>
-          monitor
+          Monitor
         </a>
         <a className="btn-ghost" href={hrefFor("replay", session.id)}>
-          replay
+          Replay
         </a>
         {session.status === "created" && onStart && (
           <button className="btn-ghost" onClick={() => onStart(session.id)}>
-            start
+            Start
           </button>
         )}
         {running && onStop && (
           <button className="btn-ghost" onClick={() => onStop(session.id)}>
-            stop
+            Stop
           </button>
         )}
         {!running && onDelete && (
           <button
             className="btn-ghost btn-danger"
             onClick={() => onDelete(session.id)}
-            title="delete this session and its recorded moves"
+            title="Delete this session and its recorded moves"
           >
-            delete
+            Delete
           </button>
         )}
       </div>

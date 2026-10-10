@@ -9,8 +9,11 @@ view is for.
 
 ## Develop
 
+`./start.sh` at the repository root (`start.cmd` on Windows) starts this dev
+server together with the backend. To run it on its own:
+
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -19,6 +22,16 @@ This serves the app at <http://localhost:5173> and forwards anything under
 (`tiles serve`), otherwise the app shows "backend unreachable" placeholders and
 a red status dot. To point at a backend somewhere else, set `TILES_API_PROXY`
 before running `npm run dev`.
+
+## Test
+
+```bash
+npm test            # run the suite once (Vitest + Testing Library)
+npm run coverage    # same, with a coverage report; fails below 80%
+```
+
+Tests sit next to the code as `*.test.ts(x)`; shared fixtures are in
+`src/test/fixtures.ts`. Views are tested with the API client mocked.
 
 ## Build
 

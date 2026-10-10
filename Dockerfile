@@ -1,5 +1,9 @@
-# TILES — API server + built web UI (local simulation mode).
-# For live play on buddyboardgames.com use Dockerfile.live instead.
+# TILES: API server + built web app in one image.
+#
+# Normally started through the launcher (`./start.sh docker`, or
+# `start.cmd docker` on Windows), which runs docker compose. Build args:
+#   LIVE=true   add Chromium so sessions in "live" mode can play on
+#               buddyboardgames.com (a much bigger image, ~1.5 GB)
 
 # --- Stage 1: build the React frontend -------------------------------------
 FROM node:22-alpine AS ui
@@ -11,12 +15,18 @@ RUN npx vite build
 
 # --- Stage 2: backend -------------------------------------------------------
 FROM python:3.12-slim AS app
+ARG LIVE=false
 WORKDIR /app
 
 # Install the package first so source edits don't bust the dep layer.
 COPY backend/pyproject.toml backend/README.md ./backend/
 COPY backend/tiles ./backend/tiles
-RUN pip install --no-cache-dir ./backend
+RUN pip install --no-cache-dir './backend[llm]' \
+    && if [ "$LIVE" = "true" ]; then \
+         pip install --no-cache-dir './backend[live]' \
+         && playwright install --with-deps chromium \
+         && rm -rf /var/lib/apt/lists/*; \
+       fi
 
 COPY --from=ui /ui/dist /app/ui
 ENV TILES_UI_DIST=/app/ui \

@@ -5,14 +5,14 @@
  */
 
 export const SERIES_COLORS = [
-  "#2a78d6", // blue
-  "#eb6834", // orange
-  "#1baf7a", // aqua
-  "#eda100", // yellow
-  "#e87ba4", // magenta
-  "#008300", // green
+  "#1f5fa8", // blue
+  "#d2552b", // orange
+  "#2a9d8f", // aqua
+  "#e0a526", // yellow
+  "#b5446e", // magenta
+  "#5b8c3a", // green
   "#4a3aa7", // violet
-  "#e34948", // red
+  "#c0392b", // red
 ];
 
 /** Sequential blue ramp, light → dark (steps 100..700). */
@@ -33,7 +33,7 @@ export const SEQUENTIAL = [
 ];
 
 export const CHROME = {
-  surface: "#fcfcfb",
+  surface: "#fffaf0",
   grid: "#e1e0d9",
   axis: "#c3c2b7",
   muted: "#898781",

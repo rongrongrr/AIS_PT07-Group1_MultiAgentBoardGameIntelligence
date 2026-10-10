@@ -1,3 +1,4 @@
+import { titleCase } from "../format";
 import { useEffect, useRef, useState } from "react";
 import type { LogEntry } from "../types";
 
@@ -21,7 +22,7 @@ export function SystemLog({ entries }: { entries: LogEntry[] }) {
         <select value={level} onChange={(e) => setLevel(e.target.value)}>
           {LEVELS.map((l) => (
             <option key={l} value={l}>
-              {l}
+              {titleCase(l)}
             </option>
           ))}
         </select>
@@ -33,7 +34,7 @@ export function SystemLog({ entries }: { entries: LogEntry[] }) {
           visible.map((e, i) => (
             <div key={i} className={`syslog-line level-${e.level}`}>
               <span className="syslog-ts">{e.ts}</span>
-              <span className="syslog-level">{e.level}</span>
+              <span className="syslog-level">{titleCase(e.level)}</span>
               {e.player && <span className="syslog-player">{e.player}</span>}
               {e.phase && <span className="syslog-phase">{e.phase}</span>}
               <span>{e.message}</span>

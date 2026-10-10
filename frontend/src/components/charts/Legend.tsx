@@ -1,3 +1,4 @@
+import { titleCase } from "../../format";
 import { seriesColor } from "./palette";
 
 /** Legend is always present for two or more series; a single series needs none. */
@@ -12,7 +13,7 @@ export function Legend({ names }: { names: string[] }) {
             style={{ background: seriesColor(i) }}
             aria-hidden
           />
-          {name}
+          {titleCase(name)}
         </li>
       ))}
     </ul>

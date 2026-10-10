@@ -1,3 +1,4 @@
+import { titleCase } from "../format";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
 import { defaultsFor, ParamForm, type ParamValues } from "../components/ParamForm";
@@ -90,7 +91,9 @@ export function Sessions({ onStarted }: { onStarted: (id: string) => void }) {
   }, [loadSessions]);
 
   const tacticianOptions: AgentInfoDTO[] =
-    mode === "live" ? [...agents.tacticians, HUMAN] : agents.tacticians;
+    mode === "live"
+      ? [...agents.tacticians.filter((t) => t.name !== HUMAN.name), HUMAN]
+      : agents.tacticians;
 
   const infoFor = (name: string): AgentInfoDTO | undefined =>
     name === "human" ? HUMAN : agents.tacticians.find((t) => t.name === name);
@@ -182,8 +185,8 @@ export function Sessions({ onStarted }: { onStarted: (id: string) => void }) {
             <label className="field">
               <span>Mode</span>
               <select value={mode} onChange={(e) => switchMode(e.target.value as "local" | "live")}>
-                <option value="local">local — simulated engine</option>
-                <option value="live">live — buddyboardgames.com (Playwright)</option>
+                <option value="local">Local — Simulated Engine</option>
+                <option value="live">Live — buddyboardgames.com (Playwright)</option>
               </select>
             </label>
             {mode === "live" && (
@@ -193,7 +196,7 @@ export function Sessions({ onStarted }: { onStarted: (id: string) => void }) {
                   <div className="row-gap">
                     <input value={roomName} onChange={(e) => setRoomName(e.target.value)} maxLength={20} />
                     <button className="btn-ghost" onClick={() => setRoomName(randomRoom())} type="button">
-                      random
+                      Random
                     </button>
                   </div>
                 </label>
@@ -203,11 +206,11 @@ export function Sessions({ onStarted }: { onStarted: (id: string) => void }) {
                 </label>
                 <label className="field field-inline">
                   <input type="checkbox" checked={headless} onChange={(e) => setHeadless(e.target.checked)} />
-                  <span>headless browsers (untick to watch each bot's Chromium window)</span>
+                  <span>Headless browsers (untick to watch each bot's Chromium window)</span>
                 </label>
                 <p className="small muted">
                   Each bot seat gets its own Chromium browser in the room. Add a{" "}
-                  <strong>human</strong> seat to play against the agents yourself via the join link
+                  <strong>Human</strong> seat to play against the agents yourself via the join link
                   shown in the Monitor.
                 </p>
               </div>
@@ -231,8 +234,8 @@ export function Sessions({ onStarted }: { onStarted: (id: string) => void }) {
                     <select value={slot.tactician} onChange={(e) => changeTactician(i, e.target.value)}>
                       {tacticianOptions.map((t) => (
                         <option key={t.name} value={t.name}>
-                          {t.name}
-                          {t.uses_opponent_model ? " (opponent-aware)" : ""}
+                          {titleCase(t.name)}
+                          {t.uses_opponent_model ? " (Opponent-Aware)" : ""}
                         </option>
                       ))}
                     </select>
@@ -240,7 +243,7 @@ export function Sessions({ onStarted }: { onStarted: (id: string) => void }) {
                       className="btn-ghost"
                       onClick={() => removeSlot(i)}
                       disabled={slots.length <= 2}
-                      title="remove player"
+                      title="Remove player"
                       type="button"
                     >
                       ✕
@@ -257,7 +260,7 @@ export function Sessions({ onStarted }: { onStarted: (id: string) => void }) {
               );
             })}
             <button className="btn-ghost" onClick={addSlot} disabled={slots.length >= 4} type="button">
-              + add player
+              + Add player
             </button>
           </div>
 
@@ -268,11 +271,11 @@ export function Sessions({ onStarted }: { onStarted: (id: string) => void }) {
               <select value={profiler} onChange={(e) => setProfiler(e.target.value)}>
                 {agents.profilers.map((p) => (
                   <option key={p.name} value={p.name}>
-                    {p.name}
+                    {titleCase(p.name)}
                     {p.description ? ` — ${p.description.length > 72 ? `${p.description.slice(0, 70)}…` : p.description}` : ""}
                   </option>
                 ))}
-                <option value="">none</option>
+                <option value="">None</option>
               </select>
             </label>
             <label className="field">
@@ -280,11 +283,11 @@ export function Sessions({ onStarted }: { onStarted: (id: string) => void }) {
               <select value={explainer} onChange={(e) => setExplainer(e.target.value)}>
                 {agents.explainers.map((x) => (
                   <option key={x.name} value={x.name}>
-                    {x.name}
-                    {x.requires ? ` (requires ${x.requires})` : ""}
+                    {titleCase(x.name)}
+                    {x.requires ? ` (Requires ${x.requires})` : ""}
                   </option>
                 ))}
-                <option value="">none</option>
+                <option value="">None</option>
               </select>
               {explainerInfo?.requires && (
                 <span className="small muted">

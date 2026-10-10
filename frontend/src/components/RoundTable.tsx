@@ -1,3 +1,4 @@
+import { titleCase } from "../format";
 import type { RoundResultDTO } from "../types";
 
 /** Per-round scoring summary: wall tilings, floor penalties, running scores. */
@@ -17,11 +18,11 @@ export function RoundTable({
     <table className="data-table round-table">
       <thead>
         <tr>
-          <th>round</th>
+          <th>Round</th>
           {players.map((p) => (
             <th key={p}>{p}</th>
           ))}
-          <th>tilings</th>
+          <th>Tilings</th>
         </tr>
       </thead>
       <tbody>
@@ -33,7 +34,7 @@ export function RoundTable({
           >
             <td>
               {r.round}
-              {r.game_over && <span className="muted small"> · final</span>}
+              {r.game_over && <span className="muted small"> · Final</span>}
             </td>
             {players.map((p, i) => {
               const gained = r.tilings
@@ -55,7 +56,7 @@ export function RoundTable({
               {r.tilings.length === 0
                 ? "—"
                 : r.tilings
-                    .map((t) => `${players[t.player_index] ?? t.player_index}: ${t.color} r${t.row + 1} +${t.points}`)
+                    .map((t) => `${players[t.player_index] ?? t.player_index}: ${titleCase(t.color)} R${t.row + 1} +${t.points}`)
                     .join(", ")}
             </td>
           </tr>

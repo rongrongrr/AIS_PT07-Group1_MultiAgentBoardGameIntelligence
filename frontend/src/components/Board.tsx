@@ -1,10 +1,11 @@
+import { titleCase } from "../format";
 import type { GameStateDTO, PlayerBoardDTO } from "../types";
 import { FLOOR_PENALTIES, wallColorAt } from "../types";
 import { Slot, Tile } from "./Tile";
 
 function Factory({ tiles, index }: { tiles: string[]; index: number }) {
   return (
-    <div className="factory" title={`factory ${index + 1}`}>
+    <div className="factory" title={`Factory ${index + 1}`}>
       <div className="factory-tiles">
         {tiles.length === 0 ? (
           <span className="muted small">—</span>
@@ -30,9 +31,9 @@ function PlayerBoardView({
     <div className={`player-board${active ? " player-board-active" : ""}`}>
       <div className="player-board-header">
         <span className="player-name">
-          {board.name || `player ${index + 1}`}
+          {board.name || `Player ${index + 1}`}
           {board.has_first_player_token && (
-            <span className="fpt-badge" title="holds first player token">
+            <span className="fpt-badge" title="Holds First Player Token">
               1st
             </span>
           )}
@@ -87,7 +88,7 @@ function PlayerBoardView({
         ))}
         {board.floor_line.length > FLOOR_PENALTIES.length && (
           <span className="muted small">
-            +{board.floor_line.length - FLOOR_PENALTIES.length} overflow
+            +{board.floor_line.length - FLOOR_PENALTIES.length} Overflow
           </span>
         )}
       </div>
@@ -101,10 +102,10 @@ export function Board({ state }: { state: GameStateDTO }) {
       <div className="supply-row">
         <span className="round-badge">Round {state.round}</span>
         <span className={`phase-badge phase-${state.phase}`}>
-          {state.phase.replace("_", " ")}
+          {titleCase(state.phase)}
         </span>
         <span className="muted small">
-          bag {state.bag.reduce((a, b) => a + b, 0)} · lid{" "}
+          Bag {state.bag.reduce((a, b) => a + b, 0)} · Lid{" "}
           {state.lid.reduce((a, b) => a + b, 0)}
         </span>
       </div>
@@ -115,12 +116,12 @@ export function Board({ state }: { state: GameStateDTO }) {
         <div className="center-pool">
           <div className="factory-tiles">
             {state.center_pool.length === 0 ? (
-              <span className="muted small">empty</span>
+              <span className="muted small">Empty</span>
             ) : (
               state.center_pool.map((t, i) => <Tile key={i} tile={t} />)
             )}
           </div>
-          <div className="factory-label">center</div>
+          <div className="factory-label">Center</div>
         </div>
       </div>
       <div className="players-row">

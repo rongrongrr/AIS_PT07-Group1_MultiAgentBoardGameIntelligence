@@ -1,3 +1,4 @@
+import { titleCase } from "../format";
 import type { TurnRecordDTO } from "../types";
 import { describeAction, sameAction } from "../types";
 import { ProfileCard } from "./ProfileCard";
@@ -33,7 +34,7 @@ export function XaiPanel({ record }: { record: TurnRecordDTO | null }) {
         <span className="action-chip action-chip-primary">
           {describeAction(chosen)}
         </span>
-        <span className="muted small"> · {record.tactician} · step {record.step}</span>
+        <span className="muted small"> · {titleCase(record.tactician)} · Step {record.step}</span>
       </div>
       {record.explanation ? (
         <>
@@ -42,7 +43,7 @@ export function XaiPanel({ record }: { record: TurnRecordDTO | null }) {
             <div className="concept-chips">
               {record.explanation.concepts.map((c) => (
                 <span key={c} className="concept-chip">
-                  {c.replace(/_/g, " ")}
+                  {titleCase(c)}
                 </span>
               ))}
             </div>
@@ -57,21 +58,21 @@ export function XaiPanel({ record }: { record: TurnRecordDTO | null }) {
           <h4>
             Alternatives considered
             {report.simulations > 0 && (
-              <span className="muted small"> · {report.simulations} sims</span>
+              <span className="muted small"> · {report.simulations} Sims</span>
             )}
             {report.used_opponent_model && (
               <span className="concept-chip" title="search biased by profiler">
-                opponent-aware
+                Opponent-Aware
               </span>
             )}
           </h4>
           <table className="candidates-table">
             <thead>
               <tr>
-                <th>action</th>
-                <th>score</th>
-                <th>visits</th>
-                <th>prior</th>
+                <th>Action</th>
+                <th>Score</th>
+                <th>Visits</th>
+                <th>Prior</th>
               </tr>
             </thead>
             <tbody>
@@ -106,17 +107,17 @@ export function XaiPanel({ record }: { record: TurnRecordDTO | null }) {
 
       <h4>Pipeline</h4>
       <div className="small muted timing-row">
-        <span>decide {timing.decide_ms?.toFixed(1) ?? "?"} ms</span>
-        <span>validate {timing.validate_ms?.toFixed(1) ?? "?"} ms</span>
-        {timing.execute_ms != null && <span>execute {timing.execute_ms.toFixed(0)} ms</span>}
-        <span>explain {timing.explain_ms?.toFixed(1) ?? "?"} ms</span>
+        <span>Decide {timing.decide_ms?.toFixed(1) ?? "?"} ms</span>
+        <span>Validate {timing.validate_ms?.toFixed(1) ?? "?"} ms</span>
+        {timing.execute_ms != null && <span>Execute {timing.execute_ms.toFixed(0)} ms</span>}
+        <span>Explain {timing.explain_ms?.toFixed(1) ?? "?"} ms</span>
         {validation && (
           <span className={validation.ok ? "ok-text" : "error-text"}>
-            validator {validation.ok ? "ok" : "rejected"}
+            Validator {validation.ok ? "OK" : "Rejected"}
             {validation.attempts && validation.attempts > 1
-              ? ` after ${validation.attempts} attempts`
+              ? ` After ${validation.attempts} attempts`
               : ""}
-            {validation.site_fallback ? " · site fallback" : ""}
+            {validation.site_fallback ? " · Site Fallback" : ""}
           </span>
         )}
       </div>

@@ -1,0 +1,3 @@
+# Keep the platform launchers runnable wherever the repo is checked out.
+*.sh  text eol=lf
+*.cmd text eol=crlf
