@@ -5,13 +5,12 @@ Stack (Validator / Tactician / Profiler / Explainer), orchestration,
 SQLite ledger, rulebook RAG, the live buddyboardgames.com adapter,
 simulation and experiment runners, and the FastAPI server.
 
-See the repository root `README.md`, `docs/ARCHITECTURE.md`,
-`docs/API.md` and `docs/EXPERIMENTS.md` for the full picture.
+See the repository root `README.md` for the full picture.
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e '.[dev,rl]'          # + [live] [telemetry] [llm] extras
-pytest                              # ~110 tests
+pytest                              # ~540 tests
 tiles --help                        # play · live · analyze · tournament · ablate · experiment · serve
 tiles serve                         # http://localhost:8000 (serves ../frontend/dist when built)
 ```

@@ -1,7 +1,7 @@
 # TILES Frontend
 
 React 18 + TypeScript + Vite single-page app for the TILES explainable
-multi-agent Azul platform. Codes strictly against `docs/API.md`.
+multi-agent Azul platform. Codes strictly against the backend REST/WebSocket API.
 
 ## Views (hash routes)
 
@@ -22,7 +22,7 @@ multi-agent Azul platform. Codes strictly against `docs/API.md`.
 src/
 ├── App.tsx            shell: nav, backend health dot, capability badges, routing
 ├── router.ts          hash router (#/view/<id>)
-├── types.ts           DTOs mirroring docs/API.md + formatting helpers
+├── types.ts           DTOs mirroring the API contract + formatting helpers
 ├── api/client.ts      fetch wrapper, session/experiment WebSockets with reconnect
 ├── components/
 │   ├── Board, Tile, MoveLog, XaiPanel, ProfileCard, RoundTable, SystemLog
