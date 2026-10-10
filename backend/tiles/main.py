@@ -20,6 +20,24 @@ logging.basicConfig(
 )
 
 
+def _abort_orphaned_sessions(db) -> int:
+    """Sessions still marked running when the server starts lost their browsers with the last process."""
+    from datetime import datetime
+
+    from tiles.models.db import Session
+    from tiles.models.schemas import SessionStatus
+
+    live = (SessionStatus.LOBBY.value, SessionStatus.PLAYING.value)
+    rows = db.query(Session).filter(Session.status.in_(live)).all()
+    for row in rows:
+        row.status = SessionStatus.ABORTED.value
+        row.completed_at = datetime.utcnow()
+    db.commit()
+    if rows:
+        logging.getLogger(__name__).warning("Marked %d session(s) from a previous run as aborted", len(rows))
+    return len(rows)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -28,6 +46,7 @@ async def lifespan(app: FastAPI):
 
     db = SessionLocal()
     try:
+        _abort_orphaned_sessions(db)
         load_registered_players(db)       # remote players registered in earlier runs
     finally:
         db.close()
@@ -37,7 +56,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="TILES",
     description="AI-driven platform for Azul board game automation and player profiling",
-    version="0.1.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 

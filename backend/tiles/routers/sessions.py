@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 import uuid
 from datetime import datetime
@@ -20,6 +21,7 @@ from tiles.explain.explainer import Explainer
 from tiles.ml.archetypes import move_record
 from tiles.ml.registry import registry
 from tiles.auth import api_key_ok
+from tiles.validation import ROOM_RE, check_platform_url, check_session_players
 from tiles.engine.human_tracker import HumanMoveTracker
 from tiles.models.db import Move, Session, get_db, GameState as GameStateModel
 from tiles.models.schemas import (
@@ -37,6 +39,8 @@ router = APIRouter()
 
 # In-memory state
 _active_sessions: Dict[str, MultiPlayerSession] = {}
+MAX_CONCURRENT_SESSIONS = int(os.environ.get("TILES_MAX_SESSIONS", "3"))
+HUMAN_IDLE_TIMEOUT_S = float(os.environ.get("TILES_HUMAN_IDLE_TIMEOUT_S", "1800"))   # abort if nobody moves for this long
 _session_tasks: Dict[str, asyncio.Task] = {}
 _ws_connections: Dict[str, List[WebSocket]] = {}
 
@@ -61,6 +65,16 @@ def _session_to_response(s: Session) -> SessionResponse:
 
 @router.post("", response_model=SessionResponse)
 def create_session(req: SessionCreate, db: DBSession = Depends(get_db)):
+    problems = check_session_players(
+        req.players, [p["name"] for p in registry.list_players()],
+        default_name=lambda p: f"Bot_{p.type}_{p.slot}")
+    if not ROOM_RE.match(req.room_name):
+        problems.append("room_name may only contain letters, digits, space, '_', '.' and '-'")
+    url_problem = check_platform_url(req.platform_url)
+    if url_problem:
+        problems.append(url_problem)
+    if problems:
+        raise HTTPException(status_code=422, detail="; ".join(problems))
     session_id = f"sess_{uuid.uuid4().hex[:12]}"
     session = Session(
         id=session_id,
@@ -105,6 +119,9 @@ async def start_session(session_id: str, db: DBSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Session is already running")
     if session.status not in (SessionStatus.CREATED.value, SessionStatus.LOBBY.value):
         raise HTTPException(status_code=400, detail=f"Session is already {session.status}")
+    if len(_active_sessions) >= MAX_CONCURRENT_SESSIONS:
+        raise HTTPException(status_code=429, detail=f"At most {MAX_CONCURRENT_SESSIONS} sessions can run at once "
+                                                    "(each runs one Chromium per bot); stop or wait for one to finish")
 
     player_config = json.loads(session.player_config)
     bot_slots = [p for p in player_config if p.get("type") != "human"]
@@ -124,6 +141,7 @@ async def start_session(session_id: str, db: DBSession = Depends(get_db)):
                 status_code=400,
                 detail=f"Model '{model_name}' not found. Available: {available}",
             )
+        model.set_time_limit(session.move_timeout_sec)
         player_name = slot.get("name") or f"Bot_{model_name}_{slot['slot']}"
         if player_name in bot_models:
             raise HTTPException(status_code=400, detail=f"Duplicate player name '{player_name}'")
@@ -421,7 +439,7 @@ async def _run_multi_bot_game(
                 try:
                     t0 = time.time()
                     action = await asyncio.wait_for(
-                        model.decide(state, player_index),
+                        _decide(model, state, player_index),
                         timeout=move_timeout_sec,
                     )
                     decision_ms = int((time.time() - t0) * 1000)
@@ -565,11 +583,9 @@ async def _run_multi_bot_game(
             # Humans may think longer than the bot timeout, so only abort on
             # stalls in bot-only games.
             stuck_duration = time.time() - last_successful_move_time
-            if mp.human_count == 0 and stuck_duration > move_timeout_sec + stuck_abort_sec:
-                abort_reason = (
-                    f"No progress for {stuck_duration:.0f}s "
-                    f"(limit: {move_timeout_sec}+{stuck_abort_sec}s)"
-                )
+            stuck_limit = (move_timeout_sec + stuck_abort_sec) if mp.human_count == 0 else HUMAN_IDLE_TIMEOUT_S
+            if stuck_duration > stuck_limit:
+                abort_reason = f"No progress for {stuck_duration:.0f}s (limit: {stuck_limit:.0f}s)"
                 await syslog("error", session_id, "abort", abort_reason,
                              {"stuck_sec": round(stuck_duration, 1),
                               "total_turns": total_turns})
@@ -619,7 +635,8 @@ async def _run_multi_bot_game(
         if abort_reason:
             _update_db_status(session_id, SessionStatus.ABORTED, db, scores=scores)
         else:
-            _update_db_status(session_id, SessionStatus.COMPLETED, db, scores=scores)
+            _update_db_status(session_id, SessionStatus.COMPLETED, db, scores=scores,
+                              completed_rows=_completed_rows(mp.bots[0].current_state))
         # experiment tracking (MLflow); runs in a thread and can never fail the game
         asyncio.create_task(asyncio.to_thread(tracking.log_session_run, session_id))
 
@@ -632,6 +649,15 @@ async def _run_multi_bot_game(
         await mp.close_all()
         _active_sessions.pop(session_id, None)
         _session_tasks.pop(session_id, None)
+
+
+async def _decide(model, state: GameStateData, player_index: int) -> GameAction:
+    """Ask a model for its move. CPU-bound search players run in a worker thread (on a copy of the
+    state) so that thinking never blocks the event loop; the move timeout can then actually fire."""
+    if not getattr(model, "cpu_bound", False):
+        return await model.decide(state, player_index)
+    snapshot = state.model_copy(deep=True)
+    return await asyncio.to_thread(lambda: asyncio.run(model.decide(snapshot, player_index)))
 
 
 _explainer = Explainer()
@@ -688,8 +714,25 @@ def _board_snapshot(state: GameStateData) -> dict:
 
 # ---- DB helpers ----
 
+def pick_winner(scores: dict, completed_rows: Optional[dict] = None) -> Optional[str]:
+    """Azul winner: highest score; ties go to the player with more completed wall rows; a tie that
+    remains is a shared win, reported as ``"A / B"``."""
+    if not scores:
+        return None
+    rows = completed_rows or {}
+    key = lambda n: (scores[n], rows.get(n, 0))  # noqa: E731
+    best = max(key(n) for n in scores)
+    return " / ".join(n for n in scores if key(n) == best)
+
+
+def _completed_rows(state: Optional[GameStateData]) -> dict:
+    if state is None:
+        return {}
+    return {p.name: sum(1 for row in p.wall if all(row)) for p in state.players}
+
+
 def _update_db_status(session_id: str, status: SessionStatus, db: DBSession,
-                      scores: dict = None):
+                      scores: dict = None, completed_rows: dict = None):
     session = db.query(Session).filter(Session.id == session_id).first()
     if session:
         session.status = status.value
@@ -697,9 +740,7 @@ def _update_db_status(session_id: str, status: SessionStatus, db: DBSession,
             session.completed_at = datetime.utcnow()
         if scores:
             session.final_scores = json.dumps(scores)
-            if scores:
-                winner = max(scores, key=scores.get)
-                session.winner = winner
+            session.winner = pick_winner(scores, completed_rows)
         db.commit()
 
 

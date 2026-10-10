@@ -35,8 +35,7 @@ class TestSessions:
         resp = client.post("/api/sessions", json={
             "room_name": "test-room",
             "players": [
-                {"slot": 0, "type": "RandomPlayer", "name": "Bot1"},
-            ],
+                {"slot": 0, "type": "RandomPlayer", "name": "Bot1"}, {"slot": 1, "type": "RandomPlayer", "name": "Other"}],
         })
         assert resp.status_code == 200
         data = resp.json()
@@ -50,8 +49,7 @@ class TestSessions:
             "room_name": "test-headed",
             "browser_mode": "headed",
             "players": [
-                {"slot": 0, "type": "RandomPlayer", "name": "Bot1"},
-            ],
+                {"slot": 0, "type": "RandomPlayer", "name": "Bot1"}, {"slot": 1, "type": "RandomPlayer", "name": "Other"}],
         })
         assert resp.status_code == 200
         assert resp.json()["browser_mode"] == "headed"
@@ -60,11 +58,11 @@ class TestSessions:
         # Create two sessions
         client.post("/api/sessions", json={
             "room_name": "room-1",
-            "players": [{"slot": 0, "type": "RandomPlayer"}],
+            "players": [{"slot": 0, "type": "RandomPlayer"}, {"slot": 1, "type": "RandomPlayer", "name": "Other"}],
         })
         client.post("/api/sessions", json={
             "room_name": "room-2",
-            "players": [{"slot": 0, "type": "RandomPlayer"}],
+            "players": [{"slot": 0, "type": "RandomPlayer"}, {"slot": 1, "type": "RandomPlayer", "name": "Other"}],
         })
 
         resp = client.get("/api/sessions")
@@ -79,7 +77,7 @@ class TestSessions:
     def test_get_session_by_id(self):
         create_resp = client.post("/api/sessions", json={
             "room_name": "test-get",
-            "players": [{"slot": 0, "type": "RandomPlayer", "name": "Bot1"}],
+            "players": [{"slot": 0, "type": "RandomPlayer", "name": "Bot1"}, {"slot": 1, "type": "RandomPlayer", "name": "Other"}],
         })
         session_id = create_resp.json()["id"]
 
@@ -116,7 +114,7 @@ class TestHistory:
     def test_get_history_empty(self):
         create_resp = client.post("/api/sessions", json={
             "room_name": "test-history",
-            "players": [{"slot": 0, "type": "RandomPlayer"}],
+            "players": [{"slot": 0, "type": "RandomPlayer"}, {"slot": 1, "type": "RandomPlayer", "name": "Other"}],
         })
         session_id = create_resp.json()["id"]
 
@@ -131,7 +129,7 @@ class TestHistory:
         import json as _json
         create_resp = client.post("/api/sessions", json={
             "room_name": "board-hist",
-            "players": [{"slot": 0, "type": "GreedyPlayer", "name": "A"}],
+            "players": [{"slot": 0, "type": "GreedyPlayer", "name": "A"}, {"slot": 1, "type": "RandomPlayer", "name": "Other"}],
         })
         sid = create_resp.json()["id"]
 
@@ -185,7 +183,7 @@ class TestHistory:
         import json as _json
         create_resp = client.post("/api/sessions", json={
             "room_name": "profile-test",
-            "players": [{"slot": 0, "type": "GreedyPlayer", "name": "A"}],
+            "players": [{"slot": 0, "type": "GreedyPlayer", "name": "A"}, {"slot": 1, "type": "RandomPlayer", "name": "Other"}],
         })
         sid = create_resp.json()["id"]
         from tiles.models.db import Move, SessionLocal
@@ -218,7 +216,7 @@ class TestHistory:
         import json as _json
         create_resp = client.post("/api/sessions", json={
             "room_name": "export-test",
-            "players": [{"slot": 0, "type": "GreedyPlayer", "name": "A"}],
+            "players": [{"slot": 0, "type": "GreedyPlayer", "name": "A"}, {"slot": 1, "type": "RandomPlayer", "name": "Other"}],
         })
         sid = create_resp.json()["id"]
 

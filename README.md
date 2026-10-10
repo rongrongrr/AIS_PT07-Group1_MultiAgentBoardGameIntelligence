@@ -181,6 +181,7 @@ Command-line (no browser needed): `cd backend && pip install -e . && tiles tourn
 - **No participant data yet** for the human-centred explanation study (instrument and protocol are ready; the team has to run it).
 - **LLM components** (rule extractor, explainer rewrite) are implemented against an interface and tested with stubs only; no API key was available to run them.
 - **Profilers and the opponent model are trained on simulated bot play**; accuracy on human players is unknown. Opponent modelling inside the search gave at most a small gain (+2.7 margin points).
+- See [docs/AUDIT.md](docs/AUDIT.md) for the final audit: what was found and fixed, remaining limitations and suggested enhancements. Safety limits (all env-configurable): at most 3 concurrent sessions (`TILES_MAX_SESSIONS`), platform URL host allow-list (`TILES_ALLOWED_PLATFORM_HOSTS`), 30-minute idle timeout for sessions with a human (`TILES_HUMAN_IDLE_TIMEOUT_S`).
 - Authentication is optional (`TILES_API_KEY`, a shared secret); the API accepts any http(s) `platform_url` and remote-model URL, so do not expose it publicly.
 
 ## Tech stack

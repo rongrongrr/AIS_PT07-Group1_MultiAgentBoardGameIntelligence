@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class MinimaxPlayer(GreedyPlayer):
+    cpu_bound = True
     _name = "MinimaxPlayer"
 
     def __init__(self, depth: int = 3, beam: int = 5, time_budget_s: float = 4.0,

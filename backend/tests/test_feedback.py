@@ -17,7 +17,7 @@ def client(db):
 
 
 def make_session_with_move(client, db):
-    sid = client.post("/api/sessions", json={"room_name": "fb-room", "players": [{"slot": 0, "type": "GreedyPlayer"}]}).json()["id"]
+    sid = client.post("/api/sessions", json={"room_name": "fb-room", "players": [{"slot": 0, "type": "GreedyPlayer"}, {"slot": 1, "type": "RandomPlayer", "name": "Other"}]}).json()["id"]
     db.add(Move(session_id=sid, step_id=1, player_name="A", system_tag="MinimaxPlayer",
                 action_json=json.dumps({"source_type": "factory", "source_index": 0, "color": "red",
                                         "destination": "floor", "destination_row": None}), decision_time_ms=1))

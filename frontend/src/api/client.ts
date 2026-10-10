@@ -20,7 +20,10 @@ async function request<T>(path: string, options?: RequestInit, retried = false):
   }
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail || `HTTP ${res.status}`);
+    const detail = Array.isArray(error.detail)
+      ? error.detail.map((d: { loc?: unknown[]; msg?: string }) => `${(d.loc || []).slice(1).join('.')}: ${d.msg}`).join('; ')
+      : error.detail;
+    throw new Error(detail || `HTTP ${res.status}`);
   }
   return res.json();
 }

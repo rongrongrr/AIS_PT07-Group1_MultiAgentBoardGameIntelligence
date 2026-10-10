@@ -74,11 +74,28 @@ def test_unknown_session_routes_404(client):
         assert client.post(f"/api/sessions/nope/{path}").status_code == 404
 
 
-def test_duplicate_player_names_rejected_on_start(client):
-    sid = create(client, players=[{"slot": 0, "type": "GreedyPlayer", "name": "Same"},
-                                  {"slot": 1, "type": "RandomPlayer", "name": "Same"}])
-    r = client.post(f"/api/sessions/{sid}/start")
-    assert r.status_code == 400 and "Duplicate" in r.json()["detail"]
+def test_invalid_session_configs_are_rejected_at_creation(client):
+    ok = [{"slot": 0, "type": "GreedyPlayer", "name": "A"}, {"slot": 1, "type": "RandomPlayer", "name": "B"}]
+
+    def post(players=ok, **kw):
+        return client.post("/api/sessions", json={"room_name": "room-x", "players": players, **kw})
+
+    assert post().status_code == 200
+    cases = {
+        "needs 2 to 4": [ok[0]],
+        "unique": [ok[0], {**ok[1], "slot": 0}],
+        "names must be unique": [ok[0], {**ok[1], "name": "a"}],
+        "unknown player type": [ok[0], {**ok[1], "type": "Nope"}],
+        "machine player": [{"slot": 0, "type": "human", "name": "H1"}, {"slot": 1, "type": "human", "name": "H2"}],
+        "may only contain": [{**ok[0], "name": "<b>x</b>"}, ok[1]],
+    }
+    for fragment, players in cases.items():
+        r = post(players)
+        assert r.status_code == 422 and fragment in r.json()["detail"], (fragment, r.text)
+    assert post(room_name="a/b?c").status_code == 422
+    r = post(platform_url="http://169.254.169.254/latest")
+    assert r.status_code == 422 and "not allowed" in r.json()["detail"]
+    assert post(platform_url="https://buddyboardgames.com/azul").status_code == 200
 
 
 @pytest.mark.parametrize("body", [

@@ -116,6 +116,13 @@ def init_db():
     """Create all tables."""
     os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
     Base.metadata.create_all(bind=engine)
+    # The move ledger is append-only: the database itself refuses to change or delete a recorded move.
+    with engine.begin() as conn:
+        for op in ("UPDATE", "DELETE"):
+            conn.exec_driver_sql(
+                f"CREATE TRIGGER IF NOT EXISTS moves_no_{op.lower()} BEFORE {op} ON moves "
+                "BEGIN SELECT RAISE(ABORT, 'the move ledger is append-only'); END"
+            )
 
 
 def get_db():

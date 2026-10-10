@@ -73,6 +73,7 @@ def _pick(sim: GameSim, weights: Weights, rng: random.Random, epsilon: float) ->
 
 
 class RolloutPlayer(GreedyPlayer):
+    cpu_bound = True
     """Greedy shortlist + round-end rollouts."""
 
     _name = "RolloutPlayer"

@@ -246,6 +246,7 @@ class BotWithHumanOpponent(FakeBot):
         self.polls = 0
         self.rng = __import__("random").Random(2)
         self.human_moves = 0
+        self.mute = False                                       # a human who never moves
 
     def _view(self):
         s = super()._view()
@@ -261,7 +262,7 @@ class BotWithHumanOpponent(FakeBot):
         if not sim.finished and sim.current == self.human_seat:
             self.current_state = self._view()
             self.polls += 1
-            if self.polls % 2 == 0:
+            if self.polls % 2 == 0 and not self.mute:
                 apply_action(sim, self.rng.choice(get_legal_actions(sim.state, sim.current)))
                 self.human_moves += 1
                 self.current_state = self._view()

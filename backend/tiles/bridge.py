@@ -126,6 +126,8 @@ class CoreTacticianPlayer(MachinePlayer):
 
     _name = "TilesTactician"
     _tactician = "greedy"
+    cpu_bound = True
+    time_budget_ms = 2500.0
 
     def __init__(self, seed: Optional[int] = None):
         self.seed = seed
@@ -140,6 +142,9 @@ class CoreTacticianPlayer(MachinePlayer):
 
     def clone(self) -> CoreTacticianPlayer:
         return type(self)(seed=self.seed)
+
+    def set_time_limit(self, seconds: float) -> None:
+        self.time_budget_ms = min(self.time_budget_ms, 700.0 * seconds)
 
     # -- opponent observation (profiler priors) -------------------------------------
 
@@ -168,7 +173,7 @@ class CoreTacticianPlayer(MachinePlayer):
         ctx = DecisionContext(
             state=core, player_index=player_index, legal=legal,
             opponent_policy=self.predictor.predict if self.predictor else None,
-            time_budget_ms=2500.0, rng_seed=self._rng.randrange(1 << 30),
+            time_budget_ms=self.time_budget_ms, rng_seed=self._rng.randrange(1 << 30),
         )
         decision = self.tactician.decide(ctx)
         report = decision.report

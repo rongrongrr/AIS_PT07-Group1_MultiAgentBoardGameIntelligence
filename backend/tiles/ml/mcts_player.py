@@ -51,6 +51,7 @@ class Node:
 
 
 class MCTSPlayer(GreedyPlayer):
+    cpu_bound = True
     _name = "MCTSPlayer"
 
     def __init__(self, iterations: int = 250, time_budget_s: float = 3.0, c: float = 1.1, beam: int = 6,

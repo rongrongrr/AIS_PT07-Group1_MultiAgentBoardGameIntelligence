@@ -47,8 +47,7 @@ class TestSessionLifecycle:
             "room_name": "integ-test-room",
             "browser_mode": "headless",
             "players": [
-                {"slot": 0, "type": "RandomPlayer", "name": "TestBot"},
-            ],
+                {"slot": 0, "type": "RandomPlayer", "name": "TestBot"}, {"slot": 1, "type": "RandomPlayer", "name": "Other"}],
         })
         assert resp.status_code == 200
         session = resp.json()
@@ -81,38 +80,25 @@ class TestSessionLifecycle:
         assert resp.status_code == 200
         assert resp.json()["status"] == "aborted"
 
-    def test_cannot_start_without_machine_player(self):
+    def test_session_needs_a_machine_player_and_known_models(self):
         resp = client.post("/api/sessions", json={
             "room_name": "human-only-room",
-            "players": [
-                {"slot": 0, "type": "human", "name": "Alice"},
-            ],
+            "players": [{"slot": 0, "type": "human", "name": "Alice"}, {"slot": 1, "type": "human", "name": "Bob"}],
         })
-        session_id = resp.json()["id"]
+        assert resp.status_code == 422 and "machine player" in resp.json()["detail"].lower()
 
-        # Starting with only human players should fail
-        resp = client.post(f"/api/sessions/{session_id}/start")
-        assert resp.status_code == 400
-        assert "machine player" in resp.json()["detail"].lower()
-
-    def test_cannot_start_with_unknown_model(self):
         resp = client.post("/api/sessions", json={
             "room_name": "unknown-model-room",
-            "players": [
-                {"slot": 0, "type": "NonExistentModel", "name": "Bot"},
-            ],
+            "players": [{"slot": 0, "type": "NonExistentModel", "name": "Bot"},
+                        {"slot": 1, "type": "RandomPlayer", "name": "Other"}],
         })
-        session_id = resp.json()["id"]
-
-        resp = client.post(f"/api/sessions/{session_id}/start")
-        assert resp.status_code == 400
-        assert "not found" in resp.json()["detail"].lower()
+        assert resp.status_code == 422 and "unknown player type" in resp.json()["detail"].lower()
 
     def test_headed_mode_persists(self):
         resp = client.post("/api/sessions", json={
             "room_name": "headed-room",
             "browser_mode": "headed",
-            "players": [{"slot": 0, "type": "RandomPlayer", "name": "Bot"}],
+            "players": [{"slot": 0, "type": "RandomPlayer", "name": "Bot"}, {"slot": 1, "type": "RandomPlayer", "name": "Other"}],
         })
         session_id = resp.json()["id"]
 

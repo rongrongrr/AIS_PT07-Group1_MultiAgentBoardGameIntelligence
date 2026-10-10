@@ -15,13 +15,16 @@ from tiles.ml.registry import registry
 from tiles.ml.remote_player import RemotePlayer
 from tiles.models.db import MLModel, get_db
 from tiles.models.schemas import GameAction, GameStateData
+from tiles.validation import check_remote_model_url
 
 router = APIRouter()
 action_router = APIRouter()      # mounted at /api/player (reference implementation of the remote-model contract)
 
-BUILTIN = {"RandomPlayer", "GreedyPlayer", "ColorCollectorPlayer", "RusherPlayer", "RecklessPlayer", "BlockerPlayer",
-           "AdaptivePlayer", "RolloutPlayer", "AdaptiveRolloutPlayer", "MinimaxPlayer", "ConditionedMinimaxPlayer",
-           "MCTSPlayer", "ConditionedMCTSPlayer", "TDPlayer"}
+
+def _is_builtin(name: str) -> bool:
+    """Players shipped with TILES (anything registered that is not a remote model) cannot be replaced."""
+    player = registry.get_player(name)
+    return player is not None and not isinstance(player, RemotePlayer)
 
 
 class RegisterRemote(BaseModel):
@@ -53,7 +56,10 @@ def list_players():
 @router.post("/register")
 def register_remote_player(body: RegisterRemote, db: DBSession = Depends(get_db)):
     """Register an external HTTP model as a Machine Player (see tiles/ml/remote_player.py for the contract)."""
-    if body.name in BUILTIN:
+    problem = check_remote_model_url(body.url)
+    if problem:
+        raise HTTPException(status_code=422, detail=problem)
+    if _is_builtin(body.name):
         raise HTTPException(status_code=409, detail=f"'{body.name}' is a built-in player")
     existing = db.query(MLModel).filter(MLModel.name == body.name).first()
     cfg = json.dumps({"url": body.url, "timeout_sec": body.timeout_sec})
@@ -69,7 +75,7 @@ def register_remote_player(body: RegisterRemote, db: DBSession = Depends(get_db)
 @router.delete("/{name}")
 def unregister_remote_player(name: str, db: DBSession = Depends(get_db)):
     row = db.query(MLModel).filter(MLModel.name == name).first()
-    if name in BUILTIN or row is None:
+    if _is_builtin(name) or row is None:
         raise HTTPException(status_code=404, detail="No such registered remote player")
     db.delete(row)
     db.commit()

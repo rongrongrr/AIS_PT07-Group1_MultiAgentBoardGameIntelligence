@@ -16,6 +16,16 @@ class MachinePlayer(ABC):
         """Given the current game state and player index, return the action to take."""
         ...
 
+    #: True for players that spend noticeable CPU time deciding (tree search). The session runs them in a
+    #: worker thread so one bot's thinking cannot freeze the event loop (other bots, the UI WebSocket,
+    #: and the move timeout itself).
+    cpu_bound: bool = False
+
+    def set_time_limit(self, seconds: float) -> None:
+        """Called by the session with its per-move limit; search players shrink their budget to fit."""
+        if hasattr(self, "time_budget_s"):
+            self.time_budget_s = min(self.time_budget_s, 0.7 * seconds)
+
     def clone(self) -> MachinePlayer:
         """A fresh instance for one game (per-game state must not be shared between sessions)."""
         return type(self)()
