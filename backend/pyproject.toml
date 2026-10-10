@@ -12,19 +12,14 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
     "pydantic>=2.5",
-    "sqlalchemy>=2.0",
-    "numpy>=1.26",
-    "scikit-learn>=1.3",
-    "httpx>=0.27",
     "playwright>=1.40",          # live play on buddyboardgames.com (then: playwright install chromium)
 ]
 
 [project.optional-dependencies]
 live = ["playwright>=1.40"]        # referenced by Dockerfile.live and start.sh
-ml = ["torch>=2.1"]                # Transformer / GRU sequence profiler
 telemetry = ["mlflow>=2.10"]       # experiment tracking (server + tracker)
 llm = ["anthropic>=0.40"]          # LLM-refined explanations & rule extraction
-rl = ["pettingzoo>=1.24.3", "gymnasium>=0.29"]  # PettingZoo environment
+rl = ["pettingzoo>=1.24.3", "gymnasium>=0.29", "numpy>=1.26"]  # PettingZoo environment
 dev = ["pytest>=8", "pytest-asyncio", "pytest-cov", "httpx>=0.27"]
 
 [project.scripts]

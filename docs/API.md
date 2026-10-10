@@ -198,25 +198,3 @@ Its `result` has a `summary`, `metrics`, `tables` and chart `series`.
 The experiment WebSocket sends four event types: `status`, `progress` (`done`,
 `total`, `message`), `log` (`level`, `message`) and `result`. It replays the
 run's history on connect, and it works for finished runs after a restart too.
-
-## The second API
-
-The repository also contains a second, separate API in `backend/tiles/main.py`
-and `backend/tiles/routers/`, belonging to the second implementation described
-in [ARCHITECTURE.md](ARCHITECTURE.md). `tiles serve` does not run it and the
-web app does not use it. It is started with `uvicorn tiles.main:app`.
-
-Its endpoints, briefly:
-
-| Area | Endpoints |
-|---|---|
-| Sessions | `POST`, `GET /api/sessions`, `GET /api/sessions/{id}`, `POST .../start`, `POST .../stop`, `WS .../ws` |
-| Players | `GET /api/players`, `GET`, `DELETE /api/players/{name}`, `POST /api/players/register`, `POST /api/player/action` |
-| History | `GET /api/history/{id}`, `.../export`, `.../state/{step}`, `.../states` |
-| Profiling | `GET /api/profiler/analyzers`, `POST /api/profiler/{id}/analyze`, `GET /api/profiler/{id}/insights`, `POST /api/profiler/ingest` |
-| Feedback | `POST /api/feedback`, `GET /api/feedback/summary`, `GET /api/feedback/{id}` |
-| Ratings | `GET /api/tournament` |
-
-It differs from the API above in its request shapes, its event names and its
-status values, so the two are not interchangeable. It also supports an optional
-API key (`TILES_API_KEY`), which the first API does not.

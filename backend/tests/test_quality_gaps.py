@@ -1,37 +1,14 @@
-"""Remaining untested paths: single-process UI hosting, LLM explainer (fake client), core state
+"""Remaining untested paths: LLM explainer (fake client), core state
 serialisation, and the LLM rule-extraction fallback."""
 
 import json
 import sys
 import types
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from tiles.agents.base import DecisionContext
 from tiles.agents.explainer.llm import LLMExplainer
 from tiles.agents.tacticians.greedy import GreedyTactician
 from tiles.core import GameState, legal_actions, new_game, step
-from tiles.main import mount_ui
-
-
-# ------------------------------------------------------------------ UI hosting
-
-def test_mount_ui_serves_files_spa_fallback_and_json_404(tmp_path):
-    (tmp_path / "assets").mkdir()
-    (tmp_path / "assets" / "app.js").write_text("console.log(1)")
-    (tmp_path / "index.html").write_text("<div id='root'></div>")
-    (tmp_path / "favicon.svg").write_text("<svg/>")
-    app = FastAPI()
-    mount_ui(app, str(tmp_path))
-    c = TestClient(app)
-    assert "root" in c.get("/").text
-    assert "root" in c.get("/some/client/route").text            # SPA fallback
-    assert c.get("/favicon.svg").text == "<svg/>"
-    assert c.get("/assets/app.js").status_code == 200
-    r = c.get("/api/unknown")
-    assert r.status_code == 404 and r.json()["detail"] == "Not found"
-    assert "root" in c.get("/..%2f..%2fsecret").text             # traversal attempts fall back to the page
 
 
 # ------------------------------------------------------------------ core state

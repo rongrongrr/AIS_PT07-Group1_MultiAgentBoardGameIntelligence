@@ -353,7 +353,7 @@ tiles experiment run profiler_ablation --param games=20 --param simulations=300
 tiles experiment run tournament --param games_per_pair=6 --output elo.json
 ```
 
-Settings for each experiment, and the results the team has measured so far, are
+Settings for each experiment are
 in [docs/EVALUATION.md](docs/EVALUATION.md).
 
 ## Repository layout
@@ -367,9 +367,7 @@ in [docs/EVALUATION.md](docs/EVALUATION.md).
 ├── backend/
 │   ├── pyproject.toml     package definition, the tiles command, optional extras
 │   ├── tiles/             the Python package
-│   ├── tests/             pytest suite
-│   ├── scripts/           standalone evaluation and training scripts
-│   └── models/            trained artefacts those scripts produce and load
+│   └── tests/             pytest suite
 ├── frontend/              the React and TypeScript web app
 └── docs/                  architecture, API reference and evaluation results
 ```
@@ -394,22 +392,6 @@ Inside `backend/tiles/`, these packages make up the app described above:
 Each of these is explained in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
 and [backend/README.md](backend/README.md) covers setting up the backend on its
 own.
-
-### A second implementation lives alongside it
-
-The repository also contains a second, independent implementation of the same
-idea, with its own rules engine (`azul/`), its own library of players (`ml/`),
-its own API (`main.py`, `routers/`, `models/`), its own explainer (`explain/`)
-and its own rule-ingestion pipeline (`rules_ingest/`). The scripts in
-`backend/scripts/` and the trained files in `backend/models/` belong to it.
-
-It is **not** what `./start.sh`, `tiles serve` or the Docker Compose services
-run, and the web app does not talk to it. It is kept because the evaluation
-scripts and a large part of the test suite exercise it, and because `bridge.py`
-lets its players be compared head to head with the Tacticians above. The
-results of those comparisons are in [docs/EVALUATION.md](docs/EVALUATION.md),
-and [The second implementation](docs/ARCHITECTURE.md#the-second-implementation)
-in the architecture guide explains how the two fit together.
 
 ## Tests
 
@@ -451,6 +433,6 @@ it.
 |---|---|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Understand how the system is put together, component by component, or add a new Tactician, Profiler, Explainer or experiment |
 | [docs/API.md](docs/API.md) | Call the REST and WebSocket API yourself, or see exactly what the web app sends and receives |
-| [docs/EVALUATION.md](docs/EVALUATION.md) | Look up an experiment's settings, or read the results measured so far |
+| [docs/EVALUATION.md](docs/EVALUATION.md) | Look up an experiment's settings |
 | [frontend/README.md](frontend/README.md) | Work on the web app's code |
 | [backend/README.md](backend/README.md) | Set up and work on the backend on its own |

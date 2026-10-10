@@ -14,7 +14,7 @@ def test_azul_env_full_random_game():
     game.reset(seed=5)
     rng = np.random.default_rng(5)
     steps = 0
-    for agent in game.agent_iter(max_iter=2000):
+    for _ in game.agent_iter(max_iter=2000):
         obs, reward, termination, truncation, info = game.last()
         if termination or truncation:
             game.step(None)

@@ -18,7 +18,6 @@ from tiles.core import (
     legal_actions,
     new_game,
     step,
-    wall_col_for,
 )
 from tiles.core.state import wall_bit
 

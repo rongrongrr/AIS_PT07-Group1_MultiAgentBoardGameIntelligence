@@ -298,59 +298,6 @@ experiments over WebSockets, with polling every few seconds as a backstop. Endpo
 Rewards are the score change when a round is resolved, plus a win or loss bonus
 at the end. Nothing in the app uses it; it is there for future training work.
 
-## The second implementation
-
-The package contains two independent implementations that grew on separate
-branches and were merged. Everything above describes the first, which is what
-`tiles serve` runs. The second is still present and still tested.
-
-```mermaid
-flowchart LR
-    subgraph served["What tiles serve runs"]
-        s_api["server/"] --> s_stack["orchestration/ and agents/"]
-        s_live["engine/live_session.py"] --> s_stack
-        s_stack --> s_core["core/"]
-        s_api --> s_ledger["ledger/"]
-    end
-    subgraph second["Second implementation"]
-        m_api["main.py and routers/"] --> m_ml["ml/ player library"]
-        m_live["engine/play_engine.py"] --> m_ml
-        scripts["backend/scripts/"] --> m_ml
-        m_ml --> m_azul["azul/ rules engine"]
-        m_api --> m_db["models/"]
-    end
-    m_ml -- "bridge.py" --> s_stack
-```
-
-| Concern | What `tiles serve` runs | Second implementation |
-|---|---|---|
-| Rules engine | `core/` | `azul/` |
-| Players | five Tacticians in `agents/tacticians/` | a registry of players in `ml/`, including rollout, minimax, MCTS, adaptive and TD-learning players, plus externally hosted models |
-| Profiling | `agents/profiler/` | `ml/opponent_model.py`, `ml/archetypes.py`, `ml/sequence_profiler.py`, `ml/analyzers.py` |
-| Explanations | `agents/explainer/` | `explain/` |
-| Database | `ledger/` | `models/` (SQLAlchemy) |
-| API | `server/` | `main.py`, `routers/`, with `auth.py` and `validation.py` |
-| Live play | `engine/live_session.py`, `browser_seat.py`, `protocol.py`, `state_translator.py`, `dom_snapshot.py` | `engine/play_engine.py`, `state_parser.py`, `action_executor.py`, `human_tracker.py` |
-| Rule ingestion | `rulebook/` | `rules_ingest/`, reading `docs/rules/azul_rules.md` |
-| Experiment tracking | `telemetry/` | `tracking.py` |
-
-Things to know about the second implementation:
-
-- It is started with `uvicorn tiles.main:app`, which is what
-  `backend/Dockerfile` does. Nothing else in the repository launches it, and
-  the web app in `frontend/` does not work against it.
-- The scripts in `backend/scripts/` and the trained files in `backend/models/`
-  belong to it. The measured results in [EVALUATION.md](EVALUATION.md) were
-  produced with those scripts.
-- `bridge.py` connects the two in one direction. It converts boards and moves
-  between the two rules engines and wraps three of the Tacticians above as
-  players in the second implementation's registry (`TilesMinimax`,
-  `TilesMCTS`, `TilesProfiledMCTS`). `tests/test_bridge.py` plays full games
-  through both engines and checks they agree on legal moves and scores.
-- The two databases both have tables named `sessions` and `moves` with
-  different columns. They use different files by default; do not point them
-  at the same one.
-
 ## Extending TILES
 
 | To add | Write | Register it in |

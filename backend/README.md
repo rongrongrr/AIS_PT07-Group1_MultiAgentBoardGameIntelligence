@@ -28,13 +28,11 @@ pytest               # run the tests
 |---|---|
 | `tiles/` | The package. The main README lists what each part does. |
 | `tests/` | The pytest suite. |
-| `scripts/` | Standalone evaluation and training scripts. |
-| `models/` | Trained files those scripts produce and load. |
 
 ## More detail
 
 - [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) explains how the package is
   organised.
 - [docs/API.md](../docs/API.md) documents the API.
-- [docs/EVALUATION.md](../docs/EVALUATION.md) covers the experiments, the
-  scripts and their results.
+- [docs/EVALUATION.md](../docs/EVALUATION.md) covers the built-in
+  experiments.
