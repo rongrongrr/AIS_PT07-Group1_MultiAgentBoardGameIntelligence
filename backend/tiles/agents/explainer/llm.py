@@ -18,7 +18,7 @@ from tiles.core import COLOR_NAMES, MoveResult
 
 from .templates import TemplateExplainer
 
-_MODEL = "claude-opus-5"
+_MODEL = "claude-opus-5-5"
 
 _SYSTEM = (
     "You are the color commentator for TILES, an AI system that plays the "
@@ -67,13 +67,11 @@ class LLMExplainer(Explainer):
         import anthropic  # lazy: optional dependency
 
         client = anthropic.Anthropic()
-        last_error: Optional[Exception] = None
         for _ in range(2):  # one retry, then give up
             try:
                 response = client.messages.create(
                     model=_MODEL,
                     max_tokens=1000,
-                    output_config={"effort": "low"},
                     system=_SYSTEM,
                     messages=[{"role": "user", "content": prompt}],
                 )
@@ -84,10 +82,8 @@ class LLMExplainer(Explainer):
                 ).strip()
                 if text:
                     return text
-            except Exception as exc:  # noqa: BLE001 — never break a game turn
-                last_error = exc
-        if last_error is not None:
-            return None
+            except Exception:  # noqa: BLE001 — never break a game turn
+                continue
         return None
 
     # -- Explainer ------------------------------------------------------------

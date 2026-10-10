@@ -20,9 +20,9 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional
+from typing import Callable, List, Optional
 
-from .ingest import Chunk, RulebookIndex
+from .ingest import RulebookIndex
 
 KINDS = ("constraint", "scoring", "flow")
 
@@ -62,7 +62,7 @@ class RuleSpec:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "RuleSpec":
+    def from_dict(cls, d: dict) -> RuleSpec:
         return cls(
             id=d["id"],
             section=d.get("section", ""),
@@ -350,7 +350,7 @@ RULEBOOK:
 
 
 def extract_rules_llm(
-    index: RulebookIndex, model: str = "claude-opus-5"
+    index: RulebookIndex, model: str = "claude-opus-5-5"
 ) -> List[RuleSpec]:
     """Claude-backed extraction of the same RuleSpec structure.
 
