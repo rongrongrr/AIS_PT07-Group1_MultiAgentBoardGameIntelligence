@@ -47,7 +47,6 @@ This section briefly introduces Azul. Azul (Plan B Games, 2017) is an abstract t
 3. **The rules are written in plain language.** The rulebook is short and well structured, which makes it a workable source for the rule-reading part of the project, and whatever is read can be checked against the engine.
 4. **Players visibly interfere with each other.** Blocking, taking a penalty on purpose and setting up bonuses are all choices that show up in the moves, which gives a profiler something to measure.
 5. **There is a public online version.** buddyboardgames.com let the team test the bots on a site it did not write, and against a person.
-6. **A gap in earlier work.** An open-source Azul bot that uses tree search exists (Yau, 2020). It does not model its opponents or explain its moves, which is what this project adds.
 
 
 
