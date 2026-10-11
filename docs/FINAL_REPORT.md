@@ -61,8 +61,6 @@ The project asks whether a program made of separate, cooperating parts can play 
 
 ### 1.5 Scope and deliverables
 
-The proposal committed the project to the following areas. The table uses the proposal's own wording.
-
 
 | Area                | Commitment in the proposal                                                                                  |
 | ------------------- | ----------------------------------------------------------------------------------------------------------- |
