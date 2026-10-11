@@ -7,7 +7,7 @@
 
 Azul is a board game in which nothing is hidden: every tile and every player's board is visible to everyone. What a player cannot see is how the opponent likes to play, for example whether they block, take risks or build quietly. TILES (Transparent Intelligence for Learning, Exploration and Simulation) is a system that plays Azul and tries to take the opponent's habits into account. It is built from four parts, called agents. The **Validator** checks that a move is legal. The **Tactician** chooses a move, and comes in five versions that range from random play to one that tries out many possible continuations before choosing (a tree search). The **Profiler** watches each opponent, keeps statistics on how they play, labels them with one of five playing styles and guesses their next move. The **Explainer** writes a short explanation for each bot move. The same four parts are used for fast games on the team's own rules engine and for real games on buddyboardgames.com, where the bots play through automated web browsers. In a recorded game, every bot move is saved to a database with the board before and after, the explanation and the time taken, so that the game can be replayed and analysed.
 
-The main results are as follows. Against bot opponents, the Profiler's first guess at the opponent's next move was right 87.8 % of the time, and the move was among its top three guesses 95.0 % of the time. A fixed guesser that never adapts scored 83.5 % and 93.5 %, and random guessing 17.2 % and 33.9 %. Five playing styles are defined. On new games played by five kinds of bot, the Profiler picked the intended style 46 % of the time. When styles that it tends to confuse are merged, leaving three broader groups, it picked the right group 71 % of the time. A rulebook reader looks up a fixed list of 19 rules in the team's own rulebook text file, and all 19 agree with the rules engine. This serves as a cross-check on the engine, where the rules the system plays by are written by hand. All 873 bot moves that were reviewed have an explanation. The system has played full games on the live website, including one that a person joined through an invite link. The main negative result is that giving the search the Profiler's guesses did not make it play better against bots. It won 98 % of its games against a blocking bot where plain search won 100 %, and it lost 5–15 when the two played each other. Testing it against people is left for future work.
+The main results are as follows. Against bot opponents, the Profiler's first guess at the opponent's next move was right 87.8 % of the time, and the move was among its top three guesses 95.0 % of the time. A fixed guesser that never adapts scored 83.5 % and 93.5 %, and random guessing 17.2 % and 33.9 %. Five playing styles are defined. On new games played by five kinds of bot, the Profiler picked the intended style 46 % of the time. When styles that it tends to confuse are merged, leaving three broader groups, it picked the right group 71 % of the time. A rulebook reader looks up a fixed list of 19 rules in the team's own rulebook text file, and all 19 agree with the rules engine. This serves as a cross-check on the engine, where the rules the system plays by are written by hand. All 873 bot moves that were reviewed have an explanation. The system has played full games on the live website, including one that a person joined through an invite link. The main negative result is that giving the search the Profiler's guesses did not make it play better against bots. It won 98 % of its games against a blocking bot where plain search won 100 %, and it lost 5–15 when the two played each other. Testing it against people is left for future work. A separate study varied the weights of the move score and the number of players. Ignoring the floor penalty costs about 8 points a game at every table size, and the first-player token is worth about 3 points at four players and nothing at two. Setting its value by table size lifts the win rate of the greedy Tactician at four players from 23 % to 31 %.
 
 ---
 
@@ -277,6 +277,21 @@ A few settings control the search. It runs 300 playouts per move by default. A s
 
 This Tactician is the same tree search with one change. At points in the tree where an opponent is to move, the hint about which replies are promising is a blend: 70 % the Profiler's guess for that opponent (§6.3) and 30 % the standard move score. Everything else is unchanged. The search still assumes the opponent picks what is worst for the bot, and the playouts still use the standard weights for every player. In other words, the Profiler only steers which opponent replies get tried first and most often. The search still judges each reply by how much it hurts the bot. Whether this helps is tested in §10.1.
 
+### 5.5 Optional parts of the move score and two weight switches
+
+The greedy Tactician rates every legal move with the seven-part score in §5.1 (the *move score*) and plays the best-rated one. Six additions to that rating came out of the study in §10.8. They are off by default, which means a greedy player in a normal game does not use them. The two settings at the end of the table are tick boxes on the Sessions page, under the greedy player's settings. The four components above them have no tick box yet. They are switched on by giving the player a weight for them in the session's player settings (`weights`, in the API or the command line), and they are what the experiments in §10.8 do for each version. Because they are off by default, the seven-part score in §5.1, the Profiler's guesses and every earlier result are unchanged.
+
+| Name | What it does |
+|---|---|
+| `round_end_feasibility` | Penalises starting a pattern line whose missing tiles are no longer on the table, so the line cannot be finished this round. The penalty runs from 0 (the line can still be finished) to −1 (the tiles it needs are gone). A line left open costs no points, but it blocks its row for other colours. |
+| `floor_outlook` | Estimates the extra floor penalty from tiles the player will probably have to take later in the round but will have no room for after this move. The player is assumed to take about one in *n* of the tiles still on the table, where *n* is the number of players. |
+| `spoil` | The share of the tiles left on the table that the next player has no pattern line for (0 to 1). A higher weight prefers moves that leave the next player only tiles that must go to the floor. |
+| `bonus_reach` | When a move completes a line, how far it brings the tile's column and colour toward their end-game bonuses, counted only for lines that are at least three-fifths done and scaled by whether the missing tiles are still in the bag or on the table. |
+| `table_aware` (a setting of the Tactician) | Sets the value of the first-player token from the number of players: 0.7 with two players, as in §5.1, and 2.0 with three or four. |
+| `endgame_aware` (a setting of the Tactician) | Once any wall has a row one tile from complete, so the game is close to ending, switches to weights that cash in points and bonuses: immediate points 4.5, bonus potential 1.5, line progress and near completion 0.3, first player and denial 0.2. |
+
+The first four are components with their own weights, calculated only when a weight is given. The two settings are available when a session is created. Results are in §10.8.
+
 ---
 
 ## 6. Opponent modelling and profiling
@@ -456,7 +471,7 @@ Every bot move records how long it took to decide, to check and to explain, and 
 
 ### 9.3 Experiments (`experiments/`)
 
-Eight experiments are defined.
+Ten experiments are defined.
 
 | Name in the code | The question it answers | Results |
 |---|---|---|
@@ -468,10 +483,12 @@ Eight experiments are defined.
 | `rule_extraction` | Do the extracted rules agree with the engine? | §10.5 |
 | `xai_coverage` | Do moves have explanations, and do these match the saved numbers? | §10.6 |
 | `latency_profile` | How long do moves take? | §10.7 |
+| `heuristic_comparison` | Which parts of the move score matter, and does it depend on the number of players? | §10.8 |
+| `player_count_scaling` | How does play change with two, three and four players? | §10.9 |
 
 Each has a form for its settings and returns its result in the same layout (a summary sentence, headline numbers, tables and chart data), so the Experiments page can display any of them. They run in the background and show progress, and they can be started from the web page or from the command line (`tiles experiment run <kind> --param k=v --output file.json`). Results can be saved in the database and exported as JSON.
 
-The first five play new games from a fixed random seed, so running them again with the same settings gives the same game outcomes (timings will differ), and they can be stopped early. Three of them (`profiler_ablation`, `tournament` and `search_budget_sweep`) play through the local game runner and the turn procedure. The other two (`prediction_accuracy` and `archetype_discovery`) use a shorter loop of their own that calls the Tactician, the rules engine and the Profiler directly, with no Validator step, no explanation and no turn record. `rule_extraction` runs the check in §4. `xai_coverage` and `latency_profile` summarise whatever games are already in the database, so their numbers depend on which games have been played.
+The first five play new games from a fixed random seed, so running them again with the same settings gives the same game outcomes (timings will differ), and they can be stopped early. The two added later, `heuristic_comparison` and `player_count_scaling`, work the same way, and every game they play saves the same figures for every player (§10.8). Three of the first five (`profiler_ablation`, `tournament` and `search_budget_sweep`) play through the local game runner and the turn procedure, and so do the two added later. The other two (`prediction_accuracy` and `archetype_discovery`) use a shorter loop of their own that calls the Tactician, the rules engine and the Profiler directly, with no Validator step, no explanation and no turn record. `rule_extraction` runs the check in §4. `xai_coverage` and `latency_profile` summarise whatever games are already in the database, so their numbers depend on which games have been played.
 
 Results of the opponent-model comparison can also be sent to MLflow (MLflow, n.d.), a tool that keeps a log of experiment runs, or to a text file. This logging is off by default when the comparison is run as an experiment. The older direct command `tiles ablate` has it on by default: it uses MLflow if that is installed and otherwise appends to a file called `experiments.jsonl`.
 
@@ -479,7 +496,7 @@ Results of the opponent-model comparison can also be sent to MLflow (MLflow, n.d
 
 ## 10. Evaluation
 
-The figures below come from the experiments in §9.3, run with the commands in Appendix A, except where the text says otherwise. The labels A1 to A7 are the ones the experiments carry in the code. Random seeds are fixed. Where bots are compared for playing strength (A1 and A3) they take turns going first, so that the advantage of moving first cancels out. The games played for A1 to A4 are all two-player games between bots. Timings depend on the computer used.
+The figures below come from the experiments in §9.3, run with the commands in Appendix A, except where the text says otherwise. The labels A1 to A9 are the ones the experiments carry in the code. Random seeds are fixed. Where bots are compared for playing strength (A1 and A3) they take turns going first, so that the advantage of moving first cancels out. The games played for A1 to A4 are all two-player games between bots; A8 and A9 play two-, three- and four-player games. Timings depend on the computer used.
 
 ### 10.1 A1 — Does the opponent model improve play?
 
@@ -605,7 +622,93 @@ Time per move from the database (873 moves), in milliseconds. "p50" is the media
 
 Checking and explaining a move take a negligible time (under 0.05 ms). Deciding is where the time goes, and only for the Tacticians that look ahead. The rows come from different games, so the gap between the two search rows is not a measure of what the opponent model costs; §10.1 gives that. In a live game the largest cost is waiting for the website (about 430–650 ms per move, §8.5), and a 300-playout search accounts for about a quarter of a live turn. The number of playouts is a setting and can be changed.
 
-### 10.8 Summary of evidence
+### 10.8 A8 — Which parts of the move score matter, and does the number of players change that?
+
+The greedy Tactician plays the move with the highest score (§5.1). Changing the weights gives players that differ in one habit at a time, and this section tests which habits matter. Each **version** below changes one or two weights. A version plays at a table where every other seat is the unchanged greedy player, called the **baseline**. Which seat the version sits in changes from game to game, and the baseline and the version are dealt the same tiles, so the two can be compared game by game. A player who is no better than the others wins one game in two with two players, one in three with three players and one in four with four. That share is called a **fair share** below.
+
+| Version | What it changes (weights from §5.1) |
+|---|---|
+| `myopic` | Looks only at points now and the floor: line progress, near completion, first player, bonus potential and denial are all set to 0 |
+| `floor_blind`, `floor_averse`, `floor_tolerant` | Floor penalty 0, 2.5 and 0.4 (baseline 1.2) |
+| `denial_heavy`, `denial_extreme`, `no_denial` | Denial 1.5, 4.0 and 0 |
+| `tempo_fpt`, `tempo_extreme` | First player 2.0 and 4.0 |
+| `bonus_hunter`, `bonus_extreme` | Bonus potential 2.0 and 5.0 |
+| `builder`, `line_focus_extreme` | Line progress and near completion both 2.0, and both 4.0 |
+| `points_first` | Immediate points 5.0, bonus potential 0.3 |
+
+Every game saves the same figures for every player: final score and rank, win, points from tiling, floor penalty, bonuses, number of moves, how often tiles went to the floor or came from the centre, how often the first-player token was taken, and decision time. These rows are part of each experiment's saved result (the `--output` file), one row per player per game.
+
+Each version played 300 games at each table size. The table shows the **points per game gained or lost compared with the baseline**. The figure after "±" is the margin of error: a difference smaller than it could be chance, so it should not be trusted. Bold marks the differences that are clearly larger than the margin of error at all three table sizes.
+
+| Version | 2 players | 3 players | 4 players |
+|---|---|---|---|
+| `myopic` | **−4.0 ± 1.6** | **−2.3 ± 1.6** | **−3.9 ± 1.5** |
+| `floor_blind` | **−8.0 ± 2.1** | **−7.5 ± 2.0** | **−8.7 ± 2.0** |
+| `floor_averse` | −0.2 ± 0.9 | −0.6 ± 1.0 | −1.6 ± 1.2 |
+| `floor_tolerant` | −0.2 ± 2.0 | +2.0 ± 2.0 | +1.6 ± 1.8 |
+| `denial_heavy` | −1.9 ± 1.3 | −0.6 ± 1.2 | −1.1 ± 1.2 |
+| `denial_extreme` | **−5.9 ± 1.6** | **−4.0 ± 1.7** | **−5.7 ± 1.8** |
+| `no_denial` | +1.1 ± 1.0 | +0.3 ± 1.2 | +0.3 ± 1.0 |
+| `tempo_fpt` | +0.4 ± 1.9 | +3.4 ± 1.9 | +3.0 ± 1.8 |
+| `tempo_extreme` | −1.4 ± 1.9 | +2.6 ± 2.0 | +2.3 ± 1.9 |
+| `bonus_hunter` | +0.8 ± 1.0 | +0.6 ± 1.5 | −0.3 ± 1.3 |
+| `bonus_extreme` | −1.2 ± 1.5 | −0.9 ± 1.7 | −0.3 ± 1.7 |
+| `builder` | −0.2 ± 0.7 | +0.5 ± 0.8 | +0.3 ± 0.6 |
+| `line_focus_extreme` | −0.9 ± 1.0 | −0.4 ± 1.1 | −0.8 ± 1.0 |
+| `points_first` | +0.2 ± 1.0 | −0.3 ± 0.9 | −0.8 ± 1.0 |
+
+What the table shows:
+
+1. **The floor penalty matters.** A player that ignores it loses about 8 points a game at every table size, and 10 to 23 points of win rate. Its floor penalty grows from about −13 to −22 at two players.
+2. **Looking only at points now is worse.** `myopic` loses 2 to 4 points at every size. Line progress, bonus potential, the first-player token and denial together are worth having.
+3. **Blocking opponents too hard costs points.** At a denial weight of 4.0 the player loses 4 to 6 points at every size. A moderate weight, or none at all, is within about 2 points of the baseline.
+4. **The first-player token is worth more as the table grows.** With two players, valuing it more makes no difference. With three and four players the players that value it score 2.3 to 3.4 points more. This was checked again with 1,000 new games per version. With four players it held: +3.3 points and 4 to 5 more wins in every 100 games. With three players the gain was smaller, +1.2 to +1.7 points. A further 2,000 games per version at three players gave +1.6 ± 0.7 points, but only +2.7 ± 2.9 wins in every 100 games, so there the gain is real but small.
+5. **Most other changes make no difference.** Moving line progress, near completion, bonus potential or points now up or down by a factor of 2 to 4 changes the result by less than the margin of error. A hint in the first 300 games that a high floor weight hurts with four players (−1.6 points) disappeared in the second check (−0.7 ± 0.6). The weights in §5.1 are therefore already about as good as simple re-weighting can make them, and any further gain has to come from new information.
+
+**New parts of the move score (§5.5).** Six ideas built from these results were tested in the same way, with 1,000 games per version per table size on new deals. The table shows the points gained or lost compared with the baseline, and, in brackets, the share of games won. Bold marks differences larger than the margin of error. "All four" combines `table_aware`, `endgame_aware`, `round_end_feasibility` and `bonus_reach`.
+
+| Version | 2 players | 3 players | 4 players |
+|---|---|---|---|
+| Baseline (share of games won) | (49 %) | (33 %) | (24 %) |
+| `table_aware` | +0.0 (same as baseline) | **+2.2 ± 1.0** (36 %) | **+3.3 ± 0.9** (31 %) |
+| `round_end_feasibility` | **+1.2 ± 0.5** (53 %) | +0.8 ± 0.4 (34 %) | +0.4 ± 0.4 (25 %) |
+| `floor_outlook` | −0.0 ± 0.3 | −0.1 ± 0.2 | −0.1 ± 0.1 |
+| `spoil` | −0.1 ± 0.3 | −0.1 ± 0.3 | +0.1 ± 0.2 |
+| `bonus_reach` | +0.0 ± 0.5 | −0.5 ± 0.6 | +0.7 ± 0.6 |
+| `endgame_aware` | +0.1 ± 0.1 | −0.1 ± 0.2 | −0.1 ± 0.1 |
+| All four | **+1.4 ± 0.7** (53 %) | **+2.9 ± 1.0** (41 %) | **+4.3 ± 1.0** (34 %) |
+
+Two of the six help. Setting the value of the first-player token by table size (`table_aware`) is the clear gain with three and four players: with four players it raises the share of games won from 24 % to 31 %. The round-end check helps a little at every size, most with two players. The other four add nothing. `floor_outlook` and `spoil` did nothing at weight 1 and were slightly worse at higher weights, and `bonus_reach` and `endgame_aware` were within the margin of error. The four-player share of 34 % for "all four" compares with 25 % for a fair share and 24 % for the unchanged baseline. As a check, `table_aware` gives the same games as the baseline with two players, as it should.
+
+**Stronger opponents.** The tests above all play against baseline greedy players. The baseline and "all four" were also run as one seat against minimax and mcts (50 playouts per move) opponents. With one minimax opponent, "all four" won 47.5 % of 300 games against 40.8 % for the baseline. With two or three minimax opponents there was no gain (64 % against 67 %, and 66 % against 72 %), and with one mcts opponent it won 25 % of 100 games against 18.5 %. Every one of these differences is within its margin of error, so these runs neither confirm nor rule out the gains. Several thousand games against mcts would be needed, which takes hours. One side result is that the baseline wins 67 % and 72 % of games against two or three minimax players, much more than a fair share. Minimax assumes that every opponent plays the move that is worst for it (§5.2), which suits two players better than three or four.
+
+**What these tests do not show.** Every version is a weight change to one Tactician, so the tests show which parts of the move score matter, not what the best strategy is. The best combination of parts was picked after the first round of tests, but it was then tested on deals that had not been used before.
+
+### 10.9 A9 — How does play change with the number of players?
+
+The experiment `player_count_scaling` plays one Tactician at tables of two, three and four players. In **self-play** every seat plays the same Tactician, which shows how the game itself changes. In the second kind of table, one seat plays the Tactician under test and the other seats play a fixed Tactician. This shows how large its advantage is. Every game saves the same figures as in §10.8.
+
+**Greedy playing itself** (300 games per table size):
+
+| Players | Average score | Average floor penalty | Moves per game | Winner's lead over last place | First seat wins | Last seat wins |
+|---|---|---|---|---|---|---|
+| 2 | 52.8 | −12.9 | 52 | 12.7 | 54.7 % (fair share 50 %) | 44.0 % |
+| 3 | 58.6 | −8.2 | 67 | 19.3 | 40.7 % (fair share 33 %) | 27.7 % |
+| 4 | 57.4 | −7.4 | 81 | 22.2 | 31.3 % (fair share 25 %) | 14.3 % |
+
+Scores rise from two to three players and then stay level. With 5, 7 and 9 factories there is more to choose from, and players lose about five points less to the floor with three or four players than with two. Turn order matters more as the table grows. The gap in wins between the first and the last seat widens from 11 points with two players to 17 with four, where the last seat wins little more than half of its fair share. Games are longer (52 to 81 moves) and the scores are further apart.
+
+**mcts against greedy players** (50 playouts per move; 144 games with two and three players and 444 with four, on different deals):
+
+| Players | Games won by mcts | Margin of error | Fair share | Times a fair share | Average score (mcts vs greedy) | Time per decision |
+|---|---|---|---|---|---|---|
+| 2 | 83 % | 76–89 % | 50 % | 1.7 | 56.9 vs 47.8 | 98 ms |
+| 3 | 54 % | 46–62 % | 33 % | 1.6 | 60.6 vs 57.1 | 157 ms |
+| 4 | 41 % | 36–45 % | 25 % | 1.6 | 59.7 vs 57.2 | 260–300 ms |
+
+The search wins about 1.6 to 1.7 times its fair share at every table size. Its win rate falls with more players only because a fair share falls. A decision takes 2.7 times as long with four players as with two. The times were measured while several runs shared the computer, so they are on the high side. A first, smaller run of 24 games with four players showed 25 %, which looked as if the advantage had disappeared. The larger run shows it had not, and 25 % was chance (the margin of error for 24 games was 12–45 %). The 83 % with two players agrees with §10.4, where `mcts` won all 10 of its games against greedy at 50 playouts. Greedy beat random in all 300 games at every table size, so those games carry no information.
+
+### 10.10 Summary of evidence
 
 | Claim | Evidence |
 |---|---|
@@ -616,6 +719,9 @@ Checking and explaining a move take a negligible time (under 0.05 ms). Deciding 
 | The search plays well | Compared with the project's own baselines: mcts 1462 > mcts_profiled 1347 > minimax 1204 > greedy 1088 > random 899 |
 | Moves are explained and can be reviewed | Every reviewed bot move has an explanation, saved with the numbers behind it; any recorded game can be replayed |
 | The system plays on the live website | Three games on 10 October 2026, one with a human who joined by invite link |
+| The move score's weights matter, and by table size | Ignoring the floor costs about 8 points and a points-only player 2–4, at every size; the first-player token is worth +3.3 points at four players and nothing at two (§10.8) |
+| The greedy player can be improved from these results | Against greedy opponents, setting the first-player weight by table size raises the four-player win rate from 23 % to 31 %, and with a round-end check to 34 %. Three further ideas gave nothing, and against minimax and MCTS opponents the samples were too small to tell (§10.8) |
+| Search keeps its edge at larger tables | `mcts` wins 83 %, 54 % and 43 % of two-, three- and four-player games against greedy, 1.6–1.7 times a fair share each time (§10.9) |
 | Modelling the opponent improves play | **Not shown** against bots (98 % vs 100 %; 5–15 head-to-head). Testing against people is future work |
 
 ---
@@ -628,7 +734,8 @@ Checking and explaining a move take a negligible time (under 0.05 ms). Deciding 
 4. **Rule extraction.** The rulebook reader covers a fixed list of 19 rules with hand-written patterns and serves as a cross-check on the engine. Two extensions would take it further: finding rules that are not on the list, and having the engine take its constants from the extracted rules.
 5. **Explanations.** The main reason is taken from the move score for every Tactician that reports one (§7.1). Drawing more of the explanation from what the search found is one extension. Another is human evaluation: ratings of clarity and usefulness from 5–10 participants, using the Replay page.
 6. **Dependence on a website the team does not control.** The site changed its message format once during the project. The code that talks to it is in one package and the game loop is tested offline, so another change would mean updating that package and checking it again in real games.
-7. **A Tactician that learns.** The repository includes a wrapper that presents the game in the form reinforcement-learning libraries expect (a PettingZoo environment; Terry et al., 2021), with its own tests. No learning agent or training code exists yet. One could be added as a new Tactician. Tuning the move-score weights automatically, for example by trying many weight settings and keeping the best, is another possible extension.
+7. **Further move-score work.** The three ideas left open after the first heuristic study (leaving the next player floor-heavy choices, planning bonus lines, a closing-round mode) were tested in §10.8 and none gave a measurable gain on its own. What remains open is stronger versions of them, a different trigger for the closing-round mode, and using these parts as the starting hints of the tree search. The gains in §10.8 were measured against greedy opponents. Against minimax and MCTS opponents the samples (100 to 300 games per variant) were too small to confirm or rule them out, so a larger run is needed.
+8. **A Tactician that learns.** The repository includes a wrapper that presents the game in the form reinforcement-learning libraries expect (a PettingZoo environment; Terry et al., 2021), with its own tests. No learning agent or training code exists yet. One could be added as a new Tactician. Tuning the move-score weights automatically, for example by trying many weight settings and keeping the best, is another possible extension.
 
 ---
 
@@ -741,6 +848,12 @@ tiles experiment run search_budget_sweep  --param budgets=25,50,100,200,400,800 
 # these two summarise games already in the database (play some first, e.g. tiles play ... --db db/tiles.db)
 tiles experiment run latency_profile --db db/tiles.db
 tiles experiment run xai_coverage    --db db/tiles.db
+# heuristics and table size (A8, A9)
+tiles experiment run heuristic_comparison --param num_players=4 --param games_per_variant=1000 --param seed=8000 --param variants=baseline,round_end,table_aware,combined
+tiles experiment run heuristic_comparison --param num_players=4 --param games_per_variant=1000 --param seed=9000 --param variants=baseline,spoil,bonus_reach,endgame,best_of_all
+tiles experiment run heuristic_comparison --param num_players=2 --param games_per_variant=300 --param seed=13000 --param opponent=minimax --param variants=baseline,best_of_all
+tiles experiment run player_count_scaling --param tactician=greedy --param games_per_setting=300 --param seed=2000
+tiles experiment run player_count_scaling --param tactician=mcts --param opponent=greedy --param simulations=50 --param modes=field --param games_per_setting=24 --param seed=6000
 # live play
 tiles live --room tiles-demo --player Athena=mcts_profiled --player You=human --headed --db db/tiles.db
 ```
@@ -761,8 +874,8 @@ backend/tiles/
 ├── ledger/          SQLite database: sessions, moves, rounds, profiles, experiments
 ├── rulebook/        rulebook.md → 19 structured rules → check against the engine
 ├── engine/          live play: message format, browser seat, live session, board translator, page-reading fallback
-├── sim/             local game runner, tournaments, opponent-model comparison, prediction evaluation
-├── experiments/     the eight experiments, the background runner, command-line entry
+├── sim/             local game runner, tournaments, opponent-model comparison, prediction evaluation, heuristic study
+├── experiments/     the ten experiments, the background runner, command-line entry
 ├── telemetry/       optional MLflow / text-file logging
 ├── rl/              PettingZoo environment wrapper (not used by the app)
 ├── server/          FastAPI app, session manager, statistics, routers/

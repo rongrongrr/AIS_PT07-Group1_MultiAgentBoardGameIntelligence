@@ -23,6 +23,8 @@ _KIND_MODULES = (
     "rule_extraction",
     "latency_profile",
     "xai_coverage",
+    "heuristic_comparison",
+    "player_count_scaling",
 )
 
 

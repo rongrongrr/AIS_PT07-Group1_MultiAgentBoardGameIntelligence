@@ -27,6 +27,8 @@ ALL_KINDS = {
     "rule_extraction",
     "latency_profile",
     "xai_coverage",
+    "heuristic_comparison",
+    "player_count_scaling",
 }
 
 TINY_PARAMS = {
@@ -38,6 +40,8 @@ TINY_PARAMS = {
     "rule_extraction": {},
     "latency_profile": {},
     "xai_coverage": {},
+    "heuristic_comparison": {"variants": "baseline,floor_averse", "games_per_variant": 2},
+    "player_count_scaling": {"games_per_setting": 2, "player_counts": "2,3"},
 }
 
 RESULT_KEYS = {"summary", "metrics", "tables", "series", "raw"}

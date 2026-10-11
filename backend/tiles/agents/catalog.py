@@ -64,7 +64,23 @@ TACTICIAN_INFO: Dict[str, dict] = {
             "opponents need. The report's heuristic Tactician; the "
             "per-component breakdown doubles as explainability evidence."
         ),
-        "params": [],
+        "params": [
+            _param(
+                "table_aware",
+                "bool",
+                False,
+                "Value the first-player token by table size (more with 3 or "
+                "4 players). Won 8-10 points of win rate at 4 players in the "
+                "heuristic study.",
+            ),
+            _param(
+                "endgame_aware",
+                "bool",
+                False,
+                "Switch to closing-round weights (cash in points and bonuses) "
+                "once a wall row is one tile from complete.",
+            ),
+        ],
     },
     "minimax": {
         "description": (

@@ -280,3 +280,21 @@ describe("ParamForm", () => {
     expect(screen.queryByText("How many")).toBeNull();
   });
 });
+
+describe("ParamForm with several forms on one page", () => {
+  it("gives each form its own element ids so labels act on their own input", () => {
+    const params = [{ name: "table_aware", type: "bool", default: false }];
+    const first = vi.fn();
+    const second = vi.fn();
+    render(
+      <>
+        <ParamForm compact params={params} values={{ table_aware: false }} onChange={first} />
+        <ParamForm compact params={params} values={{ table_aware: false }} onChange={second} />
+      </>,
+    );
+    const labels = screen.getAllByText("Table Aware");
+    fireEvent.click(labels[1]);
+    expect(second).toHaveBeenCalledWith("table_aware", true);
+    expect(first).not.toHaveBeenCalled();
+  });
+});

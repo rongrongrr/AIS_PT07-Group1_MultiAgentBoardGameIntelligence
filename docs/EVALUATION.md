@@ -30,6 +30,8 @@ experiment accepts.
 | `rule_extraction` | How many rules extracted from the rulebook text match the rules engine. | `extractor` (`deterministic`; also `llm`) |
 | `latency_profile` | Median, 90th-percentile and maximum time for each pipeline step (decide, validate, explain, total) per Tactician. It reads games already in the database, so play some first. | `tactician` (blank for all) |
 | `xai_coverage` | The share of recorded moves that have an explanation, how often each concept tag appears, and whether the stated main reason matches the evidence. It also reads games already in the database. | `tactician` (reserved, currently ignored) |
+| `heuristic_comparison` | Each named weight set for the greedy Tactician (`heuristic` variants such as `floor_averse` or `tempo_fpt`) plays against baseline greedy players at a table of 2, 3 or 4. Seats rotate, every variant gets the same deals, and each game keeps per-player statistics (score parts, floor penalty, bonuses, move mix, first-player token pick-ups, decision time). | `games_per_variant` (100), `num_players` (2), `seed` (0), `variants` (all) |
+| `player_count_scaling` | One Tactician at 2, 3 and 4 player tables, in self-play and against filler opponents: scores, game length, seat advantage, and win rate against chance. Keeps the same per-game statistics. | `tactician` (`greedy`), `opponent` (`random`), `player_counts` (`2,3,4`), `games_per_setting` (100), `simulations` (100), `seed` (0) |
 
 Four commands give a quicker, terminal-only version that prints its result
 instead of saving it to the database: `tiles ablate`, `tiles tournament`,

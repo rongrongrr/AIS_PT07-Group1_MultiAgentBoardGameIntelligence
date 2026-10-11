@@ -1,4 +1,5 @@
 import { titleCase } from "../format";
+import { useId } from "react";
 import type { ParamSpecDTO } from "../types";
 
 export type ParamValues = Record<string, unknown>;
@@ -32,12 +33,14 @@ export function ParamForm({
   onChange: (name: string, value: unknown) => void;
   compact?: boolean;
 }) {
+  // Several forms can share a page (one per player), so ids must be unique.
+  const uid = useId();
   if (params.length === 0) return null;
   return (
     <div className={compact ? "param-form param-form-compact" : "param-form"}>
       {params.map((p) => {
         const value = values[p.name];
-        const id = `param-${p.name}`;
+        const id = `${uid}-param-${p.name}`;
         let input;
         if (p.type === "bool") {
           input = (

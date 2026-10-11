@@ -49,6 +49,12 @@ def _validate_tactician_config(name: str, tactician: str, config: dict) -> None:
         if param["name"] not in config or config[param["name"]] is None:
             continue
         value = config[param["name"]]
+        if param["type"] == "bool":
+            if not isinstance(value, bool):
+                raise SessionError(
+                    422, f"{name}: {param['name']} must be of type bool"
+                )
+            continue
         numeric = (int,) if param["type"] == "int" else (int, float)
         if isinstance(value, bool) or not isinstance(value, numeric):
             raise SessionError(
