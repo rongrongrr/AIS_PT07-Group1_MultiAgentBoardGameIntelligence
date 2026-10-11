@@ -94,7 +94,7 @@ flowchart LR
   W[("buddyboardgames.com")]
   UI <--> API
   API --> MR & LS & EX
-  EX -->|three play games through it| MR
+  EX -->|five play games through it| MR
   MR & LS --> Turn
   MR & LS & EX --> L
   LS <--> W
@@ -107,7 +107,7 @@ TILES has six main pieces.
 - A **web server** (FastAPI; Ramírez, n.d.) that starts and stops games and experiments and pushes live updates to the browser.
 - Two **game runners**. The local runner plays a game entirely on the team's rules engine. The live runner plays on buddyboardgames.com and controls one web browser per bot.
 - The **turn procedure**, a single piece of code (`TurnPipeline`) that both runners call for every bot move. It calls the four agents in a fixed order.
-- An **experiment runner** that runs any of eight predefined experiments in the background.
+- An **experiment runner** that runs any of ten predefined experiments in the background.
 - A **database**, a single SQLite file that the code calls the ledger, where games, moves and experiment results are stored.
 
 ### 2.2 Design principles
@@ -207,7 +207,7 @@ In a live game there is a second, separate safeguard. The website can itself ref
 
 ### 3.5 Testing
 
-The engine tests play full random games with 2, 3 and 4 players and check after every move and every deal that all 100 tiles are still accounted for. Separate tests cover scoring, wall tiling, floor penalties, bonuses and the end of the game. There are 16 engine tests in `tests/test_rules.py`. Across the whole project there are 145 test cases, all for the backend; some tests run several times with different inputs, and each run counts as one case.
+The engine tests play full random games with 2, 3 and 4 players and check after every move and every deal that all 100 tiles are still accounted for. Separate tests cover scoring, wall tiling, floor penalties, bonuses and the end of the game. There are 16 engine tests in `tests/test_rules.py`. Across the whole project there are 147 backend test cases and 137 frontend test cases (the frontend tests cover the web pages and components); some tests run several times with different inputs, and each run counts as one case.
 
 ---
 
@@ -663,7 +663,7 @@ What the table shows:
 2. **Looking only at points now is worse.** `myopic` loses 2 to 4 points at every size. Line progress, bonus potential, the first-player token and denial together are worth having.
 3. **Blocking opponents too hard costs points.** At a denial weight of 4.0 the player loses 4 to 6 points at every size. A moderate weight, or none at all, is within about 2 points of the baseline.
 4. **The first-player token is worth more as the table grows.** With two players, valuing it more makes no difference. With three and four players the players that value it score 2.3 to 3.4 points more. This was checked again with 1,000 new games per version. With four players it held: +3.3 points and 4 to 5 more wins in every 100 games. With three players the gain was smaller, +1.2 to +1.7 points. A further 2,000 games per version at three players gave +1.6 ± 0.7 points, but only +2.7 ± 2.9 wins in every 100 games, so there the gain is real but small.
-5. **Most other changes make no difference.** Moving line progress, near completion, bonus potential or points now up or down by a factor of 2 to 4 changes the result by less than the margin of error. A hint in the first 300 games that a high floor weight hurts with four players (−1.6 points) disappeared in the second check (−0.7 ± 0.6). The weights in Section 5.1 are therefore already about as good as simple re-weighting can make them, and any further gain has to come from new information.
+5. **Most other changes make no difference.** Moving line progress, near completion, bonus potential or points now up or down by a factor of 2 to 4 changes the result by less than the margin of error. A hint in the first 300 games that a high floor weight hurts with four players (−1.6 points) disappeared in the second check (−0.7 ± 0.6). So with two players none of these changes beat the weights in Section 5.1, and with three or four players only the first-player weight did (item 4). The other changes tried here gave no gain, which does not show that no better weights exist: only these 14 versions were tried.
 
 **New parts of the move score (Section 5.5).** Six ideas built from these results were tested in the same way, with 1,000 games per version per table size on new deals, in two runs of games. Each run has its own baseline. The table shows the points gained or lost compared with the baseline of the same run, and, in brackets, the share of games won. Bold marks differences larger than the margin of error. "All four" combines `table_aware`, `endgame_aware`, `round_end_feasibility` and `bonus_reach`.
 
@@ -681,7 +681,7 @@ What the table shows:
 
 Two of the six help. Setting the value of the first-player token by table size (`table_aware`) is the clear gain with three and four players: with four players it raises the share of games won from 23 % to 31 %. The round-end check helps a little at every size, most with two players. The other four add nothing. `floor_outlook` and `spoil` did nothing at weight 1 and were slightly worse at higher weights, and `bonus_reach` and `endgame_aware` were within the margin of error. The four-player share of 34 % for "all four" compares with 25 % for a fair share and 24 % for the unchanged baseline. As a check, `table_aware` gives the same games as the baseline with two players, as it should.
 
-**Stronger opponents.** The tests above all play against baseline greedy players. The baseline and "all four" were also run as one seat against minimax and mcts (50 playouts per move) opponents. With one minimax opponent, "all four" won 47.5 % of 300 games against 40.8 % for the baseline. With two or three minimax opponents there was no gain (64 % against 67 %, and 66 % against 72 %), and with one mcts opponent it won 25 % of 100 games against 18.5 %. Every one of these differences is within its margin of error, so these runs neither confirm nor rule out the gains. Several thousand games against mcts would be needed, which takes hours. One side result is that the baseline wins 67 % and 72 % of games against two or three minimax players, much more than a fair share. Minimax assumes that every opponent plays the move that is worst for it (Section 5.2), which suits two players better than three or four.
+**Stronger opponents.** The tests above all play against baseline greedy players. The baseline and "all four" were also run as one seat against minimax and mcts (50 playouts per move) opponents. With one minimax opponent, "all four" won 47.5 % of 300 games against 40.8 % for the baseline. With two or three minimax opponents there was no gain (64 % against 67 %, and 66 % against 72 %), and with one mcts opponent it won 25 % of 100 games against 18.5 %. Every one of these differences is within its margin of error, so these runs neither confirm nor rule out the gains. Several thousand games against mcts would be needed, which takes hours. One side result is that the baseline wins 67 % and 72 % of games against two or three minimax players, much more than a fair share. Minimax assumes that every opponent plays the move that is worst for it (Section 5.2), which may be why it does worse with three or four players. Checking this is left for future work.
 
 **What these tests do not show.** Every version is a weight change to one Tactician, so the tests show which parts of the move score matter, not what the best strategy is. The best combination of parts was picked after the first round of tests, but it was then tested on deals that had not been used before.
 
@@ -697,7 +697,7 @@ The experiment `player_count_scaling` plays one Tactician at tables of two, thre
 | 3 | 58.6 | −8.2 | 67 | 19.3 | 40.7 % (fair share 33 %) | 27.7 % |
 | 4 | 57.4 | −7.4 | 81 | 22.2 | 31.3 % (fair share 25 %) | 14.3 % |
 
-Scores rise from two to three players and then stay level. With 5, 7 and 9 factories there is more to choose from, and players lose about five points less to the floor with three or four players than with two. Turn order matters more as the table grows. The gap in wins between the first and the last seat widens from 11 points with two players to 17 with four, where the last seat wins little more than half of its fair share. Games are longer (52 to 81 moves) and the scores are further apart.
+Scores rise from two to three players and then stay level. Players lose about five points less to the floor with three or four players than with two. This is probably because 5, 7 and 9 factories give more to choose from, but the tests did not check that reason. Turn order matters more as the table grows. The gap in wins between the first and the last seat widens from 11 points with two players to 17 with four, where the last seat wins little more than half of its fair share. Games are longer (52 to 81 moves) and the scores are further apart.
 
 **mcts against greedy players** (50 playouts per move; 144 games with two and three players and 444 with four, on different deals):
 
@@ -780,7 +780,7 @@ The ISS capstone brief asks for an intelligent system that applies at least one 
 | Use at least one problem-solving technique from the programme | Reasoning systems: rules engine, validator and search. Pattern recognition: clustering, nearest-signature classification and next-move prediction. Software agents: coordinated agents acting on a live website. Language processing: text retrieval, rule extraction and explanation text |
 | Complexity of problem | A multi-player game with random deals, a live online platform, and an opponent model inside the search |
 | Innovation | Search that uses an opponent model, explanations built from recorded move scores, rulebook text checked against the engine |
-| Verification and validation | 145 automated tests, random full-game tests of the engine, the rulebook check, the explanation check and repeatable experiments (Section 10) |
+| Verification and validation | 147 backend and 137 frontend automated tests, random full-game tests of the engine, the rulebook check, the explanation check and repeatable experiments (Section 10) |
 | Overall functionality | Local and live play, replay, dashboard, rulebook browser and ten experiments (Section 2.5, Section 9) |
 | Documentation | README, architecture and API documents, evaluation summary and this report |
 
@@ -807,7 +807,7 @@ The ISS capstone brief asks for an intelligent system that applies at least one 
 
 ## Statement of compliance with the policy for use of AI in teaching and learning
 
-In preparing this project and report the team used AI tools (including Claude Code, Claude, Gemini and ChatGPT) for brainstorming architectural options, clarifying technical concepts, accelerating implementation and refactoring of code under the team's direction, drafting text and tables for documentation, and proofreading. Generated code was reviewed and tested (145 automated tests) against the deterministic rules engine and, for live play, against the platform. Reported numbers come from the team's own experiment runs on the dates stated. Cited sources were checked against the original publications or pages. The design decisions, interpretation of results and conclusions are the team's own.
+In preparing this project and report the team used AI tools (including Claude Code, Claude, Gemini and ChatGPT) for brainstorming architectural options, clarifying technical concepts, accelerating implementation and refactoring of code under the team's direction, drafting text and tables for documentation, and proofreading. Generated code was reviewed and tested (147 backend and 137 frontend automated tests) against the deterministic rules engine and, for live play, against the platform. Reported numbers come from the team's own experiment runs on the dates stated. Cited sources were checked against the original publications or pages. The design decisions, interpretation of results and conclusions are the team's own.
 
 ---
 
@@ -859,7 +859,7 @@ tiles experiment run player_count_scaling --param tactician=mcts --param opponen
 tiles live --room tiles-demo --player Athena=mcts_profiled --player You=human --headed --db db/tiles.db
 ```
 
-The same experiments can be started from the Experiments page, which shows the results and exports them as JSON. The whole set takes about 25 minutes on a laptop. The experiments that play games give the same game outcomes each time for the same seed, though timings vary. The two database summaries depend on which games are in the database. A few figures in this report do not come from these commands: the legal-move counts in Section 1.1, the three-group row in Section 10.3 and the live games in Section 8.5.
+The same experiments can be started from the Experiments page, which shows the results and exports them as JSON. The first nine commands take about 25 minutes on a laptop. The commands for A8 and A9 are examples: the tables in Sections 10.8 and 10.9 pool several runs with other seeds and lists of versions, and the runs against mcts opponents take much longer (hours for the larger samples). The experiments that play games give the same game outcomes each time for the same seed, though timings vary. The two database summaries depend on which games are in the database. A few figures in this report do not come from these commands: the legal-move counts in Section 1.1, the three-group row in Section 10.3 and the live games in Section 8.5.
 
 ## Appendix B — API summary
 
