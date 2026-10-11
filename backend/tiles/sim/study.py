@@ -95,17 +95,33 @@ def play_game(
     ``seats`` is ``[{"label", "tactician", "config"}...]`` in seat order.
     """
     n = len(seats)
-    names = [f"S{i + 1}" for i in range(n)]
     config = MatchConfig(
         players=[
-            {"name": names[i], "tactician": s["tactician"], "config": s.get("config") or {}}
+            {"name": f"S{i + 1}", "tactician": s["tactician"], "config": s.get("config") or {}}
             for i, s in enumerate(seats)
         ],
         profiler=None,
         explainer=None,
         seed=seed,
     )
+    return run_match_with_stats(config, [s["label"] for s in seats], game_id, setting)[1]
 
+
+def run_match_with_stats(
+    config: MatchConfig,
+    labels: Sequence[str],
+    game_id: int = 0,
+    setting: str = "",
+    keep_records: bool = False,
+) -> tuple:
+    """Play ``config`` and return ``(match_result, per_game_statistics)``.
+
+    The statistics are the same for every experiment that plays games, so
+    their per-game files can be read together. ``labels`` names each seat in
+    the output; ``keep_records`` is passed on to the match runner.
+    """
+    n = len(config.players)
+    seed = config.seed
     moves = [0] * n
     floor_moves = [0] * n
     center_moves = [0] * n
@@ -144,7 +160,7 @@ def play_game(
         elif kind == "game_over" and event.get("bonuses"):
             bonuses = event["bonuses"]
 
-    match = MatchRunner(config, on_event=on_event).run()
+    match = MatchRunner(config, on_event=on_event, keep_records=keep_records).run()
     scores = match.scores
     top = max(scores)
     winners = [i for i, s in enumerate(scores) if s == top]
@@ -157,8 +173,8 @@ def play_game(
         players.append(
             {
                 "seat": i + 1,
-                "label": seats[i]["label"],
-                "tactician": seats[i]["tactician"],
+                "label": labels[i],
+                "tactician": config.players[i]["tactician"],
                 "score": scores[i],
                 "rank": 1 + sum(1 for s in scores if s > scores[i]),
                 "won": 1.0 if solo_win and match.winner == i else 0.0,
@@ -177,7 +193,7 @@ def play_game(
                 "avg_decide_ms": round(statistics.fmean(decide_ms[i]), 3) if decide_ms[i] else 0.0,
             }
         )
-    return {
+    return match, {
         "game": game_id,
         "setting": setting,
         "num_players": n,

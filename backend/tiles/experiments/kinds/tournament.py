@@ -102,7 +102,12 @@ def run(params: dict, ctx) -> dict:
                    [[wins[a][b] for b in names] for a in names],
                    x_label="loser", y_label="winner"),
         ],
-        raw={"standings": standings, "games": games, "params": dict(params)},
+        raw={
+            "standings": standings,
+            "games": games,
+            "game_stats": outcome.game_stats,
+            "params": dict(params),
+        },
     )
 
 

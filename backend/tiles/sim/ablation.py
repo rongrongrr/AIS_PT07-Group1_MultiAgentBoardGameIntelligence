@@ -16,7 +16,8 @@ import statistics
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
-from tiles.sim.match import MatchConfig, MatchRunner
+from tiles.sim.match import MatchConfig
+from tiles.sim.study import run_match_with_stats
 from tiles.telemetry import get_tracker
 
 # The fixed opponent: a denial-heavy greedy "blocker", so there is a
@@ -42,6 +43,7 @@ class ConditionResult:
     games: int = 0
     margins: List[int] = field(default_factory=list)
     decision_ms: List[float] = field(default_factory=list)
+    game_stats: List[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -109,7 +111,12 @@ def _run_condition(
                 explainer=None,
                 seed=seed + g,
             )
-            match = MatchRunner(config, keep_records=True).run()
+            seat_labels = ["blocker"] * 2
+            seat_labels[subject_seat] = "subject"
+            match, stats = run_match_with_stats(
+                config, seat_labels, game_id=g, setting=name, keep_records=True
+            )
+            result.game_stats.append(stats)
             subject_score = match.scores[subject_seat]
             blocker_score = match.scores[1 - subject_seat]
             won = match.winner == subject_seat

@@ -11,7 +11,8 @@ import itertools
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
-from tiles.sim.match import MatchConfig, MatchRunner
+from tiles.sim.match import MatchConfig
+from tiles.sim.study import run_match_with_stats
 
 DEFAULT_ELO = 1200.0
 K_FACTOR = 32.0
@@ -55,6 +56,8 @@ def _elo_update(a: Standing, b: Standing, result_a: float) -> None:
 class TournamentResult:
     standings: List[Standing]
     games: List[dict] = field(default_factory=list)
+    #: Per-game, per-player statistics (see ``tiles.sim.study``).
+    game_stats: List[dict] = field(default_factory=list)
 
     def table(self) -> str:
         rows = sorted(self.standings, key=lambda s: -s.elo)
@@ -111,7 +114,10 @@ def run_tournament(
                 explainer=None,
                 seed=seed + game_no,
             )
-            match = MatchRunner(config).run()
+            match, stats = run_match_with_stats(
+                config, [first["name"], second["name"]], game_id=game_no, setting="tournament"
+            )
+            result.game_stats.append(stats)
             names = [first["name"], second["name"]]
             tie = match.winner is None  # shared win (score and rows tied)
             if not tie:

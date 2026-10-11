@@ -81,7 +81,11 @@ def run(params: dict, ctx) -> dict:
                 {"avg decide ms": [r["avg_decision_ms"] for r in rows]},
                 x_label="condition", y_label="ms"),
         ],
-        raw={"conditions": rows, "params": dict(params)},
+        raw={
+            "conditions": rows,
+            "game_stats": [g for c in conditions for g in c.game_stats],
+            "params": dict(params),
+        },
     )
 
 

@@ -10,7 +10,8 @@ from __future__ import annotations
 from typing import List
 
 from tiles.experiments.registry import ExperimentSpec, ParamSpec
-from tiles.sim.match import MatchConfig, MatchRunner
+from tiles.sim.match import MatchConfig
+from tiles.sim.study import run_match_with_stats
 
 from ._common import abort_note, line, mean, pct, result, table
 
@@ -40,6 +41,7 @@ def run(params: dict, ctx) -> dict:
     total = len(budgets) * games
 
     rows = []
+    game_stats: List[dict] = []
     done = 0
     for bi, budget in enumerate(budgets):
         wins = 0
@@ -55,11 +57,17 @@ def run(params: dict, ctx) -> dict:
                 seat,
                 {"name": "mcts", "tactician": "mcts", "config": {"simulations": budget}},
             )
-            match = MatchRunner(
+            labels = ["greedy", "greedy"]
+            labels[seat] = "mcts"
+            match, stats = run_match_with_stats(
                 MatchConfig(players=players, profiler=None, explainer=None,
                             seed=seed + bi * 1000 + g),
+                labels,
+                game_id=len(game_stats),
+                setting=f"{budget}_sims",
                 keep_records=True,
-            ).run()
+            )
+            game_stats.append(stats)
             won = match.winner == seat
             wins += int(won)
             played += 1
@@ -114,7 +122,7 @@ def run(params: dict, ctx) -> dict:
                  {"avg decide ms": [r["avg_decide_ms"] for r in rows]},
                  x_label="simulations per move", y_label="ms"),
         ],
-        raw={"rows": rows, "params": dict(params)},
+        raw={"rows": rows, "game_stats": game_stats, "params": dict(params)},
     )
 
 
