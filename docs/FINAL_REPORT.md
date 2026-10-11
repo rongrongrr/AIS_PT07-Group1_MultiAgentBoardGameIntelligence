@@ -7,7 +7,7 @@
 
 TILES (Transparent Intelligence for Learning, Exploration and Simulation) is a system that plays Azul and tries to take the opponent's habits into account. Azul is a board game in which nothing is hidden: every tile and every player's board is visible to everyone. What a player cannot see is how the opponent likes to play, for example whether they block, take risks or build quietly. TILES is built from four parts, called agents. The **Validator** checks that a move is legal. The **Tactician** chooses a move, and comes in five versions that range from random play to one that tries out many possible continuations before choosing (a tree search). The **Profiler** watches each opponent, keeps statistics on how they play, labels them with one of five playing styles and guesses their next move. The **Explainer** writes a short explanation for each bot move. The same four parts are used for fast games on the team's own rules engine and for real games on buddyboardgames.com, where the bots play through automated web browsers. In a recorded game, every bot move is saved to a database with the board before and after, the explanation and the time taken, so that the game can be replayed and analysed.
 
-The main results are as follows. Against bot opponents, the Profiler's first guess at the opponent's next move was right 87.8 % of the time, and the move was among its top three guesses 95.0 % of the time. A fixed guesser that never adapts scored 83.5 % and 93.5 %, and random guessing 17.2 % and 33.9 %. Five playing styles are defined. On new games played by five kinds of bot, the Profiler picked the intended style 46 % of the time. When styles that it tends to confuse are merged, leaving three broader groups, it picked the right group 71 % of the time. A rulebook reader looks up a fixed list of 19 rules in the team's own rulebook text file, and all 19 agree with the rules engine. This serves as a cross-check on the engine, where the rules the system plays by are written by hand. All 1,007 bot moves that were reviewed have an explanation. The system has played full games on the live website, including one that a person joined through an invite link. The main negative result is that giving the search the Profiler's guesses did not make it play better against bots. It won 98 % of its games against a blocking bot where plain search won 100 %, and in 20 games against plain search it won 10, lost 7 and drew 3, which is no clear difference. Testing it against people is left for future work. A separate study varied the weights of the move score and the number of players. Ignoring the floor penalty costs about 8 points a game at every table size, and the first-player token is worth about 3 points at four players and nothing at two. Setting its value by table size lifts the win rate of the greedy Tactician at four players from 23 % to 31 %.
+The main results are as follows. Against bot opponents, the Profiler's first guess at the opponent's next move was right 87.8 % of the time, and the move was among its top three guesses 95.0 % of the time. A fixed guesser that never adapts scored 83.5 % and 93.5 %, and random guessing 17.2 % and 33.9 %. Five playing styles are defined. On new games played by five kinds of bot, the Profiler picked the intended style 46 % of the time. When styles that it tends to confuse are merged, leaving three broader groups, it picked the right group 71 % of the time. A rulebook reader looks up a fixed list of 19 rules in the team's own rulebook text file, and all 19 agree with the rules engine. This serves as a cross-check on the engine, where the rules the system plays by are written by hand. All 1,007 bot moves that were reviewed have an explanation. The system has played full games on the live website, including one that a person joined through an invite link. The main negative result is that giving the search the Profiler's guesses did not make it play better against bots. It won 98 % of its games against a blocking bot where plain search won 100 %, and in 230 games between the two, plain search won 119, the Profiler version won 96 and 15 were level, so it did not do better. Testing it against people is left for future work. A separate study varied the weights of the move score and the number of players. Ignoring the floor penalty costs about 8 points a game at every table size, and the first-player token is worth about 3 points at four players and nothing at two. Setting its value by table size lifts the win rate of the greedy Tactician at four players from 23 % to 31 %.
 
 ---
 
@@ -508,9 +508,9 @@ Three bots each play the same fixed opponent, a greedy bot whose weights are set
 | mcts (400 playouts) | 50 | 50 | **100 %** | +17.7 | 784.5 |
 | mcts_profiled (400 playouts) | 50 | 49 | 98 % | +18.2 | 686.1 |
 
-In this run the average decision was not longer when the search consulted the opponent model (686 ms against 785 ms), so the timing difference is within the variation caused by the computer's load (Section 10.7). With a much smaller search (20 games, 50 playouts per move) the picture is the same: greedy 25 %, mcts 85 % (average margin +9.0), mcts_profiled 75 % (+6.8). When the two search bots played each other at 300 playouts per move over 20 games (seed 21), `mcts_profiled` won 10, lost 7 and drew 3. In the five-bot tournament (seed 11, Section 10.4), `mcts` beat `mcts_profiled` 7–1 with 2 ties. Over these 30 games between the two, `mcts` won 14, `mcts_profiled` won 11 and 5 were level.
+In this run the average decision was not longer when the search consulted the opponent model (686 ms against 785 ms), so the timing difference is within the variation caused by the computer's load (Section 10.7). With a smaller search (50 playouts per move, 200 games per bot over two sets of deals) the picture is the same: greedy 53.5 %, mcts 81.5 % (average margin +9.3), mcts_profiled 83.0 % (+9.3). When the two search bots played each other at 300 playouts per move, `mcts` won 119 games, `mcts_profiled` won 96 and 15 were level. These are 230 games: the 30 played between them in the tournament of Section 10.4 and 200 more, with the seat that moves first alternating.
 
-**What this shows.** Tree search already beats this opponent in every game or nearly every game, so the main test has no room to show an improvement. In the 30 games between the two search bots, neither version did clearly better (14 wins to 11, with 5 level), which could easily be chance with so few games. The idea that modelling the opponent improves play is therefore **not supported against bot opponents**. It is **untested against people**, and testing it on them is the first item of future work (Section 11).
+**What this shows.** At 400 playouts tree search already beats this opponent in nearly every game, so that test has no room to show an improvement. At 50 playouts there is room (about 82 % against 100 %), and the two search bots still did equally well. In the 230 games between them, `mcts_profiled` won 45 % of the games that had a winner (interval 38–51 %), and its average score margin was −0.8 ± 1.8 points. That is no gain, and at most a small disadvantage that cannot be told from chance. The idea that modelling the opponent improves play is therefore **not supported against bot opponents**. It is **untested against people**, and testing it on them is the first item of future work (Section 11).
 
 **Possible reasons, not yet tested.** Against the blocker, the opponent is a bot built from the same seven-part move score with different weights. The standard score on its own already predicts bots of this kind most of the time (83.5 % in Section 10.2, where the players were a blocking bot and a collecting bot with their own weight settings, not this exact opponent), so the Profiler's guess has little to add. That would explain the absence of a gain. In the direct games the opponent is itself a search bot, which the standard score describes less well, and there too the opponent model gave no clear gain. One difference in the code may matter there: the Profiler's guess is partly "every move equally likely" (Section 6.3), so the blended hint for opponent replies is less sharp than the plain one, and the search may spend more of its playouts on weak replies. Varying the 70/30 blend is the direct test of this second explanation (Section 11, item 1).
 
@@ -568,27 +568,27 @@ In summary, five styles are defined, and on bot play they fall into one clear gr
 
 ### 10.4 A3 — How strong are the Tacticians?
 
-Every Tactician played every other one 10 times, 100 games in all, with 300 playouts per move for the search bots. Ratings use the Elo system from chess (Elo, 1978), in which beating a higher-rated player raises a rating more than beating a lower-rated one. Every bot starts at 1200 and a rating moves by at most 32 points per game. With 40 games each the ratings are rough; the order is the useful part. W–L–T is wins, losses and ties.
+Every Tactician played every other one 30 times, 300 games in all, with 300 playouts per move for the search bots. Ratings use the Elo system from chess (Elo, 1978), in which beating a higher-rated player raises a rating more than beating a lower-rated one. Every bot starts at 1200 and a rating moves by at most 32 points per game. With 120 games each the ratings are fairly steady, but small differences between neighbours should not be over-read. W–L–T is wins, losses and ties.
 
 | Tactician | Elo | W–L–T | Win rate | Avg score |
 |---|---|---|---|---|
-| mcts | **1462** | 35–3–2 | 87.5 % | 56.0 |
-| mcts_profiled | 1347 | 30–8–2 | 75 % | 55.2 |
-| minimax (3 moves ahead) | 1204 | 18–21–1 | 45 % | 40.8 |
-| greedy | 1088 | 14–25–1 | 35 % | 46.6 |
-| random | 899 | 0–40–0 | 0 % | 0.3 |
+| mcts | **1654** | 106–11–3 | 88.3 % | 55.9 |
+| mcts_profiled | 1502 | 96–20–4 | 80 % | 53.4 |
+| minimax (3 moves ahead) | 1130 | 51–69–0 | 42.5 % | 39.9 |
+| greedy | 982 | 43–76–1 | 35.8 % | 47.9 |
+| random | 733 | 0–120–0 | 0 % | 0.7 |
 
-Both search bots beat random 10–0 and greedy 10–0. `mcts` beat minimax 8–2 and `mcts_profiled` beat it 9–1. Minimax against greedy was close, 5–4 with one tie. Minimax looks only three moves ahead, considers a limited set of replies and cannot see past the end of the round, which may be why it gains little over greedy. The tree search, which plays imagined games through the next deal, is the clear step up. Greedy beat random 10–0.
+Both search bots beat random 30–0. `mcts` beat greedy 30–0 and `mcts_profiled` beat it 28–1 with one tie. `mcts` beat minimax 28–2 and `mcts_profiled` beat it 29–1. In this set `mcts` beat `mcts_profiled` 18–9 with 3 ties (Section 10.1 pools these games with 200 more). Minimax beat greedy 18–12, a modest lead. Minimax looks only three moves ahead, considers a limited set of replies and cannot see past the end of the round, which may be why its lead over greedy is modest. The tree search, which plays imagined games through the next deal, is the clear step up. Greedy beat random 30–0.
 
-Search budget (`mcts` against greedy, 10 games per budget):
+Search budget (`mcts` against greedy, 30 games per budget):
 
-| Playouts per move | 25 | 50 | 100 | 200 | 400 | 800 |
-|---|---|---|---|---|---|---|
-| Win rate | 60 % | 100 % | 100 % | 100 % | 100 % | 100 % |
-| Avg margin | +2.3 | +12.8 | +14.2 | +15.1 | +10.4 | +24.2 |
-| Avg decision (ms) | 45.5 | 94.6 | 192.6 | 401.2 | 677.1 | 1464.0 |
+| Playouts per move | 10 | 25 | 50 | 100 | 200 | 400 | 800 |
+|---|---|---|---|---|---|---|---|
+| Win rate | 50 % | 83 % | 93 % | 97 % | 93 % | 93 % | 97 % |
+| Avg margin | +0.6 | +10.0 | +14.9 | +13.3 | +13.2 | +19.1 | +16.5 |
+| Avg decision (ms) | 20.7 | 55.2 | 111.3 | 229.7 | 456.8 | 825.6 | 1357.3 |
 
-With 25 playouts the search wins only 6 games in 10. From 50 upwards it won every game, so this test cannot tell the larger budgets apart. With 10 games each the average margins are noisy, and each budget played its own ten deals, so the columns are not like-for-like. The default for live play is 300 playouts. In the recorded games of Section 10.7 that took a median of about 790–890 ms. That rerun was done on a computer that was also running other programs, and another run of the same code on a quieter computer gave about 135–155 ms, well under the 430–650 ms the website takes to respond (Section 8.5). Timings should be read with that in mind.
+With 10 playouts the search wins half its games, and with 25 playouts 25 of 30. From 50 playouts upward it wins 28 or 29 of 30. The differences between those budgets are within what chance produces with 30 games, so more than about 50 to 100 playouts gave no measurable gain against greedy. The average margins are noisy, and each budget played its own thirty deals, so the columns are not like-for-like. The default for live play is 300 playouts, which this result suggests is more than greedy requires; stronger opponents may need more. In the recorded games of Section 10.7 that took a median of about 790–890 ms. That rerun was done on a computer that was also running other programs, and another run of the same code on a quieter computer gave about 135–155 ms, well under the 430–650 ms the website takes to respond (Section 8.5). Timings should be read with that in mind.
 
 ### 10.5 A5 — Rulebook check
 
@@ -707,7 +707,7 @@ Scores rise from two to three players and then stay level. Players lose about fi
 | 3 | 54 % | 46–62 % | 33 % | 1.6 | 60.6 vs 57.1 | 157 ms |
 | 4 | 41 % | 36–45 % | 25 % | 1.6 | 59.7 vs 57.2 | 260–300 ms |
 
-The search wins about 1.6 to 1.7 times its fair share at every table size. Its win rate falls with more players only because a fair share falls. A decision takes about three times as long with four players as with two. The times were measured while several runs shared the computer, so they are on the high side. A first, smaller run of 24 games with four players showed 25 %, which looked as if the advantage had disappeared. The larger run shows it had not, and 25 % was chance (the margin of error for 24 games was 12–45 %). The 83 % with two players agrees with Section 10.4, where `mcts` won all 10 of its games against greedy at 50 playouts. Greedy beat random in all 300 games at every table size, so those games carry no information.
+The search wins about 1.6 to 1.7 times its fair share at every table size. Its win rate falls with more players only because a fair share falls. A decision takes about three times as long with four players as with two. The times were measured while several runs shared the computer, so they are on the high side. A first, smaller run of 24 games with four players showed 25 %, which looked as if the advantage had disappeared. The larger run shows it had not, and 25 % was chance (the margin of error for 24 games was 12–45 %). The 83 % with two players agrees with Section 10.4, where `mcts` won 28 of its 30 games against greedy at 50 playouts (93 %, interval 79–98 %). Greedy beat random in all 300 games at every table size, so those games carry no information.
 
 ### 10.10 Summary of evidence
 
@@ -717,13 +717,13 @@ The search wins about 1.6 to 1.7 times its fair share at every table size. Its w
 | Bot moves are legal | Every bot move is checked by the Validator before it is played |
 | Opponents' moves can be predicted | 87.8 % top-1 against 83.5 % for a fixed guesser and 17.2 % for random guessing, on bot opponents; the lead grows late in the game |
 | Opponents can be given a playing style | Five styles defined; on new bot games 46 % for the exact style and 71 % for one of three merged groups; one human game profiled live |
-| The search plays well | Compared with the project's own baselines: mcts 1462 > mcts_profiled 1347 > minimax 1204 > greedy 1088 > random 899 |
+| The search plays well | Compared with the project's own baselines: mcts 1654 > mcts_profiled 1502 > minimax 1130 > greedy 982 > random 733 |
 | Moves are explained and can be reviewed | Every reviewed bot move has an explanation, saved with the numbers behind it; any recorded game can be replayed |
 | The system plays on the live website | Three games on the live site, one with a human who joined by invite link |
 | The move score's weights matter, and by table size | Ignoring the floor costs about 8 points and a points-only player 2–4, at every size; the first-player token is worth +3.3 points at four players and nothing at two (Section 10.8) |
 | The greedy player can be improved from these results | Against greedy opponents, setting the first-player weight by table size raises the four-player win rate from 23 % to 31 %, and the best combination of the new parts to 34 %. Three further ideas gave nothing, and against minimax and MCTS opponents the samples were too small to tell (Section 10.8) |
 | Search keeps its edge at larger tables | `mcts` wins 83 %, 54 % and 41 % of two-, three- and four-player games against greedy, 1.6–1.7 times a fair share each time (Section 10.9) |
-| Modelling the opponent improves play | **Not shown** against bots (98 % vs 100 %; 10 wins, 7 losses and 3 draws head-to-head). Testing against people is future work |
+| Modelling the opponent improves play | **Not shown** against bots (98 % vs 100 %; 96 wins to 119 head-to-head over 230 games, 15 level). Testing against people is future work |
 
 ---
 
@@ -790,7 +790,7 @@ The ISS capstone brief asks for an intelligent system that applies at least one 
 **Lessons about the problem.**
 
 1. *Seeing everything does not make an opponent easy to exploit.* Guessing a bot's next move was easy (88 % top-1). Using that guess to play better was not. The standard move score already predicted these bots well, which may be why the search that used the opponent model showed no gain in A1. The team learned to treat the choice of test opponents as part of the method.
-2. *A negative result is still a result.* The team expected the search that used the opponent model to win. It did not: plain search was already winning every game against the test opponent, and in direct games neither version did clearly better. Reporting this was more useful than tuning until a number looked good.
+2. *A negative result is still a result.* The team expected the search that used the opponent model to win. It did not: plain search was already winning every game against the test opponent, and in direct games the opponent-model version did no better (96 wins to 119, with 15 level). Reporting this was more useful than tuning until a number looked good.
 3. *The number of choices is a poor measure of difficulty.* The proposal estimated 100–180 move combinations per turn (factories × colours × pattern lines, leaving out the floor). Counting legal moves gave 23–43 on average. The framing was corrected: random deals, long-term scoring and unknown intentions are the real difficulty.
 
 **Lessons about building the system.**
@@ -841,10 +841,10 @@ tiles experiment run prediction_accuracy  --param games=50 --param seed=11
 tiles experiment run archetype_discovery  --param games_per_preset=20 --param seed=11   # the games the signatures came from
 tiles experiment run archetype_discovery  --param games_per_preset=20 --param seed=12   # new games
 tiles experiment run profiler_ablation    --param games=50 --param simulations=400 --param seed=11
-tiles experiment run profiler_ablation    --param games=20 --param simulations=50  --param seed=21
-tiles experiment run tournament           --param games_per_pair=10 --param simulations=300 --param seed=11
-tiles experiment run tournament           --param entrants=mcts,mcts_profiled --param games_per_pair=20 --param simulations=300 --param seed=21
-tiles experiment run search_budget_sweep  --param budgets=25,50,100,200,400,800 --param games_per_budget=10 --param seed=11
+tiles experiment run profiler_ablation    --param games=100 --param simulations=50 --param seed=41000   # and again with seed=41100
+tiles experiment run tournament           --param games_per_pair=30 --param simulations=300 --param seed=51000
+tiles experiment run tournament           --param entrants=mcts,mcts_profiled --param games_per_pair=50 --param simulations=300 --param seed=31000   # also seeds 31100, 31200, 31300
+tiles experiment run search_budget_sweep  --param budgets=10,25,50,100,200,400,800 --param games_per_budget=30 --param seed=61000
 # these two summarise games already in the database. The figures in Sections 10.6 and 10.7 use 16 games played with
 #   tiles play --player P1=<tactician> --player P2=<tactician> [--player P3=...] --seed <n> --db db/tiles.db
 # (default Profiler and Explainer; mcts and mcts_profiled use 300 playouts) with these players in seat order:
@@ -864,7 +864,7 @@ tiles experiment run player_count_scaling --param tactician=mcts --param opponen
 tiles live --room tiles-demo --player Athena=mcts_profiled --player You=human --headed --db db/tiles.db
 ```
 
-The same experiments can be started from the Experiments page, which shows the results and exports them as JSON. The first nine commands take about 25 minutes on a laptop. The commands for A8 and A9 are examples: the tables in Sections 10.8 and 10.9 pool several runs with other seeds and lists of versions, and the runs against mcts opponents take much longer (hours for the larger samples). The experiments that play games give the same game outcomes each time for the same seed, though timings vary. The two database summaries depend on which games are in the database. A few figures in this report do not come from these commands: the legal-move counts in Section 1.1, the three-group row in Section 10.3 and the live games in Section 8.5.
+The same experiments can be started from the Experiments page, which shows the results and exports them as JSON. The commands before the heuristic block take about two hours in total on a laptop, of which the 30-game tournament is about an hour. The commands for A8 and A9 are examples: the tables in Sections 10.8 and 10.9 pool several runs with other seeds and lists of versions, and the runs against mcts opponents take much longer (hours for the larger samples). The experiments that play games give the same game outcomes each time for the same seed, though timings vary. The two database summaries depend on which games are in the database. A few figures in this report do not come from these commands: the legal-move counts in Section 1.1, the three-group row in Section 10.3 and the live games in Section 8.5.
 
 ## Appendix B — API summary
 

@@ -2,10 +2,10 @@
 
     python scripts/recompute_from_csv.py <folder holding the 10.x subfolders>
 
-Prints the figures of Sections 10.3, 10.4, 10.8 and 10.9 of docs/FINAL_REPORT.md
+Prints the figures of Sections 10.1, 10.3, 10.4, 10.8 and 10.9 of docs/FINAL_REPORT.md
 that are not stored in a table file, so that anyone with the CSVs can check
-them. Sections 10.1, 10.2, 10.5, 10.6 and 10.7 are read straight from the
-table files and need no calculation.
+them. Sections 10.2, 10.5, 10.6 and 10.7, and the other tables of 10.1 and
+10.4, are read straight from the table files and need no calculation.
 
 Method
 ------
@@ -103,21 +103,44 @@ def main(root: str) -> None:
                         hit += sum(int(r[l]) for l in labels)
             print(f"seed 12: right one of three groups {hit}/{total} = {hit / total:.0%}")
 
-    print("\n## 10.4 Head-to-head totals (from the tournament game files)")
-    for name in ("tournament_five_tacticians", "tournament_mcts_pair"):
-        tally = collections.defaultdict(lambda: [0, 0, 0])
-        for r in rows(root / "10.4_tactician_strength" / f"{name}__games.csv.gz"):
-            a, b = sorted((r["first"], r["second"]))
-            w = r["winner"]
-            tally[(a, b)][2 if w == "tie" else (0 if w == a else 1)] += 1
-        for (a, b), (wa, wb, t) in sorted(tally.items()):
-            print(f"{name}: {a} {wa} - {wb} {b} ({t} level)")
-    pair = [0, 0, 0]
-    for name in ("tournament_five_tacticians", "tournament_mcts_pair"):
-        for r in rows(root / "10.4_tactician_strength" / f"{name}__games.csv.gz"):
-            if {r["first"], r["second"]} == {"mcts", "mcts_profiled"}:
-                pair[2 if r["winner"] == "tie" else (0 if r["winner"] == "mcts" else 1)] += 1
-    print(f"mcts vs mcts_profiled over both sets: mcts {pair[0]}, mcts_profiled {pair[1]}, level {pair[2]}")
+    print("\n## 10.1 Profiler ablation at 50 playouts, 200 games per bot")
+    d = root / "10.1_profiler_ablation"
+    for r in rows(d / "ablation_50_playouts_200_games__conditions_subject_vs_fixed_blocker.csv.gz"):
+        n, w = int(r["games"]), int(r["wins"])
+        lo, hi = wilson(w, n)
+        margins = [float(player(g, "subject")["score"]) - float(player(g, "blocker")["score"])
+                   for g in games(d / "ablation_50_playouts_200_games.csv.gz")[r["condition"]]]
+        print(f"{r['condition']}: {w}/{n} = {w / n:.1%} [{lo:.0%}-{hi:.0%}], margin {pm(margin(margins))}")
+
+    print("\n## 10.1 and 10.4 mcts against mcts_profiled")
+    t = root / "10.4_tactician_strength"
+    sets = {"tournament, 30 games": [r for r in rows(t / "tournament_30_games_per_pair__games.csv.gz")
+                                     if {r["first"], r["second"]} == {"mcts", "mcts_profiled"}],
+            "head-to-head, 200 games": rows(d / "head_to_head_mcts_vs_mcts_profiled_200_games__games.csv.gz")}
+    total = [0, 0, 0]
+    diffs = []
+    for name, rs in sets.items():
+        c = [0, 0, 0]
+        for r in rs:
+            k = 2 if r["winner"] == "tie" else (0 if r["winner"] == "mcts" else 1)
+            c[k] += 1
+            total[k] += 1
+            sa, sb = (int(x) for x in r["score"].split("-"))
+            diffs.append((sb - sa) if r["first"] == "mcts" else (sa - sb))
+        print(f"{name}: mcts {c[0]}, mcts_profiled {c[1]}, level {c[2]}")
+    decided = total[0] + total[1]
+    lo, hi = wilson(total[1], decided)
+    print(f"pooled {sum(total)} games: mcts {total[0]}, mcts_profiled {total[1]}, level {total[2]}; "
+          f"mcts_profiled won {total[1] / decided:.1%} of decided games [{lo:.0%}-{hi:.0%}]; "
+          f"its score margin {pm(margin(diffs))}")
+
+    print("\n## 10.4 Head-to-head totals (30 games per pair)")
+    tally = collections.defaultdict(lambda: [0, 0, 0])
+    for r in rows(t / "tournament_30_games_per_pair__games.csv.gz"):
+        a, b = sorted((r["first"], r["second"]))
+        tally[(a, b)][2 if r["winner"] == "tie" else (0 if r["winner"] == a else 1)] += 1
+    for (a, b), (wa, wb, lv) in sorted(tally.items()):
+        print(f"{a} {wa} - {wb} {b} ({lv} level)")
 
     h = root / "10.8_heuristics"
     print("\n## 10.8 Points gained or lost against the baseline (paired, ± margin of error)")
