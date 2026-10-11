@@ -47,6 +47,11 @@ TACTICIANS: Dict[str, Callable[..., Tactician]] = {
 
 
 def make_tactician(name: str, **kwargs) -> Tactician:
+    if name.startswith("style_"):
+        # Opponents with habits the Profiler's model cannot describe (see styles.py).
+        from .styles import make_style_tactician
+
+        return make_style_tactician(name[len("style_"):], **kwargs)
     try:
         factory = TACTICIANS[name]
     except KeyError:

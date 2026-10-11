@@ -29,6 +29,7 @@ ALL_KINDS = {
     "xai_coverage",
     "heuristic_comparison",
     "player_count_scaling",
+    "opponent_styles",
 }
 
 TINY_PARAMS = {
@@ -42,6 +43,7 @@ TINY_PARAMS = {
     "xai_coverage": {},
     "heuristic_comparison": {"variants": "baseline,floor_averse", "games_per_variant": 2},
     "player_count_scaling": {"games_per_setting": 2, "player_counts": "2,3"},
+    "opponent_styles": {"styles": "noisy", "games_per_cell": 2, "simulations": 10, "prediction_games": 1},
 }
 
 RESULT_KEYS = {"summary", "metrics", "tables", "series", "raw"}

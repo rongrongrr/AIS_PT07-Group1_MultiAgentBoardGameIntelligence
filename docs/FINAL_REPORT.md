@@ -7,7 +7,7 @@
 
 TILES (Transparent Intelligence for Learning, Exploration and Simulation) is a system that plays Azul and tries to take the opponent's habits into account. Azul is a board game in which nothing is hidden: every tile and every player's board is visible to everyone. What a player cannot see is how the opponent likes to play, for example whether they block, take risks or build quietly. TILES is built from four parts, called agents. The **Validator** checks that a move is legal. The **Tactician** chooses a move, and comes in five versions that range from random play to one that tries out many possible continuations before choosing (a tree search). The **Profiler** watches each opponent, keeps statistics on how they play, labels them with one of five playing styles and guesses their next move. The **Explainer** writes a short explanation for each bot move. The same four parts are used for fast games on the team's own rules engine and for real games on buddyboardgames.com, where the bots play through automated web browsers. In a recorded game, every bot move is saved to a database with the board before and after, the explanation and the time taken, so that the game can be replayed and analysed.
 
-The main results are as follows. Against bot opponents, the Profiler's first guess at the opponent's next move was right 87.8 % of the time, and the move was among its top three guesses 95.0 % of the time. A fixed guesser that never adapts scored 83.5 % and 93.5 %, and random guessing 17.2 % and 33.9 %. Five playing styles are defined. On new games played by five kinds of bot, the Profiler picked the intended style 46 % of the time. When styles that it tends to confuse are merged, leaving three broader groups, it picked the right group 71 % of the time. A rulebook reader looks up a fixed list of 19 rules in the team's own rulebook text file, and all 19 agree with the rules engine. This serves as a cross-check on the engine, where the rules the system plays by are written by hand. All 1,007 bot moves that were reviewed have an explanation. The system has played full games on the live website, including one that a person joined through an invite link. The main negative result is that giving the search the Profiler's guesses did not make it play better against bots. It won 98 % of its games against a blocking bot where plain search won 100 %, and in 230 games between the two, plain search won 119, the Profiler version won 96 and 15 were level, so it did not do better. Testing it against people is left for future work. A separate study varied the weights of the move score and the number of players. Ignoring the floor penalty costs about 8 points a game at every table size, and the first-player token is worth about 3 points at four players and nothing at two. Setting its value by table size lifts the win rate of the greedy Tactician at four players from 23 % to 31 %.
+The main results are as follows. Against bot opponents, the Profiler's first guess at the opponent's next move was right 87.8 % of the time, and the move was among its top three guesses 95.0 % of the time. A fixed guesser that never adapts scored 83.5 % and 93.5 %, and random guessing 17.2 % and 33.9 %. Five playing styles are defined. On new games played by five kinds of bot, the Profiler picked the intended style 46 % of the time. When styles that it tends to confuse are merged, leaving three broader groups, it picked the right group 71 % of the time. A rulebook reader looks up a fixed list of 19 rules in the team's own rulebook text file, and all 19 agree with the rules engine. This serves as a cross-check on the engine, where the rules the system plays by are written by hand. All 1,007 bot moves that were reviewed have an explanation. The system has played full games on the live website, including one that a person joined through an invite link. The main negative result is that giving the search the Profiler's guesses did not make it play better against bots. It won 98 % of its games against a blocking bot where plain search won 100 %, and in 230 games between the two, plain search won 119, the Profiler version won 96 and 15 were level, so it did not do better. It also gave no gain against four opponents with habits outside its model, where its guesses were a little less often right than a fixed guesser (70 to 89 % against 78 to 91 %). A second predictor that also learns colour, centre and row habits predicted one of them better than the fixed guesser, but did not improve play. Testing it against people is left for future work. A separate study varied the weights of the move score and the number of players. Ignoring the floor penalty costs about 8 points a game at every table size, and the first-player token is worth about 3 points at four players and nothing at two. Setting its value by table size lifts the win rate of the greedy Tactician at four players from 23 % to 31 %.
 
 ---
 
@@ -83,7 +83,7 @@ flowchart LR
   API["Web server (FastAPI)<br/>26 endpoints"]
   MR["Local game runner"]
   LS["Live game runner<br/>one browser per bot"]
-  EX["Experiment runner<br/>10 experiments"]
+  EX["Experiment runner<br/>11 experiments"]
   subgraph Turn["Turn procedure (TurnPipeline)"]
     V["Validator<br/>checks the move is legal"]
     T["Tactician<br/>chooses a move"]
@@ -107,13 +107,13 @@ TILES has six main pieces.
 - A **web server** (FastAPI; Ramírez, n.d.) that starts and stops games and experiments and pushes live updates to the browser.
 - Two **game runners**. The local runner plays a game entirely on the team's rules engine. The live runner plays on buddyboardgames.com and controls one web browser per bot.
 - The **turn procedure**, a single piece of code (`TurnPipeline`) that both runners call for every bot move. It calls the four agents in a fixed order.
-- An **experiment runner** that runs any of ten predefined experiments in the background.
+- An **experiment runner** that runs any of eleven predefined experiments in the background.
 - A **database**, a single SQLite file that the code calls the ledger, where games, moves and experiment results are stored.
 
 ### 2.2 Design principles
 
 1. **The project has its own rules engine.** The code in `tiles/core/` decides what is legal, how a move changes the board and how a round is scored. Local games and all experiments run on it alone. In a live game the website deals the tiles, keeps the score and has the last word on every move; the engine is used to check a bot's move before it is sent, to look ahead, and to work out what a human player did.
-2. **The agents can be swapped.** The Tactician, Profiler and Explainer are each defined by a small common interface (`tiles/agents/base.py`) and looked up by name. A new version can be added by registering it under a name, without changing the game runners, the server or the web pages. For the web pages to show a description and a settings form for it, it also needs an entry in `tiles/agents/catalog.py`. There are five Tacticians, one Profiler and two Explainers. The Validator is a single fixed class.
+2. **The agents can be swapped.** The Tactician, Profiler and Explainer are each defined by a small common interface (`tiles/agents/base.py`) and looked up by name. A new version can be added by registering it under a name, without changing the game runners, the server or the web pages. For the web pages to show a description and a settings form for it, it also needs an entry in `tiles/agents/catalog.py`. In the application there are five Tacticians, one Profiler and two Explainers. A second predictor, used only in one experiment, is described in Section 6.5. The Validator is a single fixed class.
 3. **Explanations are built from recorded numbers.** When a Tactician picks a move it also returns a short list of the moves it considered and their scores. The Explainer writes its text from that list, and the list is saved with the move so that the two can be compared later (Section 7.4).
 4. **Recorded games keep every turn.** Each bot turn produces one record holding the board before and after, the move, the result of the legality check, the explanation, the opponent profiles and the timings. Games started from the web interface are always saved. Games started from the command line are saved when a database is named. The games played inside experiments are not saved move by move; only the experiment's summary result is stored, in the same database.
 
@@ -164,7 +164,7 @@ Each bot seat has its own Tactician. A human seat has none. Each game has one Va
 | Monitor | The live board, the list of moves grouped by round with timings, round summaries, a system log, the room name and invite link (live games), and the explanation panel |
 | Replay | Step through or auto-play any recorded game with the same board and explanation panel; export it as JSON |
 | Profiles | Run the Profiler over a recorded game: playing style and confidence, nine traits, which colours, sources and rows the player used, score over time, and how the style label changed move by move |
-| Experiments | Start any of the ten experiments with chosen settings, watch progress, read the summary, numbers, tables and charts, export as JSON |
+| Experiments | Start any of the eleven experiments with chosen settings, watch progress, read the summary, numbers, tables and charts, export as JSON |
 | Rulebook | Browse the rulebook, search it, and see the extracted rules and whether each agrees with the engine |
 | Agents | A diagram of the steps of a turn showing which agent handles each, and a list of the Validator and the available Tacticians, Profilers and Explainers with their settings |
 
@@ -207,7 +207,7 @@ In a live game there is a second, separate safeguard. The website can itself ref
 
 ### 3.5 Testing
 
-The engine tests play full random games with 2, 3 and 4 players and check after every move and every deal that all 100 tiles are still accounted for. Separate tests cover scoring, wall tiling, floor penalties, bonuses and the end of the game. There are 16 engine tests in `tests/test_rules.py`. Across the whole project there are 147 backend test cases and 137 frontend test cases (the frontend tests cover the web pages and components); some tests run several times with different inputs, and each run counts as one case.
+The engine tests play full random games with 2, 3 and 4 players and check after every move and every deal that all 100 tiles are still accounted for. Separate tests cover scoring, wall tiling, floor penalties, bonuses and the end of the game. There are 16 engine tests in `tests/test_rules.py`. Across the whole project there are 176 backend test cases and 137 frontend test cases (the frontend tests cover the web pages and components); some tests run several times with different inputs, and each run counts as one case.
 
 ---
 
@@ -292,6 +292,10 @@ The greedy Tactician rates every legal move with the seven-part score in Section
 
 The first four are components with their own weights, calculated only when a weight is given. The two settings are available when a session is created. Results are in Section 10.8.
 
+### 5.6 Opponents with habits outside the model (`styles.py`)
+
+The Profiler describes a player by seven weights on the parts of the move score. All the opponents in Sections 10.1 to 10.4 are built from those same parts, so the model can in principle describe them exactly. To test the opponent model against players it cannot describe exactly, four extra opponents are used. Each plays like `greedy` but adds one habit that is not one of the seven parts: `colour_loyal` favours blue and then red, `centre_averse` avoids taking from the centre, `low_rows` likes the two shortest pattern lines and avoids the two longest, and `noisy` plays a random move one time in four. They are used only in the experiment `opponent_styles` (Section 10.1) and are not offered as Tacticians in the web interface.
+
 ---
 
 ## 6. Opponent modelling and profiling
@@ -341,6 +345,10 @@ The predictor's output is a probability for every legal move, not a single move.
 ### 6.4 Profile Analyzer (`profiler/analysis.py`)
 
 Any recorded game can be run through the Profiler again afterwards (`POST /api/profiles/{id}/analyze`). The result is each player's final profile, some descriptive statistics (which colours, sources and rows they used, and their score over time) and the style label after each move, which the Profiles page draws as a timeline. The same code handles human moves recorded in live games (Section 8.3).
+
+### 6.5 An extended predictor that learns habits (`profiler/habits.py`)
+
+The predictor in Section 6.3 describes a player only by the seven weights on the move score. A second version, used only in the experiment `opponent_styles` (Section 10.1) and not offered in the application, adds twelve habit features: one for each colour, one for taking from the centre, one for each pattern line and one for the floor. The habit weights start at zero. After each wrong guess they move by a fixed step of 0.25: up for the habits of the move that was played and down for those of the move that was guessed. The original seven weights are updated as before but with a smaller step (0.1 instead of 0.8), so that the habit weights explain departures from the default score. The step sizes were chosen from a small set of values on 30 separate games per opponent, not the games reported in Section 10.1. Larger habit steps, and an update after every move instead of after wrong guesses, did worse.
 
 ---
 
@@ -471,7 +479,7 @@ Every bot move records how long it took to decide, to check and to explain, and 
 
 ### 9.3 Experiments (`experiments/`)
 
-Ten experiments are defined.
+Eleven experiments are defined.
 
 | Name in the code | The question it answers | Results |
 |---|---|---|
@@ -485,10 +493,11 @@ Ten experiments are defined.
 | `latency_profile` | How long do moves take? | Section 10.7 |
 | `heuristic_comparison` | Which parts of the move score matter, and does it depend on the number of players? | Section 10.8 |
 | `player_count_scaling` | How does play change with two, three and four players? | Section 10.9 |
+| `opponent_styles` | Does the opponent model help against opponents it cannot describe exactly? | Section 10.1 |
 
 Each has a form for its settings and returns its result in the same layout (a summary sentence, headline numbers, tables and chart data), so the Experiments page can display any of them. They run in the background and show progress, and they can be started from the web page or from the command line (`tiles experiment run <kind> --param k=v --output file.json`). Results can be saved in the database and exported as JSON.
 
-The first five play new games from a fixed random seed, so running them again with the same settings gives the same game outcomes (timings will differ), and they can be stopped early. The two added later, `heuristic_comparison` and `player_count_scaling`, work the same way, and every game they play saves the same figures for every player (Section 10.8). The three older experiments that play full games (`profiler_ablation`, `tournament` and `search_budget_sweep`) save the same per-game figures in their result file as well. Three of the first five (`profiler_ablation`, `tournament` and `search_budget_sweep`) play through the local game runner and the turn procedure, and so do the two added later. The other two (`prediction_accuracy` and `archetype_discovery`) use a shorter loop of their own that calls the Tactician, the rules engine and the Profiler directly, with no Validator step, no explanation and no turn record. `rule_extraction` runs the check in Section 4. `xai_coverage` and `latency_profile` summarise whatever games are already in the database, so their numbers depend on which games have been played.
+The first five play new games from a fixed random seed, so running them again with the same settings gives the same game outcomes (timings will differ), and they can be stopped early. The three added later, `heuristic_comparison`, `player_count_scaling` and `opponent_styles`, work the same way, and every game they play saves the same figures for every player (Section 10.8). The three older experiments that play full games (`profiler_ablation`, `tournament` and `search_budget_sweep`) save the same per-game figures in their result file as well. Three of the first five (`profiler_ablation`, `tournament` and `search_budget_sweep`) play through the local game runner and the turn procedure, and so do the three added later. The other two (`prediction_accuracy` and `archetype_discovery`) use a shorter loop of their own that calls the Tactician, the rules engine and the Profiler directly, with no Validator step, no explanation and no turn record. `rule_extraction` runs the check in Section 4. `xai_coverage` and `latency_profile` summarise whatever games are already in the database, so their numbers depend on which games have been played.
 
 Results of the opponent-model comparison can also be sent to MLflow (MLflow, n.d.), a tool that keeps a log of experiment runs, or to a text file. This logging is off by default when the comparison is run as an experiment. The older direct command `tiles ablate` has it on by default: it uses MLflow if that is installed and otherwise appends to a file called `experiments.jsonl`.
 
@@ -513,6 +522,30 @@ In this run the average decision was not longer when the search consulted the op
 **What this shows.** At 400 playouts tree search already beats this opponent in nearly every game, so that test has no room to show an improvement. At 50 playouts there is room (about 82 % against 100 %), and the two search bots still did equally well. In the 230 games between them, `mcts_profiled` won 45 % of the games that had a winner (interval 38–51 %), and its average score margin was −0.8 ± 1.8 points. That is no gain, and at most a small disadvantage that cannot be told from chance. The idea that modelling the opponent improves play is therefore **not supported against bot opponents**. It is **untested against people**, and testing it on them is the first item of future work (Section 11).
 
 **Possible reasons, not yet tested.** Against the blocker, the opponent is a bot built from the same seven-part move score with different weights. The standard score on its own already predicts bots of this kind most of the time (83.5 % in Section 10.2, where the players were a blocking bot and a collecting bot with their own weight settings, not this exact opponent), so the Profiler's guess has little to add. That would explain the absence of a gain. In the direct games the opponent is itself a search bot, which the standard score describes less well, and there too the opponent model gave no clear gain. One difference in the code may matter there: the Profiler's guess is partly "every move equally likely" (Section 6.3), so the blended hint for opponent replies is less sharp than the plain one, and the search may spend more of its playouts on weak replies. Varying the 70/30 blend is the direct test of this second explanation (Section 11, item 1).
+
+**Opponents the model cannot describe exactly.** The first reason suggests testing opponents that are not built from the same move score. The experiment `opponent_styles` (Section 5.6) does this with four opponents, each with a habit outside the model. Plain `mcts` and `mcts_profiled` each played 150 games against each opponent, at 25 playouts per move so that the search does not win every game, and both bots were dealt the same games. The table shows how often each bot won, the difference between the two bots (`mcts_profiled` minus `mcts`) with its margin of error, and how often the Profiler's first guess at the opponent's next move was right, next to a fixed guesser that does not adapt (the default move score).
+
+| Opponent | `mcts` wins | `mcts_profiled` wins | Difference in wins per 100 games | Difference in average margin (points) | Profiler's first guess right | Fixed guesser's first guess right |
+|---|---|---|---|---|---|---|
+| `colour_loyal` | 90.7 % | 89.0 % | −1.7 ± 5.7 | −2.3 ± 3.0 | 75.9 % | 78.4 % |
+| `centre_averse` | 87.0 % | 83.7 % | −3.3 ± 6.8 | −2.4 ± 3.1 | 86.8 % | 89.3 % |
+| `low_rows` | 81.0 % | 80.3 % | −0.7 ± 7.4 | −1.1 ± 2.8 | 88.5 % | 90.6 % |
+| `noisy` | 96.7 % | 97.3 % | +0.7 ± 3.9 | +2.0 ± 3.2 | 70.0 % | 78.1 % |
+| All four | | | −1.2 ± 3.0 | −0.9 ± 1.5 | | |
+
+The opponent model gave no gain against any of the four, and every difference is within its margin of error. The Profiler's first guess was also right less often than the fixed guesser for all four opponents, by 2 to 3 points for three of them and by 8 points for `noisy`. With about 1,300 guesses per opponent the 8-point gap is clearly larger than chance, and the smaller gaps are small. Against the greedy bots of Section 10.2, which are made of the seven parts, the Profiler was 4 points better than the fixed guesser, so the model helps when the opponent fits it and can slightly hurt when it does not. A likely reason, not tested, is that a model with only seven weights adjusts to the wrong features when the real habit lies elsewhere. Taken with the 230 direct games, these tests give no evidence that the opponent model improves play against bots, including bots it cannot describe exactly. The opponents here are artificial and simple, and the games are two-player games with a small search, so this does not settle the question for people.
+
+**A model that can learn the habits.** The explanation above suggests giving the model a way to describe such habits. The extended predictor of Section 6.5 was run on the same opponents, the same games and the same deals. Plain `mcts` is unaffected by the Profiler, so its results are unchanged.
+
+| Opponent | Default Profiler's first guess right | Extended Profiler's first guess right | Fixed guesser's first guess right | Difference in wins per 100 games, extended | Difference in average margin (points), extended |
+|---|---|---|---|---|---|
+| `colour_loyal` | 75.9 % | 80.8 % | 78.4 % | −3.0 ± 6.7 | −2.4 ± 3.2 |
+| `centre_averse` | 86.8 % | 86.8 % | 89.3 % | −7.0 ± 6.7 | −3.0 ± 2.9 |
+| `low_rows` | 88.5 % | 88.5 % | 90.6 % | −5.7 ± 7.9 | −2.3 ± 2.9 |
+| `noisy` | 70.0 % | 70.8 % | 78.1 % | +1.3 ± 3.7 | +3.4 ± 3.4 |
+| All four | | | | −3.6 ± 3.2 | −1.1 ± 1.6 |
+
+The extended predictor learned the favourite colour: its first guess was right 80.8 % of the time, against 75.9 % for the default predictor and 78.4 % for the fixed guesser. For the other three opponents it was no better than the default predictor and still below the fixed guesser. Better prediction against `colour_loyal` did not give better play: `mcts_profiled` won 132 of 150 games there against 136 for plain `mcts`. Over the four opponents the win rate with the opponent model was 3.6 ± 3.2 points per 100 games lower than without it, which is just beyond the margin of error, and the average margin was 1.1 ± 1.6 points lower, which is within it. So the richer model improved prediction for one habit and did not improve play against any of the four opponents, and there is a hint that the opponent model lowers the win rate slightly. A possible reason, not tested, is that these opponents are built from the same move score as the fixed guesser, which therefore repeats their tie-breaking exactly and is hard to beat.
 
 ### 10.2 A2 — How well does the Profiler guess the next move?
 
@@ -723,14 +756,14 @@ The search wins about 1.6 to 1.7 times its fair share at every table size. Its w
 | The move score's weights matter, and by table size | Ignoring the floor costs about 8 points and a points-only player 2–4, at every size; the first-player token is worth +3.3 points at four players and nothing at two (Section 10.8) |
 | The greedy player can be improved from these results | Against greedy opponents, setting the first-player weight by table size raises the four-player win rate from 23 % to 31 %, and the best combination of the new parts to 34 %. Three further ideas gave nothing, and against minimax and MCTS opponents the samples were too small to tell (Section 10.8) |
 | Search keeps its edge at larger tables | `mcts` wins 83 %, 54 % and 41 % of two-, three- and four-player games against greedy, 1.6–1.7 times a fair share each time (Section 10.9) |
-| Modelling the opponent improves play | **Not shown** against bots (98 % vs 100 %; 96 wins to 119 head-to-head over 230 games, 15 level). Testing against people is future work |
+| Modelling the opponent improves play | **Not shown** against bots (98 % vs 100 %; 96 wins to 119 head-to-head over 230 games, 15 level; no gain against four opponents with habits outside its model, including with a predictor that learns such habits). Testing against people is future work |
 
 ---
 
 ## 11. Limitations and future work
 
-1. **Opponent-aware play against people.** Human players can already join live games and have their moves recorded. The next step is to run the comparison in Section 10.1 against people, which needs a set of recorded human games (30–50 would be a reasonable target), willing participants, and a way to compare the two search bots against the same people. If there is still no gain, the first things to adjust are the 70/30 blend and the predictor's settings, and after that a richer opponent model trained on recorded games.
-2. **An opponent model that carries over between games.** The model keeps seven weights per opponent, describes a player in terms of the project's own move score, and starts fresh each game. Carrying what is learned about a returning player from one game to the next is a natural extension, as is a model with more ways to describe a player.
+1. **Opponent-aware play against people.** Human players can already join live games and have their moves recorded. Against bots with habits outside the model the opponent model also gave no gain (Section 10.1), so people are the remaining test. The next step is to run the comparison in Section 10.1 against people, which needs a set of recorded human games (30–50 would be a reasonable target), willing participants, and a way to compare the two search bots against the same people. If there is still no gain, the first things to adjust are the 70/30 blend and the predictor's settings, and after that a richer opponent model trained on recorded games.
+2. **An opponent model that carries over between games.** The model keeps seven weights per opponent, describes a player in terms of the project's own move score, and starts fresh each game. Carrying what is learned about a returning player from one game to the next is a natural extension, as is a model with more ways to describe a player. A first model of that kind (Section 6.5) predicted one of four test opponents better but did not improve play.
 3. **Playing styles.** Five styles are defined, and bot play separates one group clearly and the others partly (Section 10.3). A model that looks at the order of moves and not only at averages, together with human games, could separate them further.
 4. **Explanations.** The main reason is taken from the move score for every Tactician that reports one (Section 7.1). Drawing more of the explanation from what the search found is one extension. Another is human evaluation: ratings of clarity and usefulness from 5–10 participants, using the Replay page.
 5. **Dependence on a website the team does not control.** The site changed its message format once during the project. The code that talks to it is in one package and the game loop is tested offline, so another change would mean updating that package and checking it again in real games.
@@ -779,8 +812,8 @@ The ISS capstone brief asks for an intelligent system that applies at least one 
 | Use at least one problem-solving technique from the programme | Reasoning systems: rules engine, validator and search. Pattern recognition: clustering, nearest-signature classification and next-move prediction. Software agents: coordinated agents acting on a live website. Language processing: text retrieval, rule extraction and explanation text |
 | Complexity of problem | A multi-player game with random deals, a live online platform, and an opponent model inside the search |
 | Innovation | Search that uses an opponent model, explanations built from recorded move scores, rulebook text checked against the engine |
-| Verification and validation | 147 backend and 137 frontend automated tests, random full-game tests of the engine, the rulebook check, the explanation check and repeatable experiments (Section 10) |
-| Overall functionality | Local and live play, replay, dashboard, rulebook browser and ten experiments (Section 2.5, Section 9) |
+| Verification and validation | 176 backend and 137 frontend automated tests, random full-game tests of the engine, the rulebook check, the explanation check and repeatable experiments (Section 10) |
+| Overall functionality | Local and live play, replay, dashboard, rulebook browser and eleven experiments (Section 2.5, Section 9) |
 | Documentation | README, architecture and API documents, evaluation summary and this report |
 
 ---
@@ -806,7 +839,7 @@ The ISS capstone brief asks for an intelligent system that applies at least one 
 
 ## Statement of compliance with the policy for use of AI in teaching and learning
 
-In preparing this project and report the team used AI tools (including Claude Code, Claude, Gemini and ChatGPT) for brainstorming architectural options, clarifying technical concepts, accelerating implementation and refactoring of code under the team's direction, drafting text and tables for documentation, and proofreading. Generated code was reviewed and tested (147 backend and 137 frontend automated tests) against the deterministic rules engine and, for live play, against the platform. Reported numbers come from the team's own experiment runs on the dates stated. Cited sources were checked against the original publications or pages. The design decisions, interpretation of results and conclusions are the team's own.
+In preparing this project and report the team used AI tools (including Claude Code, Claude, Gemini and ChatGPT) for brainstorming architectural options, clarifying technical concepts, accelerating implementation and refactoring of code under the team's direction, drafting text and tables for documentation, and proofreading. Generated code was reviewed and tested (176 backend and 137 frontend automated tests) against the deterministic rules engine and, for live play, against the platform. Reported numbers come from the team's own experiment runs on the dates stated. Cited sources were checked against the original publications or pages. The design decisions, interpretation of results and conclusions are the team's own.
 
 ---
 
@@ -845,6 +878,8 @@ tiles experiment run profiler_ablation    --param games=100 --param simulations=
 tiles experiment run tournament           --param games_per_pair=30 --param simulations=300 --param seed=51000
 tiles experiment run tournament           --param entrants=mcts,mcts_profiled --param games_per_pair=50 --param simulations=300 --param seed=31000   # also seeds 31100, 31200, 31300
 tiles experiment run search_budget_sweep  --param budgets=10,25,50,100,200,400,800 --param games_per_budget=30 --param seed=61000
+tiles experiment run opponent_styles      --param styles=colour_loyal --param games_per_cell=150 --param simulations=25 --param prediction_games=50 --param seed=71000   # also centre_averse (72000), low_rows (73000), noisy (74000)
+tiles experiment run opponent_styles      --param styles=colour_loyal --param profiler=extended --param games_per_cell=150 --param simulations=25 --param prediction_games=50 --param seed=71000   # same seeds, extended Profiler
 # these two summarise games already in the database. The figures in Sections 10.6 and 10.7 use 16 games played with
 #   tiles play --player P1=<tactician> --player P2=<tactician> [--player P3=...] --seed <n> --db db/tiles.db
 # (default Profiler and Explainer; mcts and mcts_profiled use 300 playouts) with these players in seat order:
@@ -881,7 +916,7 @@ backend/tiles/
 ├── rulebook/        rulebook.md → 19 structured rules → check against the engine
 ├── engine/          live play: message format, browser seat, live session, board translator, page-reading fallback
 ├── sim/             local game runner, tournaments, opponent-model comparison, prediction evaluation, heuristic study
-├── experiments/     the ten experiments, the background runner, command-line entry
+├── experiments/     the eleven experiments, the background runner, command-line entry
 ├── telemetry/       optional MLflow / text-file logging
 ├── rl/              PettingZoo environment wrapper (not used by the app)
 ├── server/          FastAPI app, session manager, statistics, routers/

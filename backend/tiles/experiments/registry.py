@@ -25,6 +25,7 @@ _KIND_MODULES = (
     "xai_coverage",
     "heuristic_comparison",
     "player_count_scaling",
+    "opponent_styles",
 )
 
 

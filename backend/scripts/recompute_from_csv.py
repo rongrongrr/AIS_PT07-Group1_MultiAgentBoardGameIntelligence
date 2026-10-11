@@ -2,7 +2,7 @@
 
     python scripts/recompute_from_csv.py <folder holding the 10.x subfolders>
 
-Prints the figures of Sections 10.1, 10.3, 10.4, 10.8 and 10.9 of docs/FINAL_REPORT.md
+Prints the figures of Section 10.1 (including the odd-opponent test), 10.3, 10.4, 10.8 and 10.9 of docs/FINAL_REPORT.md
 that are not stored in a table file, so that anyone with the CSVs can check
 them. Sections 10.2, 10.5, 10.6 and 10.7, and the other tables of 10.1 and
 10.4, are read straight from the table files and need no calculation.
@@ -133,6 +133,28 @@ def main(root: str) -> None:
     print(f"pooled {sum(total)} games: mcts {total[0]}, mcts_profiled {total[1]}, level {total[2]}; "
           f"mcts_profiled won {total[1] / decided:.1%} of decided games [{lo:.0%}-{hi:.0%}]; "
           f"its score margin {pm(margin(diffs))}")
+
+    for title, stem in (("the default Profiler", "opponent_styles_25_playouts"),
+                        ("the extended Profiler", "opponent_styles_25_playouts_extended_profiler")):
+        print(f"\n## 10.1 Opponent model against four odd opponents, {title} (25 playouts, 150 games per bot and style)")
+        by = games(d / f"{stem}.csv.gz")
+        pooled_w, pooled_m = [], []
+        for style in ("colour_loyal", "centre_averse", "low_rows", "noisy"):
+            plain, prof = by[f"{style}/mcts"], by[f"{style}/mcts_profiled"]
+            dw = [(float(player(q, "subject")["won"]) + 0.5 * float(player(q, "subject")["shared"]))
+                  - (float(player(p_, "subject")["won"]) + 0.5 * float(player(p_, "subject")["shared"]))
+                  for p_, q in zip(plain, prof)]
+            dm = [(float(player(q, "subject")["score"]) - float(player(q, "opponent")["score"]))
+                  - (float(player(p_, "subject")["score"]) - float(player(p_, "opponent")["score"]))
+                  for p_, q in zip(plain, prof)]
+            pooled_w += dw
+            pooled_m += dm
+            print(f"{style}: mcts {win_share(plain, 'subject'):.1%}, mcts_profiled {win_share(prof, 'subject'):.1%}, "
+                  f"win difference {pm(margin(dw), 100)} points, margin difference {pm(margin(dm))}")
+        print(f"all four styles: win difference {pm(margin(pooled_w), 100)} points, margin difference {pm(margin(pooled_m))}")
+        for r in rows(d / f"{stem}__next_move_prediction_on_these_opponents.csv.gz"):
+            print(f"prediction on {r['style']}: Profiler top-1 {float(r['profiler_top1']):.1%}, fixed guesser {float(r['static_top1']):.1%}, "
+                  f"top-3 {float(r['profiler_top3']):.1%} against {float(r['static_top3']):.1%}")
 
     print("\n## 10.4 Head-to-head totals (30 games per pair)")
     tally = collections.defaultdict(lambda: [0, 0, 0])

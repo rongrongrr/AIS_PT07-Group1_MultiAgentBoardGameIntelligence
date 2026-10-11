@@ -173,3 +173,81 @@ def test_ablation_and_sweep_save_per_game_statistics():
     result = search_budget_sweep.run({"budgets": "5", "games_per_budget": 2, "seed": 1}, _Ctx())
     assert len(result["raw"]["game_stats"]) == 2
     _assert_stats(result["raw"]["game_stats"], 2)
+
+
+def test_style_opponents_play_legal_distinct_games():
+    from tiles.agents.base import DecisionContext
+    from tiles.agents.tacticians import make_tactician
+    from tiles.agents.tacticians.styles import HABITS, style_names
+    from tiles.core import legal_actions, new_game
+
+    state = new_game(2, seed=3)
+    legal = legal_actions(state)
+    ctx = DecisionContext(state, 0, legal)
+    for name in style_names():
+        decision = make_tactician(f"style_{name}", seed=1).decide(ctx)
+        assert decision.action in legal and decision.report.candidates
+    assert set(HABITS) == {"colour_loyal", "centre_averse", "low_rows"}
+    with pytest.raises(ValueError):
+        make_tactician("style_nope")
+    # The habits really change what is played.
+    differs = 0
+    for seed in range(1, 11):
+        st = new_game(2, seed=seed)
+        c = DecisionContext(st, 0, legal_actions(st))
+        plain = make_tactician("greedy").decide(c).action
+        differs += sum(make_tactician(f"style_{name}").decide(c).action != plain for name in HABITS)
+    assert differs > 0
+
+
+def test_opponent_styles_experiment_runs_and_validates():
+    from tiles.experiments.kinds import opponent_styles
+
+    result = opponent_styles.run(
+        {"styles": "centre_averse,noisy", "games_per_cell": 2, "simulations": 5, "prediction_games": 1, "seed": 2,
+         "profiler": "extended", "habit_rate": 0.25}, _Ctx()
+    )
+    assert len(result["raw"]["game_stats"]) == 8
+    assert [t["title"][:8] for t in result["tables"]] == ["Win rate", "Opponent", "Next-mov"]
+    with pytest.raises(ValueError):
+        validate_params("opponent_styles", {"styles": "unknown"})
+    with pytest.raises(ValueError):
+        validate_params("opponent_styles", {"styles": " , "})
+
+
+def test_extended_profiler_learns_a_colour_habit_and_stays_valid():
+    from tiles.agents.profiler import make_profiler
+    from tiles.agents.profiler.habits import HABIT_KEYS, ExtendedProfiler, habit_features
+    from tiles.core import legal_actions, new_game, step
+
+    for a in legal_actions(new_game(2, seed=1))[:5]:
+        f = habit_features(a)
+        assert set(f) == set(HABIT_KEYS) and sum(f[k] for k in HABIT_KEYS if k.startswith("habit_colour")) == 1.0
+    assert "extended" not in __import__("tiles.agents.profiler", fromlist=["PROFILERS"]).PROFILERS  # not offered in the app
+    with pytest.raises(ValueError):
+        make_profiler("extended")
+
+    import random
+
+    from tiles.agents.base import DecisionContext
+    from tiles.agents.tacticians import make_tactician
+    from tiles.core import deal_round
+
+    profiler = ExtendedProfiler(habit_rate=0.5)
+    for game in range(3):
+        state = new_game(2, seed=40 + game)
+        rng = random.Random(game)
+        players = [make_tactician("style_colour_loyal"), make_tactician("greedy")]
+        while not state.is_game_over:
+            legal = legal_actions(state)
+            mover = state.current_player
+            action = players[mover].decide(DecisionContext(state, mover, legal)).action
+            before = state.clone()
+            move, round_result = step(state, action)
+            profiler.observe(before, action, move)
+            if round_result is not None and not round_result.game_over:
+                deal_round(state, rng)
+    weights = profiler.predictor.weights_for(0)
+    assert weights["habit_colour_0"] > 0  # blue is the favourite colour
+    dist = profiler.predict(new_game(2, seed=9), 0, legal_actions(new_game(2, seed=9)))
+    assert abs(sum(dist.values()) - 1.0) < 1e-6

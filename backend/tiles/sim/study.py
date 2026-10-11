@@ -113,6 +113,7 @@ def run_match_with_stats(
     game_id: int = 0,
     setting: str = "",
     keep_records: bool = False,
+    profiler=None,
 ) -> tuple:
     """Play ``config`` and return ``(match_result, per_game_statistics)``.
 
@@ -160,7 +161,7 @@ def run_match_with_stats(
         elif kind == "game_over" and event.get("bonuses"):
             bonuses = event["bonuses"]
 
-    match = MatchRunner(config, on_event=on_event, keep_records=keep_records).run()
+    match = MatchRunner(config, on_event=on_event, keep_records=keep_records, profiler=profiler).run()
     scores = match.scores
     top = max(scores)
     winners = [i for i, s in enumerate(scores) if s == top]
