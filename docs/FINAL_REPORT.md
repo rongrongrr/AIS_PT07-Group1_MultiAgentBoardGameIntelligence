@@ -94,7 +94,7 @@ flowchart LR
   W[("buddyboardgames.com")]
   UI <--> API
   API --> MR & LS & EX
-  EX -->|five play games through it| MR
+  EX -->|six play games through it| MR
   MR & LS --> Turn
   MR & LS & EX --> L
   LS <--> W
@@ -839,7 +839,7 @@ The ISS capstone brief asks for an intelligent system that applies at least one 
 
 ## Statement of compliance with the policy for use of AI in teaching and learning
 
-In preparing this project and report the team used AI tools (including Claude Code, Claude, Gemini and ChatGPT) for brainstorming architectural options, clarifying technical concepts, accelerating implementation and refactoring of code under the team's direction, drafting text and tables for documentation, and proofreading. Generated code was reviewed and tested (176 backend and 137 frontend automated tests) against the deterministic rules engine and, for live play, against the platform. Reported numbers come from the team's own experiment runs on the dates stated. Cited sources were checked against the original publications or pages. The design decisions, interpretation of results and conclusions are the team's own.
+In preparing this project and report the team used AI tools (including Claude Code, Claude, Gemini and ChatGPT) for brainstorming architectural options, clarifying technical concepts, accelerating implementation and refactoring of code under the team's direction, drafting text and tables for documentation, and proofreading. Generated code was reviewed and tested (176 backend and 137 frontend automated tests) against the deterministic rules engine and, for live play, against the platform. Reported numbers come from the team's own experiment runs. Cited sources were checked against the original publications or pages. The design decisions, interpretation of results and conclusions are the team's own.
 
 ---
 
