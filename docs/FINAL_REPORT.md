@@ -26,7 +26,7 @@ The main results are as follows. Against bot opponents, the Profiler's first gue
 
 ### 1.1 Azul in brief
 
-This section gives the minimum needed to read the rest of the report. Azul (Plan B Games, 2017) won the Spiel des Jahres in 2018 (Spiel des Jahres, 2018). Two to four players compete to build a mosaic of coloured tiles.
+This section briefly introduces Azul. Azul (Plan B Games, 2017) is an abstract tile-drafting board game that won the Spiel des Jahres in 2018 (Spiel des Jahres, 2018). Two to four players compete to build a mosaic of coloured tiles.
 
 **Components.** There are 100 tiles, 20 in each of five colours, kept in a bag. Each player has a *wall* (a 5×5 grid, empty at the start), five *pattern lines* of lengths 1 to 5 to the left of the wall, and a *floor line* of seven slots. Each round, *factory displays* (5, 7 or 9 for 2, 3 or 4 players) are filled with four random tiles each from the bag. A shared *centre* area starts empty.
 
