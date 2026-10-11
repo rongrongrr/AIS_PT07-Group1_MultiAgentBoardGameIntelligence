@@ -1,6 +1,13 @@
 # TILES: Architecting an Explainable Multi-Agent System for Competitive Board Games
 
 ## A Case Study on Azul — Final Technical Report
+
+**Master of Technology in Artificial Intelligent Systems**
+
+**ISS Supervisor:** Zhengqing Hu
+
+**Team members:** Chan Jing Rong (A0185806W) · Velu (A0314464H) · Johann Oh Hock Seng (A0314457A) · Brian Zheng (A0132097H) · Weiqiao Li (A0314458B)
+
 ---
 
 ## Abstract
@@ -11,7 +18,11 @@ The main results are as follows. Against bot opponents, the Profiler's first gue
 
 ---
 
+
+
 ## 1. Introduction
+
+
 
 ### 1.1 Azul in brief
 
@@ -38,6 +49,8 @@ This section gives the minimum needed to read the rest of the report. Azul (Plan
 5. **There is a public online version.** buddyboardgames.com let the team test the bots on a site it did not write, and against a person.
 6. **A gap in earlier work.** An open-source Azul bot that uses tree search exists (Yau, 2020). It does not model its opponents or explain its moves, which is what this project adds.
 
+
+
 ### 1.3 The imperfect-profile framing
 
 Chess programs are now stronger than the best human players (Zhang et al., 2025), and AlphaGo defeated a world champion at Go (Silver et al., 2016). Both work by searching for the best move against a strong opponent. In Azul the best reply also depends on the habits of the particular opponent. The team calls this an *imperfect-profile* setting: the state of the game is fully visible, but the opponent's profile (their strategy, appetite for risk and favourite tactics) is not, and it changes what the best move is. A program in this setting has to work out the profile from the moves it sees, and adapt.
@@ -50,13 +63,15 @@ The project asks whether a program made of separate, cooperating parts can play 
 
 The proposal committed the project to the following areas. The table uses the proposal's own wording.
 
-| Area | Commitment in the proposal |
-|---|---|
-| AI / ML / DL | Rule extraction, opponent modelling, profiling; exploration of transformer, RL and probabilistic approaches |
-| NLP | Automated rulebook understanding via Retrieval-Augmented Generation; unstructured text to structured rules |
-| Explainable AI | Transparent profiling, interpretable decision pathways, human-centred evaluation |
-| Data science | Feature engineering from gameplay data; clustering and classification into archetypes |
-| Systems engineering | Modular agent-of-agents architecture with specialised agents |
+
+| Area                | Commitment in the proposal                                                                                  |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| AI / ML / DL        | Rule extraction, opponent modelling, profiling; exploration of transformer, RL and probabilistic approaches |
+| NLP                 | Automated rulebook understanding via Retrieval-Augmented Generation; unstructured text to structured rules  |
+| Explainable AI      | Transparent profiling, interpretable decision pathways, human-centred evaluation                            |
+| Data science        | Feature engineering from gameplay data; clustering and classification into archetypes                       |
+| Systems engineering | Modular agent-of-agents architecture with specialised agents                                                |
+
 
 The deliverables were a working prototype; a rule extraction module with an accuracy benchmark; an opponent modelling module with prediction accuracy compared against baselines; an opponent profiling module that identifies 3–5 player types; an explainability dashboard; and a documented repository, a technical report and a demo.
 
@@ -73,7 +88,11 @@ The final system approaches these areas with methods chosen to be simple, repeat
 
 ---
 
+
+
 ## 2. System architecture
+
+
 
 ### 2.1 Overview
 
@@ -101,6 +120,8 @@ flowchart LR
   API --> L
 ```
 
+
+
 TILES has six main pieces.
 
 - A **web interface** (React) with eight pages for setting up games, watching them live, replaying them, looking at opponent profiles, running experiments and browsing the rulebook.
@@ -110,12 +131,16 @@ TILES has six main pieces.
 - An **experiment runner** that runs any of eleven predefined experiments in the background.
 - A **database**, a single SQLite file that the code calls the ledger, where games, moves and experiment results are stored.
 
+
+
 ### 2.2 Design principles
 
 1. **The project has its own rules engine.** The code in `tiles/core/` decides what is legal, how a move changes the board and how a round is scored. Local games and all experiments run on it alone. In a live game the website deals the tiles, keeps the score and has the last word on every move; the engine is used to check a bot's move before it is sent, to look ahead, and to work out what a human player did.
 2. **The agents can be swapped.** The Tactician, Profiler and Explainer are each defined by a small common interface (`tiles/agents/base.py`) and looked up by name. A new version can be added by registering it under a name, without changing the game runners, the server or the web pages. For the web pages to show a description and a settings form for it, it also needs an entry in `tiles/agents/catalog.py`. In the application there are five Tacticians, one Profiler and two Explainers. A second predictor, used only in one experiment, is described in Section 6.5. The Validator is a single fixed class.
 3. **Explanations are built from recorded numbers.** When a Tactician picks a move it also returns a short list of the moves it considered and their scores. The Explainer writes its text from that list, and the list is saved with the move so that the two can be compared later (Section 7.4).
 4. **Recorded games keep every turn.** Each bot turn produces one record holding the board before and after, the move, the result of the legality check, the explanation, the opponent profiles and the timings. Games started from the web interface are always saved. Games started from the command line are saved when a database is named. The games played inside experiments are not saved move by move; only the experiment's summary result is stored, in the same database.
+
+
 
 ### 2.3 What happens on each turn
 
@@ -143,6 +168,8 @@ sequenceDiagram
   P->>L: save the turn record
 ```
 
+
+
 The agents are not wired to each other. The turn procedure calls each one and passes the results along. There is one exception: for the `mcts_profiled` Tactician, the turn procedure hands over the Profiler's guessing function, and the search calls it directly for each opponent position it looks at.
 
 The procedure has two halves. The first (`propose()`) lists the legal moves, fetches the opponent profiles, asks the Tactician for a move and checks it. The second (`conclude()`) runs after the move has been played: it shows the move to the Profiler, asks the Explainer for an explanation and assembles the turn record. In a local game the two halves run in one call, with the move applied on the rules engine in between. In a live game the live runner calls the first half, sends the move to the website, waits for the site's updated board and then calls the second half. In both cases it is the game runner that saves the finished record to the database.
@@ -157,22 +184,28 @@ Each bot seat has its own Tactician. A human seat has none. Each game has one Va
 
 ### 2.5 User interface
 
-| Page | What it is for |
-|---|---|
-| Dashboard | Totals across the database: games, moves, experiments, win rate per Tactician, how long decisions take, counts of playing styles, recent games |
-| Sessions | Set up a game with 2–4 seats (any Tactician and its settings, or a human seat in a live game), and choose the Profiler, Explainer, random seed and pacing; list, start, stop and delete games |
-| Monitor | The live board, the list of moves grouped by round with timings, round summaries, a system log, the room name and invite link (live games), and the explanation panel |
-| Replay | Step through or auto-play any recorded game with the same board and explanation panel; export it as JSON |
-| Profiles | Run the Profiler over a recorded game: playing style and confidence, nine traits, which colours, sources and rows the player used, score over time, and how the style label changed move by move |
-| Experiments | Start any of the eleven experiments with chosen settings, watch progress, read the summary, numbers, tables and charts, export as JSON |
-| Rulebook | Browse the rulebook, search it, and see the extracted rules and whether each agrees with the engine |
-| Agents | A diagram of the steps of a turn showing which agent handles each, and a list of the Validator and the available Tacticians, Profilers and Explainers with their settings |
+
+| Page        | What it is for                                                                                                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Dashboard   | Totals across the database: games, moves, experiments, win rate per Tactician, how long decisions take, counts of playing styles, recent games                                                   |
+| Sessions    | Set up a game with 2–4 seats (any Tactician and its settings, or a human seat in a live game), and choose the Profiler, Explainer, random seed and pacing; list, start, stop and delete games    |
+| Monitor     | The live board, the list of moves grouped by round with timings, round summaries, a system log, the room name and invite link (live games), and the explanation panel                            |
+| Replay      | Step through or auto-play any recorded game with the same board and explanation panel; export it as JSON                                                                                         |
+| Profiles    | Run the Profiler over a recorded game: playing style and confidence, nine traits, which colours, sources and rows the player used, score over time, and how the style label changed move by move |
+| Experiments | Start any of the eleven experiments with chosen settings, watch progress, read the summary, numbers, tables and charts, export as JSON                                                           |
+| Rulebook    | Browse the rulebook, search it, and see the extracted rules and whether each agrees with the engine                                                                                              |
+| Agents      | A diagram of the steps of a turn showing which agent handles each, and a list of the Validator and the available Tacticians, Profilers and Explainers with their settings                        |
+
 
 The charts are drawn directly as SVG without a charting library. The server's interface is documented in `docs/API.md`.
 
 ---
 
+
+
 ## 3. Game engine and Validator
+
+
 
 ### 3.1 How the game is stored
 
@@ -186,16 +219,18 @@ A move is "take all tiles of one colour from one place and put them on one patte
 
 Whether a move is legal is decided by one function, `check_action`. It has eight checks, applied in a fixed order, and stops at the first one that fails. Each check has a name, and a failed check returns that name with a sentence saying what was wrong. Not every check applies to every move: the factory check is skipped when tiles come from the centre, and the four pattern-line checks are skipped when the tiles go straight to the floor.
 
-| Check | The question it asks |
-|---|---|
-| `phase_is_drafting` | Is the game still in the tile-taking phase? |
-| `color_exists` | Is this a real colour? |
-| `source_exists` | Does this factory exist? |
-| `source_has_color` | Does the chosen place hold any tiles of that colour? |
-| `dest_exists` | Does this pattern line exist? |
-| `wall_slot_open` | Is that colour still missing from the matching wall row? |
-| `line_color_matches` | Is the line empty, or already holding this colour? |
-| `line_has_space` | Does the line have room for at least one more tile? |
+
+| Check                | The question it asks                                     |
+| -------------------- | -------------------------------------------------------- |
+| `phase_is_drafting`  | Is the game still in the tile-taking phase?              |
+| `color_exists`       | Is this a real colour?                                   |
+| `source_exists`      | Does this factory exist?                                 |
+| `source_has_color`   | Does the chosen place hold any tiles of that colour?     |
+| `dest_exists`        | Does this pattern line exist?                            |
+| `wall_slot_open`     | Is that colour still missing from the matching wall row? |
+| `line_color_matches` | Is the line empty, or already holding this colour?       |
+| `line_has_space`     | Does the line have room for at least one more tile?      |
+
 
 The same eight names are used as labels by the rulebook reader (Section 4). The rest of the engine applies a move to the board, scores the end of a round (moving tiles to the wall, scoring them against their neighbours, charging floor penalties without letting a score fall below zero, and passing on the first-player token) and adds the end-game bonuses of 2 per row, 7 per column and 10 per colour. Dealing the next round is kept separate, because in a live game the website does the dealing. (In the code these are `apply_action`, `resolve_round`, `end_game_bonuses` and `step()`, which applies a move and scores the round if the move ended it.)
 
@@ -210,6 +245,8 @@ In a live game there is a second, separate safeguard. The website can itself ref
 The engine tests play full random games with 2, 3 and 4 players and check after every move and every deal that all 100 tiles are still accounted for. Separate tests cover scoring, wall tiling, floor penalties, bonuses and the end of the game. There are 16 engine tests in `tests/test_rules.py`. Across the whole project there are 176 backend test cases and 137 frontend test cases (the frontend tests cover the web pages and components); some tests run several times with different inputs, and each run counts as one case.
 
 ---
+
+
 
 ## 4. Rule extraction from the rulebook
 
@@ -227,6 +264,8 @@ There is also an optional extractor that uses a language model. When it is selec
 
 ---
 
+
+
 ## 5. Tacticians: choosing a move
 
 A Tactician is the part that chooses a move. All five versions have the same interface. They are given the board, the list of legal moves and a random seed (a number that fixes the sequence of "random" choices, so that the same game can be replayed exactly). They return a move together with a report of what they considered. One of them is also given the Profiler's guess about what each opponent will do (Section 5.4).
@@ -235,15 +274,17 @@ A Tactician is the part that chooses a move. All five versions have the same int
 
 Much of the system leans on one simple way of scoring a single move. It looks only at the board as it is now, with no look-ahead, and adds up seven parts, each multiplied by a fixed weight.
 
-| Part | What it measures | Weight |
-|---|---|---|
-| Immediate points | If the move completes a pattern line, the points the tile would score on the wall as it stands now | 3.0 |
-| Line progress | The share of the pattern line that this move fills | 1.0 |
-| Near completion | Extra credit when the line ends at least half full but not complete | 0.8 |
-| Floor penalty | Penalty points for everything the move puts on the floor: tiles that do not fit, tiles sent there on purpose, and the first-player token (counts against the move) | 1.2 |
-| First player | Taking the first-player token | 0.7 |
-| Bonus potential | If the move completes a line, how close the tile's row, column and colour will then be to an end-game bonus | 0.6 |
-| Denial | Taking tiles that an opponent's part-filled line needs: the number of tiles taken, multiplied by how full that line already is | 0.4 |
+
+| Part             | What it measures                                                                                                                                                   | Weight |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| Immediate points | If the move completes a pattern line, the points the tile would score on the wall as it stands now                                                                 | 3.0    |
+| Line progress    | The share of the pattern line that this move fills                                                                                                                 | 1.0    |
+| Near completion  | Extra credit when the line ends at least half full but not complete                                                                                                | 0.8    |
+| Floor penalty    | Penalty points for everything the move puts on the floor: tiles that do not fit, tiles sent there on purpose, and the first-player token (counts against the move) | 1.2    |
+| First player     | Taking the first-player token                                                                                                                                      | 0.7    |
+| Bonus potential  | If the move completes a line, how close the tile's row, column and colour will then be to an end-game bonus                                                        | 0.6    |
+| Denial           | Taking tiles that an opponent's part-filled line needs: the number of tiles taken, multiplied by how full that line already is                                     | 0.4    |
+
 
 This score is used in several places. The greedy Tactician plays the move with the highest score. Minimax uses it to decide which moves to look at. The tree search uses it as a first hint about which moves are promising, and to play out imagined games quickly. The Profiler's next-move guesser is the same score with the weights adjusted for each opponent (Section 6.3). The Explainer has one stock phrase for each part (Section 7.1). Changing the weights also gives bots with different habits, which is how the test opponents in Section 10 are made.
 
@@ -281,14 +322,16 @@ This Tactician is the same tree search with one change. At points in the tree wh
 
 The greedy Tactician rates every legal move with the seven-part score in Section 5.1 (the *move score*) and plays the best-rated one. Six additions to that rating came out of the study in Section 10.8. They are off by default, which means a greedy player in a normal game does not use them. The two settings at the end of the table are tick boxes on the Sessions page, under the greedy player's settings. The four components above them have no tick box yet. They are switched on by giving the player a weight for them in the session's player settings (`weights`, in the API or the command line), and they are what the experiments in Section 10.8 do for each version. Because they are off by default, the seven-part score in Section 5.1, the Profiler's guesses and every earlier result are unchanged.
 
-| Name | What it does |
-|---|---|
-| `round_end_feasibility` | Penalises starting a pattern line whose missing tiles are no longer on the table, so the line cannot be finished this round. The penalty runs from 0 (the line can still be finished) to −1 (the tiles it needs are gone). A line left open costs no points, but it blocks its row for other colours. |
-| `floor_outlook` | Estimates the extra floor penalty from tiles the player will probably have to take later in the round but will have no room for after this move. The player is assumed to take about one in *n* of the tiles still on the table, where *n* is the number of players. |
-| `spoil` | The share of the tiles left on the table that the next player has no pattern line for (0 to 1). A higher weight prefers moves that leave the next player only tiles that must go to the floor. |
-| `bonus_reach` | When a move completes a line, how far it brings the tile's column and colour toward their end-game bonuses, counted only for lines that are at least three-fifths done and scaled by whether the missing tiles are still in the bag or on the table. |
-| `table_aware` (a setting of the Tactician) | Sets the value of the first-player token from the number of players: 0.7 with two players, as in Section 5.1, and 2.0 with three or four. |
-| `endgame_aware` (a setting of the Tactician) | Once any wall has a row one tile from complete, so the game is close to ending, switches to weights that cash in points and bonuses: immediate points 4.5, bonus potential 1.5, line progress and near completion 0.3, first player and denial 0.2. |
+
+| Name                                         | What it does                                                                                                                                                                                                                                                                                          |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `round_end_feasibility`                      | Penalises starting a pattern line whose missing tiles are no longer on the table, so the line cannot be finished this round. The penalty runs from 0 (the line can still be finished) to −1 (the tiles it needs are gone). A line left open costs no points, but it blocks its row for other colours. |
+| `floor_outlook`                              | Estimates the extra floor penalty from tiles the player will probably have to take later in the round but will have no room for after this move. The player is assumed to take about one in *n* of the tiles still on the table, where *n* is the number of players.                                  |
+| `spoil`                                      | The share of the tiles left on the table that the next player has no pattern line for (0 to 1). A higher weight prefers moves that leave the next player only tiles that must go to the floor.                                                                                                        |
+| `bonus_reach`                                | When a move completes a line, how far it brings the tile's column and colour toward their end-game bonuses, counted only for lines that are at least three-fifths done and scaled by whether the missing tiles are still in the bag or on the table.                                                  |
+| `table_aware` (a setting of the Tactician)   | Sets the value of the first-player token from the number of players: 0.7 with two players, as in Section 5.1, and 2.0 with three or four.                                                                                                                                                             |
+| `endgame_aware` (a setting of the Tactician) | Once any wall has a row one tile from complete, so the game is close to ending, switches to weights that cash in points and bonuses: immediate points 4.5, bonus potential 1.5, line progress and near completion 0.3, first player and denial 0.2.                                                   |
+
 
 The first four are components with their own weights, calculated only when a weight is given. The two settings are available when a session is created. Results are in Section 10.8.
 
@@ -298,6 +341,8 @@ The Profiler describes a player by seven weights on the parts of the move score.
 
 ---
 
+
+
 ## 6. Opponent modelling and profiling
 
 The Profiler does three things for every player it watches. It keeps running statistics on how they play, it labels them with a playing style, and it guesses their next move. All three start from scratch at the beginning of each game; nothing is carried over from earlier games.
@@ -306,17 +351,19 @@ The Profiler does three things for every player it watches. It keeps running sta
 
 After each move the Profiler notes a few facts about it: the colour taken, whether it came from the centre, whether any tiles went to the floor, whether it completed a line, whether it took the first-player token, and four parts of the move score (immediate points, denial, floor penalty and bonus potential). For each player these are averaged into nine traits, each scaled, and capped where needed, to lie between 0 and 1.
 
-| Trait | Meaning |
-|---|---|
-| `color_bias` | How strongly the player favours one colour (0 = an even spread, 1 = always the same colour) |
-| `center_rate` | Share of moves that take from the centre |
-| `floor_rate` | Share of moves that put at least one tile on the floor |
-| `completion_rate` | Share of moves that complete a pattern line |
-| `denial_avg` | Average denial value, which is high for a player who often takes tiles an opponent needs |
-| `risk_avg` | Average floor penalty accepted per move |
-| `bonus_focus` | Average progress towards end-game bonuses per move |
-| `fpt_rate` | Share of moves that take the first-player token |
-| `immediate_avg` | Average immediate points per move |
+
+| Trait             | Meaning                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------- |
+| `color_bias`      | How strongly the player favours one colour (0 = an even spread, 1 = always the same colour) |
+| `center_rate`     | Share of moves that take from the centre                                                    |
+| `floor_rate`      | Share of moves that put at least one tile on the floor                                      |
+| `completion_rate` | Share of moves that complete a pattern line                                                 |
+| `denial_avg`      | Average denial value, which is high for a player who often takes tiles an opponent needs    |
+| `risk_avg`        | Average floor penalty accepted per move                                                     |
+| `bonus_focus`     | Average progress towards end-game bonuses per move                                          |
+| `fpt_rate`        | Share of moves that take the first-player token                                             |
+| `immediate_avg`   | Average immediate points per move                                                           |
+
 
 The Profiler also notes how long each decision took. The average (`tempo_ms`) is shown as a tenth figure but is not used for the style label.
 
@@ -352,7 +399,11 @@ The predictor in Section 6.3 describes a player only by the seven weights on the
 
 ---
 
+
+
 ## 7. Explanations
+
+
 
 ### 7.1 How an explanation is built (`explainer/templates.py`)
 
@@ -383,7 +434,11 @@ The faithfulness comparison is a guard against a later change that would make th
 
 ---
 
+
+
 ## 8. Live platform play
+
+
 
 ### 8.1 How the bots play on the website
 
@@ -418,11 +473,15 @@ stateDiagram-v2
   failed --> [*]
 ```
 
-| Stage | What happens | Moves on when |
-|---|---|---|
-| connecting | A browser is started for each bot. The host creates the room and the other bots join. If the room name is already taken, a new name is tried, up to two more times. | All bots are in the room |
-| lobby | If there are human seats, the program waits until the number of players in the room matches the number of seats, for up to five minutes. The host then presses Start. The opening tiles normally appear by themselves. If they have not appeared after about eight seconds, the host asks the site to deal. If that also fails, the program reads the board from what the page is showing. | The first board has been received |
-| running | Bot turns go through the turn procedure. On a human's turn the bots wait for the site's next board and work out the move from it. Between rounds, if the site has not dealt within a few seconds and a bot is to move, that bot asks for the deal. | The game ends |
+
+
+
+| Stage      | What happens                                                                                                                                                                                                                                                                                                                                                                               | Moves on when                     |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------- |
+| connecting | A browser is started for each bot. The host creates the room and the other bots join. If the room name is already taken, a new name is tried, up to two more times.                                                                                                                                                                                                                        | All bots are in the room          |
+| lobby      | If there are human seats, the program waits until the number of players in the room matches the number of seats, for up to five minutes. The host then presses Start. The opening tiles normally appear by themselves. If they have not appeared after about eight seconds, the host asks the site to deal. If that also fails, the program reads the board from what the page is showing. | The first board has been received |
+| running    | Bot turns go through the turn procedure. On a human's turn the bots wait for the site's next board and work out the move from it. Between rounds, if the site has not dealt within a few seconds and a bot is to move, that bot asks for the deal.                                                                                                                                         | The game ends                     |
+
 
 A game ends in one of four ways.
 
@@ -441,31 +500,39 @@ TILES does not see a human's move directly. It sees the board before and the boa
 
 ### 8.4 What goes wrong, and what the code does
 
-| Problem | Response |
-|---|---|
-| The room name is still in use (the site keeps a room for a while after a game) | Try a new name, at most twice, and update the invite link |
-| A human never arrives | After five minutes, try to start anyway; if the site will not start the game, the session fails |
-| The first deal does not arrive | Wait, then ask for a deal, then read the board off the page, then give up |
-| The next round is not dealt on a bot's turn | Wait a few seconds, then that bot asks for the deal |
-| One bot's browser has not yet received the latest board | Use the most up-to-date board that any of the bots has |
-| The site refuses a move or does not reply | Note it and try again on the next board; three in a row stop the game with an error |
-| A human walks away mid-game | Keep waiting, with periodic warnings, until someone presses Stop |
+
+| Problem                                                                        | Response                                                                                        |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| The room name is still in use (the site keeps a room for a while after a game) | Try a new name, at most twice, and update the invite link                                       |
+| A human never arrives                                                          | After five minutes, try to start anyway; if the site will not start the game, the session fails |
+| The first deal does not arrive                                                 | Wait, then ask for a deal, then read the board off the page, then give up                       |
+| The next round is not dealt on a bot's turn                                    | Wait a few seconds, then that bot asks for the deal                                             |
+| One bot's browser has not yet received the latest board                        | Use the most up-to-date board that any of the bots has                                          |
+| The site refuses a move or does not reply                                      | Note it and try again on the next board; three in a row stop the game with an error             |
+| A human walks away mid-game                                                    | Keep waiting, with periodic warnings, until someone presses Stop                                |
+
 
 The game loop is tested without the website, against a stand-in built from the team's own rules engine (`tests/test_live_session.py`). The tests cover a full game with the host dealing, the site dealing, a human seat, the Stop button, repeated refusals and a room name that is taken. The browser-driving code is exercised in real games instead of automated tests. The code that reads the board off the page (`dom_snapshot.py`) is a last resort that runs only if the first deal never arrives.
 
 ### 8.5 Results on the real site
 
-| Game | Players | Outcome | Notes |
-|---|---|---|---|
-| Command line, bot vs bot | Athena = greedy, Bob = greedy | 49 moves, 5 rounds, 59–74 | Median time to carry out a move on the site 650 ms; time to decide 0.1 ms |
-| Web interface, bot vs bot | Athena = mcts_profiled (300 playouts), Bob = greedy | 52 moves, 5 rounds, Athena won 55–44 | Athena's median times: 141 ms to decide, 431 ms to carry out the move on the site, 577 ms in total |
-| Web interface, bot host and a human who joined by invite link | Athena = mcts_profiled, human | 26 moves recorded | The Profiler observed all 26 human moves and labelled the player set_collector (confidence 0.37) |
+
+| Game                                                          | Players                                             | Outcome                              | Notes                                                                                              |
+| ------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Command line, bot vs bot                                      | Athena = greedy, Bob = greedy                       | 49 moves, 5 rounds, 59–74            | Median time to carry out a move on the site 650 ms; time to decide 0.1 ms                          |
+| Web interface, bot vs bot                                     | Athena = mcts_profiled (300 playouts), Bob = greedy | 52 moves, 5 rounds, Athena won 55–44 | Athena's median times: 141 ms to decide, 431 ms to carry out the move on the site, 577 ms in total |
+| Web interface, bot host and a human who joined by invite link | Athena = mcts_profiled, human                       | 26 moves recorded                    | The Profiler observed all 26 human moves and labelled the player set_collector (confidence 0.37)   |
+
 
 Three things had to be handled before these games ran: the changed message format and the encoding of room names in invite links (Section 8.1), and room names that were still in use (Section 8.4). Each is now covered by a test.
 
 ---
 
+
+
 ## 9. Database, timings and experiments
+
+
 
 ### 9.1 The database (`ledger/store.py`)
 
@@ -481,19 +548,21 @@ Every bot move records how long it took to decide, to check and to explain, and 
 
 Eleven experiments are defined.
 
-| Name in the code | The question it answers | Results |
-|---|---|---|
-| `profiler_ablation` | Does the opponent model improve play? (An *ablation* is a comparison with one part switched off.) | Section 10.1 |
-| `prediction_accuracy` | How often is the next-move guess right? | Section 10.2 |
-| `archetype_discovery` | Can playing styles be recognised? | Section 10.3 |
-| `tournament` | Which Tactician is strongest? | Section 10.4 |
-| `search_budget_sweep` | How does strength change with the amount of search? | Section 10.4 |
-| `rule_extraction` | Do the extracted rules agree with the engine? | Section 10.5 |
-| `xai_coverage` | Do moves have explanations, and do these match the saved numbers? | Section 10.6 |
-| `latency_profile` | How long do moves take? | Section 10.7 |
-| `heuristic_comparison` | Which parts of the move score matter, and does it depend on the number of players? | Section 10.8 |
-| `player_count_scaling` | How does play change with two, three and four players? | Section 10.9 |
-| `opponent_styles` | Does the opponent model help against opponents it cannot describe exactly? | Section 10.1 |
+
+| Name in the code       | The question it answers                                                                           | Results      |
+| ---------------------- | ------------------------------------------------------------------------------------------------- | ------------ |
+| `profiler_ablation`    | Does the opponent model improve play? (An *ablation* is a comparison with one part switched off.) | Section 10.1 |
+| `prediction_accuracy`  | How often is the next-move guess right?                                                           | Section 10.2 |
+| `archetype_discovery`  | Can playing styles be recognised?                                                                 | Section 10.3 |
+| `tournament`           | Which Tactician is strongest?                                                                     | Section 10.4 |
+| `search_budget_sweep`  | How does strength change with the amount of search?                                               | Section 10.4 |
+| `rule_extraction`      | Do the extracted rules agree with the engine?                                                     | Section 10.5 |
+| `xai_coverage`         | Do moves have explanations, and do these match the saved numbers?                                 | Section 10.6 |
+| `latency_profile`      | How long do moves take?                                                                           | Section 10.7 |
+| `heuristic_comparison` | Which parts of the move score matter, and does it depend on the number of players?                | Section 10.8 |
+| `player_count_scaling` | How does play change with two, three and four players?                                            | Section 10.9 |
+| `opponent_styles`      | Does the opponent model help against opponents it cannot describe exactly?                        | Section 10.1 |
+
 
 Each has a form for its settings and returns its result in the same layout (a summary sentence, headline numbers, tables and chart data), so the Experiments page can display any of them. They run in the background and show progress, and they can be started from the web page or from the command line (`tiles experiment run <kind> --param k=v --output file.json`). Results can be saved in the database and exported as JSON.
 
@@ -503,6 +572,8 @@ Results of the opponent-model comparison can also be sent to MLflow (MLflow, n.d
 
 ---
 
+
+
 ## 10. Evaluation
 
 The figures below come from the experiments in Section 9.3, run with the commands in Appendix A, except where the text says otherwise. The labels A1 to A9 are the ones the experiments carry in the code. Random seeds are fixed. Where bots are compared for playing strength (A1 and A3) they take turns going first, so that the advantage of moving first cancels out. The games played for A1 to A4 are all two-player games between bots; A8 and A9 play two-, three- and four-player games. Timings depend on the computer used.
@@ -511,11 +582,13 @@ The figures below come from the experiments in Section 9.3, run with the command
 
 Three bots each play the same fixed opponent, a greedy bot whose weights are set to block heavily. The three are `greedy` (no look-ahead), `mcts` (tree search) and `mcts_profiled` (tree search that uses the Profiler's guesses, Section 5.4). A win is decided by Azul's rules: the higher score or, if the scores are level, more completed wall rows. A game level on both is a win for neither. The average margin is the bot's final score minus the opponent's.
 
-| Bot | Games | Wins | Win rate | Avg margin (pts) | Avg decision (ms) |
-|---|---|---|---|---|---|
-| greedy | 50 | 25 | 50 % | −2.1 | 0.2 |
-| mcts (400 playouts) | 50 | 50 | **100 %** | +17.7 | 784.5 |
-| mcts_profiled (400 playouts) | 50 | 49 | 98 % | +18.2 | 686.1 |
+
+| Bot                          | Games | Wins | Win rate  | Avg margin (pts) | Avg decision (ms) |
+| ---------------------------- | ----- | ---- | --------- | ---------------- | ----------------- |
+| greedy                       | 50    | 25   | 50 %      | −2.1             | 0.2               |
+| mcts (400 playouts)          | 50    | 50   | **100 %** | +17.7            | 784.5             |
+| mcts_profiled (400 playouts) | 50    | 49   | 98 %      | +18.2            | 686.1             |
+
 
 In this run the average decision was not longer when the search consulted the opponent model (686 ms against 785 ms), so the timing difference is within the variation caused by the computer's load (Section 10.7). With a smaller search (50 playouts per move, 200 games per bot over two sets of deals) the picture is the same: greedy 53.5 %, mcts 81.5 % (average margin +9.3), mcts_profiled 83.0 % (+9.3). When the two search bots played each other at 300 playouts per move, `mcts` won 119 games, `mcts_profiled` won 96 and 15 were level. These are 230 games: the 30 played between them in the tournament of Section 10.4 and 200 more, with the seat that moves first alternating.
 
@@ -525,25 +598,29 @@ In this run the average decision was not longer when the search consulted the op
 
 **Opponents the model cannot describe exactly.** The first reason suggests testing opponents that are not built from the same move score. The experiment `opponent_styles` (Section 5.6) does this with four opponents, each with a habit outside the model. Plain `mcts` and `mcts_profiled` each played 150 games against each opponent, at 25 playouts per move so that the search does not win every game, and both bots were dealt the same games. The table shows how often each bot won, the difference between the two bots (`mcts_profiled` minus `mcts`) with its margin of error, and how often the Profiler's first guess at the opponent's next move was right, next to a fixed guesser that does not adapt (the default move score).
 
-| Opponent | `mcts` wins | `mcts_profiled` wins | Difference in wins per 100 games | Difference in average margin (points) | Profiler's first guess right | Fixed guesser's first guess right |
-|---|---|---|---|---|---|---|
-| `colour_loyal` | 90.7 % | 89.0 % | −1.7 ± 5.7 | −2.3 ± 3.0 | 75.9 % | 78.4 % |
-| `centre_averse` | 87.0 % | 83.7 % | −3.3 ± 6.8 | −2.4 ± 3.1 | 86.8 % | 89.3 % |
-| `low_rows` | 81.0 % | 80.3 % | −0.7 ± 7.4 | −1.1 ± 2.8 | 88.5 % | 90.6 % |
-| `noisy` | 96.7 % | 97.3 % | +0.7 ± 3.9 | +2.0 ± 3.2 | 70.0 % | 78.1 % |
-| All four | | | −1.2 ± 3.0 | −0.9 ± 1.5 | | |
+
+| Opponent        | `mcts` wins | `mcts_profiled` wins | Difference in wins per 100 games | Difference in average margin (points) | Profiler's first guess right | Fixed guesser's first guess right |
+| --------------- | ----------- | -------------------- | -------------------------------- | ------------------------------------- | ---------------------------- | --------------------------------- |
+| `colour_loyal`  | 90.7 %      | 89.0 %               | −1.7 ± 5.7                       | −2.3 ± 3.0                            | 75.9 %                       | 78.4 %                            |
+| `centre_averse` | 87.0 %      | 83.7 %               | −3.3 ± 6.8                       | −2.4 ± 3.1                            | 86.8 %                       | 89.3 %                            |
+| `low_rows`      | 81.0 %      | 80.3 %               | −0.7 ± 7.4                       | −1.1 ± 2.8                            | 88.5 %                       | 90.6 %                            |
+| `noisy`         | 96.7 %      | 97.3 %               | +0.7 ± 3.9                       | +2.0 ± 3.2                            | 70.0 %                       | 78.1 %                            |
+| All four        |             |                      | −1.2 ± 3.0                       | −0.9 ± 1.5                            |                              |                                   |
+
 
 The opponent model gave no gain against any of the four, and every difference is within its margin of error. The Profiler's first guess was also right less often than the fixed guesser for all four opponents, by 2 to 3 points for three of them and by 8 points for `noisy`. With about 1,300 guesses per opponent the 8-point gap is clearly larger than chance, and the smaller gaps are small. Against the greedy bots of Section 10.2, which are made of the seven parts, the Profiler was 4 points better than the fixed guesser, so the model helps when the opponent fits it and can slightly hurt when it does not. A likely reason, not tested, is that a model with only seven weights adjusts to the wrong features when the real habit lies elsewhere. Taken with the 230 direct games, these tests give no evidence that the opponent model improves play against bots, including bots it cannot describe exactly. The opponents here are artificial and simple, and the games are two-player games with a small search, so this does not settle the question for people.
 
 **A model that can learn the habits.** The explanation above suggests giving the model a way to describe such habits. The extended predictor of Section 6.5 was run on the same opponents, the same games and the same deals. Plain `mcts` is unaffected by the Profiler, so its results are unchanged.
 
-| Opponent | Default Profiler's first guess right | Extended Profiler's first guess right | Fixed guesser's first guess right | Difference in wins per 100 games, extended | Difference in average margin (points), extended |
-|---|---|---|---|---|---|
-| `colour_loyal` | 75.9 % | 80.8 % | 78.4 % | −3.0 ± 6.7 | −2.4 ± 3.2 |
-| `centre_averse` | 86.8 % | 86.8 % | 89.3 % | −7.0 ± 6.7 | −3.0 ± 2.9 |
-| `low_rows` | 88.5 % | 88.5 % | 90.6 % | −5.7 ± 7.9 | −2.3 ± 2.9 |
-| `noisy` | 70.0 % | 70.8 % | 78.1 % | +1.3 ± 3.7 | +3.4 ± 3.4 |
-| All four | | | | −3.6 ± 3.2 | −1.1 ± 1.6 |
+
+| Opponent        | Default Profiler's first guess right | Extended Profiler's first guess right | Fixed guesser's first guess right | Difference in wins per 100 games, extended | Difference in average margin (points), extended |
+| --------------- | ------------------------------------ | ------------------------------------- | --------------------------------- | ------------------------------------------ | ----------------------------------------------- |
+| `colour_loyal`  | 75.9 %                               | 80.8 %                                | 78.4 %                            | −3.0 ± 6.7                                 | −2.4 ± 3.2                                      |
+| `centre_averse` | 86.8 %                               | 86.8 %                                | 89.3 %                            | −7.0 ± 6.7                                 | −3.0 ± 2.9                                      |
+| `low_rows`      | 88.5 %                               | 88.5 %                                | 90.6 %                            | −5.7 ± 7.9                                 | −2.3 ± 2.9                                      |
+| `noisy`         | 70.0 %                               | 70.8 %                                | 78.1 %                            | +1.3 ± 3.7                                 | +3.4 ± 3.4                                      |
+| All four        |                                      |                                       |                                   | −3.6 ± 3.2                                 | −1.1 ± 1.6                                      |
+
 
 The extended predictor learned the favourite colour: its first guess was right 80.8 % of the time, against 75.9 % for the default predictor and 78.4 % for the fixed guesser. For the other three opponents it was no better than the default predictor and still below the fixed guesser. Better prediction against `colour_loyal` did not give better play: `mcts_profiled` won 132 of 150 games there against 136 for plain `mcts`. Over the four opponents the win rate with the opponent model was 3.6 ± 3.2 points per 100 games lower than without it, which is just beyond the margin of error, and the average margin was 1.1 ± 1.6 points lower, which is within it. So the richer model improved prediction for one habit and did not improve play against any of the four opponents, and there is a hint that the opponent model lowers the win rate slightly. A possible reason, not tested, is that these opponents are built from the same move score as the fixed guesser, which therefore repeats their tie-breaking exactly and is hard to beat.
 
@@ -551,17 +628,21 @@ The extended predictor learned the favourite colour: its first guess was right 8
 
 The experiment plays 50 two-player games. The player being predicted is a greedy bot with one of two weight settings, a blocker or a collector, alternating from game to game. Its opponent is a greedy bot with the default weights. The predicted bot always has the first move of the game. Before each of its moves the Profiler makes its guess, and only then is it shown the move. A new Profiler is used for every game, so everything it knows about the player was learned during that game. This gives 1,360 predictions. "Top-1" means the Profiler's first choice was the move played. "Top-3" means the move was among its first three choices.
 
-| Guesser | Top-1 | Top-3 |
-|---|---|---|
-| **Profiler** (adjusts its weights during the game) | **87.8 %** | **95.0 %** |
-| Fixed guesser (the top move by the default score; never adapts) | 83.5 % | 93.5 % |
-| Random guess among the legal moves (calculated exactly) | 17.2 % | 33.9 % |
 
-| Part of the game | Predictions | Profiler top-1 | Fixed guesser top-1 |
-|---|---|---|---|
-| Early (rounds 1–2) | 551 | 87.8 % | 85.7 % |
-| Middle (rounds 3–4) | 544 | 86.2 % | 81.3 % |
-| Late (round 5 onwards) | 265 | **90.9 %** | 83.4 % |
+| Guesser                                                         | Top-1      | Top-3      |
+| --------------------------------------------------------------- | ---------- | ---------- |
+| **Profiler** (adjusts its weights during the game)              | **87.8 %** | **95.0 %** |
+| Fixed guesser (the top move by the default score; never adapts) | 83.5 %     | 93.5 %     |
+| Random guess among the legal moves (calculated exactly)         | 17.2 %     | 33.9 %     |
+
+
+
+| Part of the game       | Predictions | Profiler top-1 | Fixed guesser top-1 |
+| ---------------------- | ----------- | -------------- | ------------------- |
+| Early (rounds 1–2)     | 551         | 87.8 %         | 85.7 %              |
+| Middle (rounds 3–4)    | 544         | 86.2 %         | 81.3 %              |
+| Late (round 5 onwards) | 265         | **90.9 %**     | 83.4 %              |
+
 
 The Profiler beats the fixed guesser by 4.3 percentage points overall. Its lead widens from 2.1 points in rounds 1–2 to 4.9 in rounds 3–4 and 7.5 from round five. Its own accuracy does not climb steadily (87.8, 86.2 and 90.9 %); part of the widening is the fixed guesser doing worse later in the game. A widening lead is what one would expect if the Profiler is picking up the player's habits.
 
@@ -573,11 +654,13 @@ Five greedy bots with different weight settings (blocker, collector, risk_taker,
 
 The style signatures were worked out from the seed-11 games (Section 6.2), so the seed-11 column below shows how well the signatures fit the games they came from. The seed-12 column uses new games, with the same five bots, against the same opponent, that the signatures were averaged from. It tests whether the Profiler recognises a bot it has been tuned on in a game it has not seen. Players of a new kind are outside this test.
 
-| | Seed 11 (used to set the signatures) | **Seed 12 (new games)** | By chance |
-|---|---|---|---|
-| Label matches the intended style (five styles) | 52 % | **46 %** | 20 % |
-| k-means with five clusters: purity | 50 % | 41 % | — |
-| Label falls in the right one of three groups | — | **71 %** | roughly a third |
+
+|                                                | Seed 11 (used to set the signatures) | **Seed 12 (new games)** | By chance       |
+| ---------------------------------------------- | ------------------------------------ | ----------------------- | --------------- |
+| Label matches the intended style (five styles) | 52 %                                 | **46 %**                | 20 %            |
+| k-means with five clusters: purity             | 50 %                                 | 41 %                    | —               |
+| Label falls in the right one of three groups   | —                                    | **71 %**                | roughly a third |
+
 
 Purity is worked out as follows. For each cluster, find the bot type that appears in it most often and count those games. Purity is that count, added up over the five clusters, as a share of all 100 games.
 
@@ -585,13 +668,15 @@ The three groups are {blocker, risk_taker}, {cautious} and {collector, vanilla}.
 
 Seed-12 results (rows are the bot's weight setting, columns are the Profiler's label):
 
+
 | bot setting → | aggressive_blocker | cautious_optimizer | set_collector | greedy_scorer | risk_taker |
-|---|---|---|---|---|---|
-| blocker | **14** | 0 | 1 | 0 | 5 |
-| collector | 2 | 7 | **6** | 4 | 1 |
-| risk_taker | 9 | 0 | 0 | 1 | **10** |
-| cautious | 1 | **13** | 3 | 3 | 0 |
-| vanilla | 2 | 7 | 7 | **3** | 1 |
+| ------------- | ------------------ | ------------------ | ------------- | ------------- | ---------- |
+| blocker       | **14**             | 0                  | 1             | 0             | 5          |
+| collector     | 2                  | 7                  | **6**         | 4             | 1          |
+| risk_taker    | 9                  | 0                  | 0             | 1             | **10**     |
+| cautious      | 1                  | **13**             | 3             | 3             | 0          |
+| vanilla       | 2                  | 7                  | 7             | **3**         | 1          |
+
 
 The blocker is usually recognised (14 of 20), and so is the cautious bot (13 of 20). The risk-taker is split almost evenly between risk_taker and aggressive_blocker (10 and 9), so those two are better treated as one group, and as a group they are recognised in 38 of 40 games. The collector and vanilla bots are not told apart from each other, each is labelled cautious_optimizer 7 times in 20, and together they land in their own group in only 20 of 40 games. Clustering without labels did no better (41 % purity).
 
@@ -603,23 +688,27 @@ In summary, five styles are defined, and on bot play they fall into one clear gr
 
 Every Tactician played every other one 30 times, 300 games in all, with 300 playouts per move for the search bots. Ratings use the Elo system from chess (Elo, 1978), in which beating a higher-rated player raises a rating more than beating a lower-rated one. Every bot starts at 1200 and a rating moves by at most 32 points per game. With 120 games each the ratings are fairly steady, but small differences between neighbours should not be over-read. W–L–T is wins, losses and ties.
 
-| Tactician | Elo | W–L–T | Win rate | Avg score |
-|---|---|---|---|---|
-| mcts | **1654** | 106–11–3 | 88.3 % | 55.9 |
-| mcts_profiled | 1502 | 96–20–4 | 80 % | 53.4 |
-| minimax (3 moves ahead) | 1130 | 51–69–0 | 42.5 % | 39.9 |
-| greedy | 982 | 43–76–1 | 35.8 % | 47.9 |
-| random | 733 | 0–120–0 | 0 % | 0.7 |
+
+| Tactician               | Elo      | W–L–T    | Win rate | Avg score |
+| ----------------------- | -------- | -------- | -------- | --------- |
+| mcts                    | **1654** | 106–11–3 | 88.3 %   | 55.9      |
+| mcts_profiled           | 1502     | 96–20–4  | 80 %     | 53.4      |
+| minimax (3 moves ahead) | 1130     | 51–69–0  | 42.5 %   | 39.9      |
+| greedy                  | 982      | 43–76–1  | 35.8 %   | 47.9      |
+| random                  | 733      | 0–120–0  | 0 %      | 0.7       |
+
 
 Both search bots beat random 30–0. `mcts` beat greedy 30–0 and `mcts_profiled` beat it 28–1 with one tie. `mcts` beat minimax 28–2 and `mcts_profiled` beat it 29–1. In this set `mcts` beat `mcts_profiled` 18–9 with 3 ties (Section 10.1 pools these games with 200 more). Minimax beat greedy 18–12, a modest lead. Minimax looks only three moves ahead, considers a limited set of replies and cannot see past the end of the round, which may be why its lead over greedy is modest. The tree search, which plays imagined games through the next deal, is the clear step up. Greedy beat random 30–0.
 
 Search budget (`mcts` against greedy, 30 games per budget):
 
-| Playouts per move | 10 | 25 | 50 | 100 | 200 | 400 | 800 |
-|---|---|---|---|---|---|---|---|
-| Win rate | 50 % | 83 % | 93 % | 97 % | 93 % | 93 % | 97 % |
-| Avg margin | +0.6 | +10.0 | +14.9 | +13.3 | +13.2 | +19.1 | +16.5 |
-| Avg decision (ms) | 20.7 | 55.2 | 111.3 | 229.7 | 456.8 | 825.6 | 1357.3 |
+
+| Playouts per move | 10   | 25    | 50    | 100   | 200   | 400   | 800    |
+| ----------------- | ---- | ----- | ----- | ----- | ----- | ----- | ------ |
+| Win rate          | 50 % | 83 %  | 93 %  | 97 %  | 93 %  | 93 %  | 97 %   |
+| Avg margin        | +0.6 | +10.0 | +14.9 | +13.3 | +13.2 | +19.1 | +16.5  |
+| Avg decision (ms) | 20.7 | 55.2  | 111.3 | 229.7 | 456.8 | 825.6 | 1357.3 |
+
 
 With 10 playouts the search wins half its games, and with 25 playouts 25 of 30. From 50 playouts upward it wins 28 or 29 of 30. The differences between those budgets are within what chance produces with 30 games, so more than about 50 to 100 playouts gave no measurable gain against greedy. The average margins are noisy, and each budget played its own thirty deals, so the columns are not like-for-like. The default for live play is 300 playouts, which this result suggests is more than greedy requires; stronger opponents may need more. In the recorded games of Section 10.7 that took a median of about 790–890 ms. That rerun was done on a computer that was also running other programs, and another run of the same code on a quieter computer gave about 135–155 ms, well under the 430–650 ms the website takes to respond (Section 8.5). Timings should be read with that in mind.
 
@@ -631,13 +720,15 @@ All 19 rules on the team's list were found in the rulebook file and all 19 agree
 
 Over 1,007 recorded moves in 16 games (five Tacticians, 2–4 players; the games are listed in Appendix A):
 
-| Measure | Value |
-|---|---|
-| Moves with an explanation | **100 %** (1,007 of 1,007) |
-| Saved main reason matches the saved score breakdown | **100 %** of the 839 explanations that state a main reason |
-| Explanations with no main reason | 168: 134 moves by the random Tactician, which has no score breakdown, and 34 moves by other Tacticians, all of them forced moves |
-| Labels | COMPLETES_LINE 645 · BONUS_SETUP 609 · FLOOR_SACRIFICE 241 · ENDGAME 197 · BLOCKS_OPPONENT 125 · TAKES_FIRST_PLAYER 80 · FORCED 36 |
-| Main reasons | Immediate points 595 · Line progress 143 · Near completion 35 · Denial 29 · Floor penalty 21 · Bonus potential 14 · First player 2 |
+
+| Measure                                             | Value                                                                                                                              |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Moves with an explanation                           | **100 %** (1,007 of 1,007)                                                                                                         |
+| Saved main reason matches the saved score breakdown | **100 %** of the 839 explanations that state a main reason                                                                         |
+| Explanations with no main reason                    | 168: 134 moves by the random Tactician, which has no score breakdown, and 34 moves by other Tacticians, all of them forced moves   |
+| Labels                                              | COMPLETES_LINE 645 · BONUS_SETUP 609 · FLOOR_SACRIFICE 241 · ENDGAME 197 · BLOCKS_OPPONENT 125 · TAKES_FIRST_PLAYER 80 · FORCED 36 |
+| Main reasons                                        | Immediate points 595 · Line progress 143 · Near completion 35 · Denial 29 · Floor penalty 21 · Bonus potential 14 · First player 2 |
+
 
 The second row is the consistency guard described in Section 7.4.
 
@@ -645,13 +736,15 @@ The second row is the consistency guard described in Section 7.4.
 
 Time per move from the database (1,007 moves), in milliseconds. "p50" is the median, and "p90" is the value that 90 % of moves stay under.
 
-| Tactician | Moves | decide p50 | decide p90 | decide max | check p50 | explain p50 | total p50 |
-|---|---|---|---|---|---|---|---|
-| random | 134 | 0.03 | 0.03 | 0.07 | 0.01 | 0.05 | 0.96 |
-| greedy | 373 | 0.29 | 0.98 | 3.68 | 0.01 | 0.08 | 1.14 |
-| minimax | 182 | 45.7 | 177.4 | 561.4 | 0.01 | 0.10 | 46.5 |
-| mcts (300) | 159 | 787.5 | 1494.9 | 2124.5 | 0.01 | 0.10 | 787.9 |
-| mcts_profiled (300) | 159 | 892.2 | 1801.3 | 2782.1 | 0.01 | 0.11 | 894.0 |
+
+| Tactician           | Moves | decide p50 | decide p90 | decide max | check p50 | explain p50 | total p50 |
+| ------------------- | ----- | ---------- | ---------- | ---------- | --------- | ----------- | --------- |
+| random              | 134   | 0.03       | 0.03       | 0.07       | 0.01      | 0.05        | 0.96      |
+| greedy              | 373   | 0.29       | 0.98       | 3.68       | 0.01      | 0.08        | 1.14      |
+| minimax             | 182   | 45.7       | 177.4      | 561.4      | 0.01      | 0.10        | 46.5      |
+| mcts (300)          | 159   | 787.5      | 1494.9     | 2124.5     | 0.01      | 0.10        | 787.9     |
+| mcts_profiled (300) | 159   | 892.2      | 1801.3     | 2782.1     | 0.01      | 0.11        | 894.0     |
+
 
 Checking and explaining a move take a negligible time (a median of about 0.1 ms or less). Deciding is where the time goes, and only for the Tacticians that look ahead. The rows come from different games, so the gap between the two search rows is not a measure of what the opponent model costs; Section 10.1 gives that. These figures come from a rerun on a computer that was also running other programs, so they are about five times higher than another run of the same code on a quieter computer, where the medians for the two search rows were 135 ms and 155 ms. Timings depend on the computer and on what else it is doing, and the figures from the quieter computer are the better guide to the speed of the code. In the live games of Section 8.5, where the search took a median of 141 ms, the largest cost was waiting for the website (about 430–650 ms per move) and the search accounted for about a quarter of a live turn. The number of playouts is a setting and can be changed.
 
@@ -659,36 +752,40 @@ Checking and explaining a move take a negligible time (a median of about 0.1 ms 
 
 The greedy Tactician plays the move with the highest score (Section 5.1). Changing the weights gives players that differ in one habit at a time, and this section tests which habits matter. Each **version** below changes one or two weights. A version plays at a table where every other seat is the unchanged greedy player, called the **baseline**. Which seat the version sits in changes from game to game, and the baseline and the version are dealt the same tiles, so the two can be compared game by game. A player who is no better than the others wins one game in two with two players, one in three with three players and one in four with four. That share is called a **fair share** below.
 
-| Version | What it changes (weights from Section 5.1) |
-|---|---|
-| `myopic` | Looks only at points now and the floor: line progress, near completion, first player, bonus potential and denial are all set to 0 |
-| `floor_blind`, `floor_averse`, `floor_tolerant` | Floor penalty 0, 2.5 and 0.4 (baseline 1.2) |
-| `denial_heavy`, `denial_extreme`, `no_denial` | Denial 1.5, 4.0 and 0 |
-| `tempo_fpt`, `tempo_extreme` | First player 2.0 and 4.0 |
-| `bonus_hunter`, `bonus_extreme` | Bonus potential 2.0 and 5.0 |
-| `builder`, `line_focus_extreme` | Line progress and near completion both 2.0, and both 4.0 |
-| `points_first` | Immediate points 5.0, bonus potential 0.3 |
+
+| Version                                         | What it changes (weights from Section 5.1)                                                                                        |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `myopic`                                        | Looks only at points now and the floor: line progress, near completion, first player, bonus potential and denial are all set to 0 |
+| `floor_blind`, `floor_averse`, `floor_tolerant` | Floor penalty 0, 2.5 and 0.4 (baseline 1.2)                                                                                       |
+| `denial_heavy`, `denial_extreme`, `no_denial`   | Denial 1.5, 4.0 and 0                                                                                                             |
+| `tempo_fpt`, `tempo_extreme`                    | First player 2.0 and 4.0                                                                                                          |
+| `bonus_hunter`, `bonus_extreme`                 | Bonus potential 2.0 and 5.0                                                                                                       |
+| `builder`, `line_focus_extreme`                 | Line progress and near completion both 2.0, and both 4.0                                                                          |
+| `points_first`                                  | Immediate points 5.0, bonus potential 0.3                                                                                         |
+
 
 Every game saves the same figures for every player: final score and rank, win, points from tiling, floor penalty, bonuses, number of moves, how often tiles went to the floor or came from the centre, how often the first-player token was taken, and decision time. These rows are part of each experiment's saved result (the `--output` file), one row per player per game.
 
 Each version played 300 games at each table size. The table shows the **points per game gained or lost compared with the baseline**. The figure after "±" is the margin of error: a difference smaller than it could be chance, so it should not be trusted. Bold marks the differences that are clearly larger than the margin of error at all three table sizes.
 
-| Version | 2 players | 3 players | 4 players |
-|---|---|---|---|
-| `myopic` | **−4.0 ± 1.6** | **−2.3 ± 1.6** | **−3.9 ± 1.5** |
-| `floor_blind` | **−8.0 ± 2.1** | **−7.5 ± 2.0** | **−8.7 ± 2.0** |
-| `floor_averse` | −0.2 ± 0.9 | −0.6 ± 1.0 | −1.6 ± 1.2 |
-| `floor_tolerant` | −0.2 ± 2.0 | +2.0 ± 2.0 | +1.6 ± 1.8 |
-| `denial_heavy` | −1.9 ± 1.3 | −0.6 ± 1.2 | −1.1 ± 1.2 |
-| `denial_extreme` | **−5.9 ± 1.6** | **−4.0 ± 1.7** | **−5.7 ± 1.8** |
-| `no_denial` | +1.1 ± 1.0 | +0.3 ± 1.2 | +0.3 ± 1.0 |
-| `tempo_fpt` | +0.4 ± 1.9 | +3.4 ± 1.9 | +3.0 ± 1.8 |
-| `tempo_extreme` | −1.4 ± 1.9 | +2.6 ± 2.0 | +2.3 ± 1.9 |
-| `bonus_hunter` | +0.8 ± 1.0 | +0.6 ± 1.5 | −0.3 ± 1.3 |
-| `bonus_extreme` | −1.2 ± 1.5 | −0.9 ± 1.7 | −0.3 ± 1.7 |
-| `builder` | −0.2 ± 0.7 | +0.5 ± 0.8 | +0.3 ± 0.6 |
-| `line_focus_extreme` | −0.9 ± 1.0 | −0.4 ± 1.1 | −0.8 ± 1.0 |
-| `points_first` | +0.2 ± 1.0 | −0.3 ± 0.9 | −0.8 ± 1.0 |
+
+| Version              | 2 players      | 3 players      | 4 players      |
+| -------------------- | -------------- | -------------- | -------------- |
+| `myopic`             | **−4.0 ± 1.6** | **−2.3 ± 1.6** | **−3.9 ± 1.5** |
+| `floor_blind`        | **−8.0 ± 2.1** | **−7.5 ± 2.0** | **−8.7 ± 2.0** |
+| `floor_averse`       | −0.2 ± 0.9     | −0.6 ± 1.0     | −1.6 ± 1.2     |
+| `floor_tolerant`     | −0.2 ± 2.0     | +2.0 ± 2.0     | +1.6 ± 1.8     |
+| `denial_heavy`       | −1.9 ± 1.3     | −0.6 ± 1.2     | −1.1 ± 1.2     |
+| `denial_extreme`     | **−5.9 ± 1.6** | **−4.0 ± 1.7** | **−5.7 ± 1.8** |
+| `no_denial`          | +1.1 ± 1.0     | +0.3 ± 1.2     | +0.3 ± 1.0     |
+| `tempo_fpt`          | +0.4 ± 1.9     | +3.4 ± 1.9     | +3.0 ± 1.8     |
+| `tempo_extreme`      | −1.4 ± 1.9     | +2.6 ± 2.0     | +2.3 ± 1.9     |
+| `bonus_hunter`       | +0.8 ± 1.0     | +0.6 ± 1.5     | −0.3 ± 1.3     |
+| `bonus_extreme`      | −1.2 ± 1.5     | −0.9 ± 1.7     | −0.3 ± 1.7     |
+| `builder`            | −0.2 ± 0.7     | +0.5 ± 0.8     | +0.3 ± 0.6     |
+| `line_focus_extreme` | −0.9 ± 1.0     | −0.4 ± 1.1     | −0.8 ± 1.0     |
+| `points_first`       | +0.2 ± 1.0     | −0.3 ± 0.9     | −0.8 ± 1.0     |
+
 
 What the table shows:
 
@@ -700,17 +797,19 @@ What the table shows:
 
 **New parts of the move score (Section 5.5).** Six ideas built from these results were tested in the same way, with 1,000 games per version per table size on new deals, in two runs of games. Each run has its own baseline. The table shows the points gained or lost compared with the baseline of the same run, and, in brackets, the share of games won. Bold marks differences larger than the margin of error. "All four" combines `table_aware`, `endgame_aware`, `round_end_feasibility` and `bonus_reach`.
 
-| Version | 2 players | 3 players | 4 players |
-|---|---|---|---|
-| Baseline, first run (share of games won) | (49 %) | (33 %) | (23 %) |
-| `table_aware` | +0.0 (same as baseline) | **+2.2 ± 1.0** (36 %) | **+3.3 ± 1.0** (31 %) |
-| `round_end_feasibility` | **+1.2 ± 0.5** (53 %) | +0.8 ± 0.4 (34 %) | +0.4 ± 0.3 (25 %) |
-| `floor_outlook` | −0.0 ± 0.3 | −0.1 ± 0.2 | −0.1 ± 0.1 |
-| Baseline, second run (share of games won) | (49 %) | (34 %) | (24 %) |
-| `spoil` | −0.1 ± 0.3 | −0.1 ± 0.3 | +0.1 ± 0.2 |
-| `bonus_reach` | +0.0 ± 0.5 | −0.5 ± 0.6 | +0.7 ± 0.6 |
-| `endgame_aware` | +0.1 ± 0.1 | −0.1 ± 0.1 | −0.0 ± 0.1 |
-| All four | **+1.4 ± 0.7** (53 %) | **+2.9 ± 1.0** (41 %) | **+4.3 ± 1.0** (34 %) |
+
+| Version                                   | 2 players               | 3 players             | 4 players             |
+| ----------------------------------------- | ----------------------- | --------------------- | --------------------- |
+| Baseline, first run (share of games won)  | (49 %)                  | (33 %)                | (23 %)                |
+| `table_aware`                             | +0.0 (same as baseline) | **+2.2 ± 1.0** (36 %) | **+3.3 ± 1.0** (31 %) |
+| `round_end_feasibility`                   | **+1.2 ± 0.5** (53 %)   | +0.8 ± 0.4 (34 %)     | +0.4 ± 0.3 (25 %)     |
+| `floor_outlook`                           | −0.0 ± 0.3              | −0.1 ± 0.2            | −0.1 ± 0.1            |
+| Baseline, second run (share of games won) | (49 %)                  | (34 %)                | (24 %)                |
+| `spoil`                                   | −0.1 ± 0.3              | −0.1 ± 0.3            | +0.1 ± 0.2            |
+| `bonus_reach`                             | +0.0 ± 0.5              | −0.5 ± 0.6            | +0.7 ± 0.6            |
+| `endgame_aware`                           | +0.1 ± 0.1              | −0.1 ± 0.1            | −0.0 ± 0.1            |
+| All four                                  | **+1.4 ± 0.7** (53 %)   | **+2.9 ± 1.0** (41 %) | **+4.3 ± 1.0** (34 %) |
+
 
 Two of the six help. Setting the value of the first-player token by table size (`table_aware`) is the clear gain with three and four players: with four players it raises the share of games won from 23 % to 31 %. The round-end check helps a little at every size, most with two players. The other four add nothing. `floor_outlook` and `spoil` did nothing at weight 1 and were slightly worse at higher weights, and `bonus_reach` and `endgame_aware` were within the margin of error. The four-player share of 34 % for "all four" compares with 25 % for a fair share and 24 % for the unchanged baseline. As a check, `table_aware` gives the same games as the baseline with two players, as it should.
 
@@ -724,41 +823,49 @@ The experiment `player_count_scaling` plays one Tactician at tables of two, thre
 
 **Greedy playing itself** (300 games per table size):
 
-| Players | Average score | Average floor penalty | Moves per game | Winner's lead over last place | First seat wins | Last seat wins |
-|---|---|---|---|---|---|---|
-| 2 | 52.8 | −12.9 | 52 | 12.7 | 54.7 % (fair share 50 %) | 44.0 % |
-| 3 | 58.6 | −8.2 | 67 | 19.3 | 40.7 % (fair share 33 %) | 27.7 % |
-| 4 | 57.4 | −7.4 | 81 | 22.2 | 31.3 % (fair share 25 %) | 14.3 % |
+
+| Players | Average score | Average floor penalty | Moves per game | Winner's lead over last place | First seat wins          | Last seat wins |
+| ------- | ------------- | --------------------- | -------------- | ----------------------------- | ------------------------ | -------------- |
+| 2       | 52.8          | −12.9                 | 52             | 12.7                          | 54.7 % (fair share 50 %) | 44.0 %         |
+| 3       | 58.6          | −8.2                  | 67             | 19.3                          | 40.7 % (fair share 33 %) | 27.7 %         |
+| 4       | 57.4          | −7.4                  | 81             | 22.2                          | 31.3 % (fair share 25 %) | 14.3 %         |
+
 
 Scores rise from two to three players and then stay level. Players lose about five points less to the floor with three or four players than with two. This is probably because 5, 7 and 9 factories give more to choose from, but the tests did not check that reason. Turn order matters more as the table grows. The gap in wins between the first and the last seat widens from 11 points with two players to 17 with four, where the last seat wins little more than half of its fair share. Games are longer (52 to 81 moves) and the scores are further apart.
 
 **mcts against greedy players** (50 playouts per move; 144 games with two and three players and 444 with four, on different deals):
 
+
 | Players | Games won by mcts | Margin of error | Fair share | Times a fair share | Average score (mcts vs greedy) | Time per decision |
-|---|---|---|---|---|---|---|
-| 2 | 83 % | 76–89 % | 50 % | 1.7 | 56.9 vs 47.8 | 98 ms |
-| 3 | 54 % | 46–62 % | 33 % | 1.6 | 60.6 vs 57.1 | 157 ms |
-| 4 | 41 % | 36–45 % | 25 % | 1.6 | 59.7 vs 57.2 | 260–300 ms |
+| ------- | ----------------- | --------------- | ---------- | ------------------ | ------------------------------ | ----------------- |
+| 2       | 83 %              | 76–89 %         | 50 %       | 1.7                | 56.9 vs 47.8                   | 98 ms             |
+| 3       | 54 %              | 46–62 %         | 33 %       | 1.6                | 60.6 vs 57.1                   | 157 ms            |
+| 4       | 41 %              | 36–45 %         | 25 %       | 1.6                | 59.7 vs 57.2                   | 260–300 ms        |
+
 
 The search wins about 1.6 to 1.7 times its fair share at every table size. Its win rate falls with more players only because a fair share falls. A decision takes about three times as long with four players as with two. The times were measured while several runs shared the computer, so they are on the high side. A first, smaller run of 24 games with four players showed 25 %, which looked as if the advantage had disappeared. The larger run shows it had not, and 25 % was chance (the margin of error for 24 games was 12–45 %). The 83 % with two players agrees with Section 10.4, where `mcts` won 28 of its 30 games against greedy at 50 playouts (93 %, interval 79–98 %). Greedy beat random in all 300 games at every table size, so those games carry no information.
 
 ### 10.10 Summary of evidence
 
-| Claim | Evidence |
-|---|---|
-| The engine follows the rules | Random full games never lose or gain a tile; separate tests for scoring and the end of the game; the engine agrees with the team's rulebook write-up on 19 listed rules (a consistency check, Section 4) |
-| Bot moves are legal | Every bot move is checked by the Validator before it is played |
-| Opponents' moves can be predicted | 87.8 % top-1 against 83.5 % for a fixed guesser and 17.2 % for random guessing, on bot opponents; the lead grows late in the game |
-| Opponents can be given a playing style | Five styles defined; on new bot games 46 % for the exact style and 71 % for one of three merged groups; one human game profiled live |
-| The search plays well | Compared with the project's own baselines: mcts 1654 > mcts_profiled 1502 > minimax 1130 > greedy 982 > random 733 |
-| Moves are explained and can be reviewed | Every reviewed bot move has an explanation, saved with the numbers behind it; any recorded game can be replayed |
-| The system plays on the live website | Three games on the live site, one with a human who joined by invite link |
-| The move score's weights matter, and by table size | Ignoring the floor costs about 8 points and a points-only player 2–4, at every size; the first-player token is worth +3.3 points at four players and nothing at two (Section 10.8) |
+
+| Claim                                                | Evidence                                                                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The engine follows the rules                         | Random full games never lose or gain a tile; separate tests for scoring and the end of the game; the engine agrees with the team's rulebook write-up on 19 listed rules (a consistency check, Section 4)                                                                                                 |
+| Bot moves are legal                                  | Every bot move is checked by the Validator before it is played                                                                                                                                                                                                                                           |
+| Opponents' moves can be predicted                    | 87.8 % top-1 against 83.5 % for a fixed guesser and 17.2 % for random guessing, on bot opponents; the lead grows late in the game                                                                                                                                                                        |
+| Opponents can be given a playing style               | Five styles defined; on new bot games 46 % for the exact style and 71 % for one of three merged groups; one human game profiled live                                                                                                                                                                     |
+| The search plays well                                | Compared with the project's own baselines: mcts 1654 > mcts_profiled 1502 > minimax 1130 > greedy 982 > random 733                                                                                                                                                                                       |
+| Moves are explained and can be reviewed              | Every reviewed bot move has an explanation, saved with the numbers behind it; any recorded game can be replayed                                                                                                                                                                                          |
+| The system plays on the live website                 | Three games on the live site, one with a human who joined by invite link                                                                                                                                                                                                                                 |
+| The move score's weights matter, and by table size   | Ignoring the floor costs about 8 points and a points-only player 2–4, at every size; the first-player token is worth +3.3 points at four players and nothing at two (Section 10.8)                                                                                                                       |
 | The greedy player can be improved from these results | Against greedy opponents, setting the first-player weight by table size raises the four-player win rate from 23 % to 31 %, and the best combination of the new parts to 34 %. Three further ideas gave nothing, and against minimax and MCTS opponents the samples were too small to tell (Section 10.8) |
-| Search keeps its edge at larger tables | `mcts` wins 83 %, 54 % and 41 % of two-, three- and four-player games against greedy, 1.6–1.7 times a fair share each time (Section 10.9) |
-| Modelling the opponent improves play | **Not shown** against bots (98 % vs 100 %; 96 wins to 119 head-to-head over 230 games, 15 level; no gain against four opponents with habits outside its model, including with a predictor that learns such habits). Testing against people is future work |
+| Search keeps its edge at larger tables               | `mcts` wins 83 %, 54 % and 41 % of two-, three- and four-player games against greedy, 1.6–1.7 times a fair share each time (Section 10.9)                                                                                                                                                                |
+| Modelling the opponent improves play                 | **Not shown** against bots (98 % vs 100 %; 96 wins to 119 head-to-head over 230 games, 15 level; no gain against four opponents with habits outside its model, including with a predictor that learns such habits). Testing against people is future work                                                |
+
 
 ---
+
+
 
 ## 11. Limitations and future work
 
@@ -772,6 +879,8 @@ The search wins about 1.6 to 1.7 times its fair share at every table size. Its w
 
 ---
 
+
+
 ## 12. Conclusion
 
 TILES plays complete games of Azul, on its own rules engine and on a public website, with the same four agents in both settings. Having its own engine is what made fast simulation, search and repeatable experiments possible. Three of the four agents can be swapped for new versions, bot moves in recorded games are saved with a written explanation, and the main experiments can be re-run from the command line.
@@ -782,19 +891,23 @@ One idea was not confirmed: using the Profiler's guesses inside the search did n
 
 ---
 
+
+
 ## 13. Individual accomplishments
 
 The work was split by component so that each member owned at least one concept-heavy part of the system (search, learning, language processing, agents and integration, or systems and evaluation). Everyone also took part in the shared tasks listed after the table.
 
 The table below states each member's area, the concepts applied and where the work can be found.
 
-| Member | Component owned | Concepts applied | Main evidence |
-|---|---|---|---|
-| **Chan Jing Rong** | Tactician search: the move score, minimax (alpha–beta), tree search (MCTS) and the variant that uses the opponent model; tournament and Elo; search-budget sweep; opponent-model comparison (A1, A3) | Adversarial search, Monte Carlo methods with random events, balancing exploration against exploitation, experiment design | `agents/tacticians/`, `sim/`, experiments `tournament`, `search_budget_sweep`, `profiler_ablation`; Section 5, Section 10.1, Section 10.4 |
-| **Velu** | Opponent modelling and profiling: per-move measurements and traits, style signatures, k-means experiment, next-move predictor, Profile Analyzer and Profiles page (A2, A4) | Feature engineering, nearest-signature classification, k-means clustering, a small online learner for next-move prediction, evaluation against baselines | `agents/profiler/`, `sim/prediction_eval.py`, experiments `prediction_accuracy`, `archetype_discovery`; Section 6, Section 10.2, Section 10.3 |
-| **Johann Oh Hock Seng** | Language and explanation: rulebook splitting and search (TF-IDF), pattern-based rule extraction, optional LLM extractor, checking rules against the engine, template and LLM Explainers, explanation check, Rulebook page and explanation panel (A5, A6) | Information retrieval, turning text into structured rules, template-based explanation, checking explanations against recorded data | `rulebook/`, `agents/explainer/`, experiments `rule_extraction`, `xai_coverage`; Section 4, Section 7, Section 10.5, Section 10.6 |
-| **Brian Zheng** | Live play: browser-driven bot seats, the update to the site's new message format, working out human moves, room handling and failure handling, Sessions and Monitor pages; initial prototype and first architecture diagram | Software acting in an environment it does not control, reverse-engineering a message protocol, inferring moves from observed boards, fault handling | `engine/`, `tests/test_live_session.py`, `tests/test_state_translator.py`; Section 8 |
-| **Weiqiao Li** | Systems core: rules engine and Validator, `TurnPipeline`, SQLite database, FastAPI server, experiment runner, optional MLflow / text-file logging, Docker packaging, integration of the components | Rule-based systems, deterministic state machines, coordinating components, reproducibility | `core/`, `agents/validator.py`, `orchestration/`, `ledger/`, `server/`, `experiments/`, `telemetry/`; Section 2, Section 3, Section 9 |
+
+| Member                  | Component owned                                                                                                                                                                                                                                          | Concepts applied                                                                                                                                         | Main evidence                                                                                                                                 |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Chan Jing Rong**      | Tactician search: the move score, minimax (alpha–beta), tree search (MCTS) and the variant that uses the opponent model; tournament and Elo; search-budget sweep; opponent-model comparison (A1, A3)                                                     | Adversarial search, Monte Carlo methods with random events, balancing exploration against exploitation, experiment design                                | `agents/tacticians/`, `sim/`, experiments `tournament`, `search_budget_sweep`, `profiler_ablation`; Section 5, Section 10.1, Section 10.4     |
+| **Velu**                | Opponent modelling and profiling: per-move measurements and traits, style signatures, k-means experiment, next-move predictor, Profile Analyzer and Profiles page (A2, A4)                                                                               | Feature engineering, nearest-signature classification, k-means clustering, a small online learner for next-move prediction, evaluation against baselines | `agents/profiler/`, `sim/prediction_eval.py`, experiments `prediction_accuracy`, `archetype_discovery`; Section 6, Section 10.2, Section 10.3 |
+| **Johann Oh Hock Seng** | Language and explanation: rulebook splitting and search (TF-IDF), pattern-based rule extraction, optional LLM extractor, checking rules against the engine, template and LLM Explainers, explanation check, Rulebook page and explanation panel (A5, A6) | Information retrieval, turning text into structured rules, template-based explanation, checking explanations against recorded data                       | `rulebook/`, `agents/explainer/`, experiments `rule_extraction`, `xai_coverage`; Section 4, Section 7, Section 10.5, Section 10.6             |
+| **Brian Zheng**         | Live play: browser-driven bot seats, the update to the site's new message format, working out human moves, room handling and failure handling, Sessions and Monitor pages; initial prototype and first architecture diagram                              | Software acting in an environment it does not control, reverse-engineering a message protocol, inferring moves from observed boards, fault handling      | `engine/`, `tests/test_live_session.py`, `tests/test_state_translator.py`; Section 8                                                          |
+| **Weiqiao Li**          | Systems core: rules engine and Validator, `TurnPipeline`, SQLite database, FastAPI server, experiment runner, optional MLflow / text-file logging, Docker packaging, integration of the components                                                       | Rule-based systems, deterministic state machines, coordinating components, reproducibility                                                               | `core/`, `agents/validator.py`, `orchestration/`, `ledger/`, `server/`, `experiments/`, `telemetry/`; Section 2, Section 3, Section 9         |
+
 
 **Shared by all five.** Writing and running tests for one's own component and reviewing another's; requirements analysis against the capstone brief; the reports; and the demo and presentation.
 
@@ -802,21 +915,27 @@ The table below states each member's area, the concepts applied and where the wo
 
 ---
 
+
+
 ## 14. Alignment with the capstone requirements
 
 The ISS capstone brief asks for an intelligent system that applies at least one problem-solving technique from the programme, with good documentation, presentations and, in Phase 2, a technical paper, an individual report and a demo. Its guide for application projects lists complexity, innovation, verification and validation, customer feedback and overall functionality.
 
-| Requirement | How TILES meets it |
-|---|---|
-| Design and develop an intelligent system | Four cooperating agents: a rule checker, move choosers that search ahead, an opponent model that adapts during a game, and an explainer (Section 2, Sections 5 to 7) |
+
+| Requirement                                                   | How TILES meets it                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Design and develop an intelligent system                      | Four cooperating agents: a rule checker, move choosers that search ahead, an opponent model that adapts during a game, and an explainer (Section 2, Sections 5 to 7)                                                                                                                       |
 | Use at least one problem-solving technique from the programme | Reasoning systems: rules engine, validator and search. Pattern recognition: clustering, nearest-signature classification and next-move prediction. Software agents: coordinated agents acting on a live website. Language processing: text retrieval, rule extraction and explanation text |
-| Complexity of problem | A multi-player game with random deals, a live online platform, and an opponent model inside the search |
-| Innovation | Search that uses an opponent model, explanations built from recorded move scores, rulebook text checked against the engine |
-| Verification and validation | 176 backend and 137 frontend automated tests, random full-game tests of the engine, the rulebook check, the explanation check and repeatable experiments (Section 10) |
-| Overall functionality | Local and live play, replay, dashboard, rulebook browser and eleven experiments (Section 2.5, Section 9) |
-| Documentation | README, architecture and API documents, evaluation summary and this report |
+| Complexity of problem                                         | A multi-player game with random deals, a live online platform, and an opponent model inside the search                                                                                                                                                                                     |
+| Innovation                                                    | Search that uses an opponent model, explanations built from recorded move scores, rulebook text checked against the engine                                                                                                                                                                 |
+| Verification and validation                                   | 176 backend and 137 frontend automated tests, random full-game tests of the engine, the rulebook check, the explanation check and repeatable experiments (Section 10)                                                                                                                      |
+| Overall functionality                                         | Local and live play, replay, dashboard, rulebook browser and eleven experiments (Section 2.5, Section 9)                                                                                                                                                                                   |
+| Documentation                                                 | README, architecture and API documents, evaluation summary and this report                                                                                                                                                                                                                 |
+
 
 ---
+
+
 
 ## 15. Learning reflections
 
@@ -828,20 +947,24 @@ The ISS capstone brief asks for an intelligent system that applies at least one 
 
 **Lessons about building the system.**
 
-4. *Have a rules engine of your own.* Relying on the website to run the game made the first prototype fragile and slow to test. An engine of the team's own made search, testing and experiments possible, and gave live play something to check moves against.
-5. *Treat the outside world as unreliable.* The website changed its message format during the project. Keeping the code that knows how the website works in one package kept the changes in one place, and a stand-in for the site kept the game loop testable.
-6. *Explanations need a record to check against.* Because explanations are built from saved numbers, they can be compared with those numbers automatically. That comparison shows consistency, not usefulness, which only people can judge.
-7. *Make experiments repeatable.* Fixed seeds and one command per experiment meant the game-playing experiments could be re-run and compared with earlier results.
+1. *Have a rules engine of your own.* Relying on the website to run the game made the first prototype fragile and slow to test. An engine of the team's own made search, testing and experiments possible, and gave live play something to check moves against.
+2. *Treat the outside world as unreliable.* The website changed its message format during the project. Keeping the code that knows how the website works in one package kept the changes in one place, and a stand-in for the site kept the game loop testable.
+3. *Explanations need a record to check against.* Because explanations are built from saved numbers, they can be compared with those numbers automatically. That comparison shows consistency, not usefulness, which only people can judge.
+4. *Make experiments repeatable.* Fixed seeds and one command per experiment meant the game-playing experiments could be re-run and compared with earlier results.
 
 **What the team would change.** Set up automated checks on every commit and a plan for human evaluation in the first week, and start collecting human games earlier, since the opponent-aware search is best tested against people.
 
 ---
+
+
 
 ## Statement of compliance with the policy for use of AI in teaching and learning
 
 In preparing this project and report the team used AI tools (including Claude Code, Claude, Gemini and ChatGPT) for brainstorming architectural options, clarifying technical concepts, accelerating implementation and refactoring of code under the team's direction, drafting text and tables for documentation, and proofreading. Generated code was reviewed and tested (176 backend and 137 frontend automated tests) against the deterministic rules engine and, for live play, against the platform. Reported numbers come from the team's own experiment runs. Cited sources were checked against the original publications or pages. The design decisions, interpretation of results and conclusions are the team's own.
 
 ---
+
+
 
 ## References
 
@@ -858,12 +981,14 @@ In preparing this project and report the team used AI tools (including Claude Co
 11. Elo, A. E. (1978). *The Rating of Chessplayers, Past and Present*. Arco.
 12. Terry, J. K., Black, B., Grammel, N., et al. (2021). PettingZoo: Gym for multi-agent reinforcement learning. *Advances in Neural Information Processing Systems 34*.
 13. Plan B Games. (2017). *Azul rulebook*. (Game by Michael Kiesling.)
-14. Spiel des Jahres. (2018). Azul, Spiel des Jahres 2018. https://www.spiel-des-jahres.de/en/games/azul/
-15. Chessprogramming Wiki. (n.d.). Branching factor. https://www.chessprogramming.org/Branching_Factor
-16. Yau, A. (2020). *Azul-MCTS-AI* [Source code]. GitHub. https://github.com/mgsweet/Azul-MCTS-AI
-17. Microsoft. (n.d.). Playwright documentation. https://playwright.dev
-18. Ramírez, S. (n.d.). FastAPI documentation. https://fastapi.tiangolo.com
-19. MLflow. (n.d.). MLflow documentation. https://mlflow.org
+14. Spiel des Jahres. (2018). Azul, Spiel des Jahres 2018. [https://www.spiel-des-jahres.de/en/games/azul/](https://www.spiel-des-jahres.de/en/games/azul/)
+15. Chessprogramming Wiki. (n.d.). Branching factor. [https://www.chessprogramming.org/Branching_Factor](https://www.chessprogramming.org/Branching_Factor)
+16. Yau, A. (2020). *Azul-MCTS-AI* [Source code]. GitHub. [https://github.com/mgsweet/Azul-MCTS-AI](https://github.com/mgsweet/Azul-MCTS-AI)
+17. Microsoft. (n.d.). Playwright documentation. [https://playwright.dev](https://playwright.dev)
+18. Ramírez, S. (n.d.). FastAPI documentation. [https://fastapi.tiangolo.com](https://fastapi.tiangolo.com)
+19. MLflow. (n.d.). MLflow documentation. [https://mlflow.org](https://mlflow.org)
+
+
 
 ## Appendix A — Re-running the experiments
 
@@ -924,3 +1049,4 @@ backend/tiles/
 frontend/src/        views/ (8) · components/ (board, move log, explanation panel, charts) · api/ · types.ts
 docs/                ARCHITECTURE · API · EVALUATION · FINAL_REPORT
 ```
+
