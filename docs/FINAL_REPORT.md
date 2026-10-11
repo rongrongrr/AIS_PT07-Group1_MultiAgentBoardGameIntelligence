@@ -56,7 +56,7 @@ Chess programs are now stronger than the best human players (Zhang et al., 2025)
 
 ### 1.4 Problem statement
 
-The project asks whether a program made of separate, cooperating parts can play a scored, turn-based game well, adapt to the opponent in front of it, and say why it made each move. The brief set four tasks: read rules from text, predict and profile opponents, search for good moves within a time limit, and give a reason for each decision that can be checked afterwards. The parts should also be replaceable, so that a better version of one can be added without rewriting the others.
+The project studies whether a program made of separate, cooperating parts can play a scored, turn-based game well, adapt to the opponent in front of it, and say why it made each move. The brief set four tasks: read rules from text, predict and profile opponents, search for good moves within a time limit, and give a reason for each decision that can be checked afterwards. The parts should also be replaceable, so that a better version of one can be added without rewriting the others.
 
 ### 1.5 Scope and deliverables
 
